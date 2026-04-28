@@ -5,9 +5,9 @@ import block2 from "@assets/mainPage/section_1/block_2.png";
 import arrow from "@assets/mainPage/section_1/arrow.png";
 import miniLogo1 from "@assets/mainPage/section_1/miniLogo_1.png";
 import miniLogo2 from "@assets/mainPage/section_1/miniLogo_2.png";
-import brick from "@assets/mainPage/section_1/brick.png";
 import stackTitle from "@assets/mainPage/section_1/Stack_title.png";
 import pageBkg from "@assets/mainPage/Bkg.png";
+import { BrickModel } from "./BrickModel.jsx";
 import "./Hero.css";
 
 export function Hero() {
@@ -85,13 +85,7 @@ export function Hero() {
               alt=""
               aria-hidden="true"
             />
-            <img
-              className="hero__brick"
-              src={brick}
-              width={480}
-              height={360}
-              alt="Stack nonsense — ship anyway"
-            />
+            <BrickModel />
           </div>
 
           <img
