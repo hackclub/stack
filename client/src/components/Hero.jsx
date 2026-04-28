@@ -7,20 +7,19 @@ import miniLogo1 from "@assets/mainPage/section_1/miniLogo_1.png";
 import miniLogo2 from "@assets/mainPage/section_1/miniLogo_2.png";
 import brick from "@assets/mainPage/section_1/brick.png";
 import stackTitle from "@assets/mainPage/section_1/Stack_title.png";
-import overlayBkg from "@assets/mainPage/section_1/overlay_bkg.png";
+import pageBkg from "@assets/mainPage/Bkg.png";
 import "./Hero.css";
 
 export function Hero() {
   return (
     <section className="hero" aria-label="Stack hero">
-      <div className="hero__bg" aria-hidden="true" />
       <img
-        className="hero__overlay-bkg"
-        src={overlayBkg}
+        className="hero__page-bkg"
+        src={pageBkg}
         alt=""
         aria-hidden="true"
-        width={720}
-        height={480}
+        width={512}
+        height={1024}
       />
 
       <div className="hero__shell">
@@ -28,8 +27,8 @@ export function Hero() {
           <img
             className="hero__brand"
             src={brandingLogo}
-            width={220}
-            height={120}
+            width={130}
+            height={72}
             alt="Hack Club"
           />
 
@@ -50,12 +49,14 @@ export function Hero() {
 
         <div className="hero__main">
           <div className="hero__copy">
-            <h1 className="hero__headline">
-              <span className="line--cream">Code.</span>
-              <span className="line--red">Build.</span>
-              <span className="line--cream">Get LEGO.</span>
-            </h1>
-            <div className="hero__cta-row">
+            <div className="hero__lead">
+              <h1 className="hero__headline">
+                <span className="line--cream">Code.</span>
+                <span className="line--red">Build.</span>
+                <span className="line--cream">Get LEGO.</span>
+              </h1>
+            </div>
+            <div className="hero__cta">
               <img
                 className="hero__arrow"
                 src={arrow}
@@ -91,14 +92,15 @@ export function Hero() {
               height={360}
               alt="Stack nonsense — ship anyway"
             />
-            <img
-              className="hero__stack-title"
-              src={stackTitle}
-              width={420}
-              height={120}
-              alt="Stack"
-            />
           </div>
+
+          <img
+            className="hero__stack-title"
+            src={stackTitle}
+            width={420}
+            height={120}
+            alt="Stack"
+          />
         </div>
       </div>
     </section>

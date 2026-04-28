@@ -1,45 +1,45 @@
 .hero {
+  /* Extra horizontal inset after shell safe-area (shell already applies env(safe-area-inset-*)) */
+  --hero-gutter-x: clamp(0.35rem, 1.5vw, 0.95rem);
+  --hero-gutter-right: clamp(0.5rem, 2vw, 1.25rem);
   position: relative;
-  min-height: 100vh;
+  /* Bkg.png is a tall 1:2 page background; width drives scroll height. */
+  min-height: max(100dvh, 200vw);
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-}
-
-.hero__bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
   background: #73a5ca;
 }
 
-.hero__overlay-bkg {
+.hero__page-bkg {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-  width: min(72vw, 760px);
-  max-width: none;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: 100%;
   height: auto;
+  min-width: 100%;
   display: block;
   pointer-events: none;
   user-select: none;
-  object-fit: contain;
-  object-position: right bottom;
 }
 
 .hero__shell {
   position: relative;
-  z-index: 2;
-  flex: 1;
+  z-index: 1;
+  flex: 0 0 100svh;
   width: 100%;
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: clamp(1rem, 2.5vw, 2rem) clamp(1.25rem, 4vw, 3rem)
-    clamp(1.25rem, 3vw, 2.5rem);
+  height: 100svh;
+  max-width: none;
+  margin: 0;
+  /* Keep bottom spacing tiny so the CTA can sit close to the viewport edge. */
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+    max(env(safe-area-inset-bottom, 0px), clamp(0.25rem, 0.8vh, 0.6rem))
+    env(safe-area-inset-left, 0px);
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: 100svh;
+  overflow: hidden;
 }
 
 /* Logo = top-left, toolbar = viewport-centered, cards = top-right */
@@ -52,10 +52,10 @@
 
 .hero__brand {
   position: absolute;
-  left: 0;
+  left: var(--hero-gutter-x);
   top: 0;
   z-index: 3;
-  width: clamp(120px, 20vw, 232px);
+  width: clamp(72px, 10vw, 138px);
   height: auto;
   display: block;
   filter: drop-shadow(4px 6px 0 rgba(22, 36, 86, 0.12));
@@ -70,7 +70,7 @@
   min-height: 52px;
   margin-inline: auto;
   width: fit-content;
-  max-width: calc(100% - 2 * clamp(88px, 24vw, 200px));
+  max-width: calc(100% - 2 * clamp(96px, 22vw, 180px));
   padding: 0 clamp(0.75rem, 2.5vw, 2.5rem);
 }
 
@@ -131,40 +131,85 @@
   filter: drop-shadow(6px 10px 14px rgba(22, 36, 86, 0.2));
 }
 
-/* Left column: headline vertically centered; text stays left-aligned */
+/* Full-bleed main row — do NOT max-width + center (that was pushing all assets inward) */
 .hero__main {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.95fr);
   align-items: stretch;
-  gap: clamp(1rem, 3vw, 2.75rem);
-  padding-top: clamp(1rem, 3vw, 2.25rem);
+  align-content: stretch;
+  gap: clamp(0.75rem, 2vw, 2rem);
+  padding-top: clamp(0.85rem, 2vw, 1.75rem);
   padding-bottom: clamp(0.5rem, 2vw, 1.5rem);
+  padding-left: 0;
+  padding-right: var(--hero-gutter-right);
+  box-sizing: border-box;
   width: 100%;
-  min-height: min(520px, calc(100vh - clamp(140px, 22vw, 200px)));
+  max-width: none;
+  margin-inline: 0;
+  /* Fill remaining viewport height so the bottom-anchored CTA has room to sit low. */
+  min-height: calc(100dvh - clamp(72px, 12vw, 120px));
 }
 
 .hero__copy {
+  position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: flex-start;
   align-self: stretch;
   text-align: left;
-  max-width: 640px;
+  /* Viewport-backed height — tall enough so CTA visibly sits toward the viewport bottom */
+  min-height: min(82dvh, calc(100dvh - clamp(7.5rem, 12vw, 10rem)));
+  width: 100%;
+  max-width: none;
+  padding-left: clamp(1.35rem, 3.2vw, 2.6rem);
+  /* Reserve strip for absolutely positioned CTA (keeps headline from colliding when short viewport) */
+  padding-bottom: clamp(6rem, 17vh, 10rem);
+  box-sizing: border-box;
+}
+
+.hero__lead {
+  position: absolute;
+  left: 0;
+  top: clamp(1.75rem, 8vh, 7rem);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  align-self: flex-start;
+  flex: 0 0 auto;
+  height: 50vh;
+  min-height: 260px;
+  max-height: 560px;
+  width: 100%;
+  max-width: min(640px, 100%);
+  margin-left: 0;
+  padding-left: 0;
+  box-sizing: border-box;
 }
 
 .hero__headline {
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: clamp(0.2rem, 1vh, 0.85rem);
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  padding-left: clamp(1rem, 4vw, 4rem);
   line-height: 0.95;
+  text-align: left;
   filter: drop-shadow(3px 4px 0 rgba(22, 36, 86, 0.15));
+  box-sizing: border-box;
 }
 
 .hero__headline span {
   display: block;
-  font-size: clamp(2.5rem, 6.5vw, 5.5rem);
-  letter-spacing: -0.02em;
-  -webkit-text-stroke: 3px #162456;
+  font-size: clamp(3.35rem, min(10.5vw, 11vh), 8.5rem);
+  letter-spacing: -0.03em;
+  -webkit-text-stroke: clamp(2px, 0.07em, 4px) #162456;
   paint-order: stroke fill;
 }
 
@@ -176,25 +221,41 @@
   color: #e32d3c;
 }
 
-.hero__cta-row {
-  display: flex;
-  align-items: center;
-  gap: clamp(0.35rem, 1.2vw, 0.75rem);
-  margin-top: clamp(1.1rem, 2.5vw, 1.85rem);
-}
-
 .hero__arrow {
-  width: clamp(68px, 12vw, 118px);
+  width: clamp(64px, 11vw, 112px);
   height: auto;
   flex-shrink: 0;
   mix-blend-mode: multiply;
   filter: drop-shadow(4px 6px 0 rgba(22, 36, 86, 0.12));
 }
 
+.hero__cta {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: clamp(0, 0.35vw, 0.2rem);
+  align-self: stretch;
+  margin-top: 0;
+  /* Out of normal flow → always hugs bottom of .hero__copy (flex auto had no slack once headline fills the row) */
+  position: absolute;
+  left: 0;
+  right: auto;
+  width: 100%;
+  padding-right: clamp(1rem, 4vw, 2rem);
+  padding-left: 0;
+  bottom: max(env(safe-area-inset-bottom, 0px), clamp(0.2rem, 0.8vh, 0.5rem));
+  box-sizing: border-box;
+}
+
 .hero__build-now {
   margin: 0;
-  font-size: clamp(1.35rem, 3vw, 2.25rem);
+  flex: 0 1 auto;
+  margin-left: clamp(-0.2rem, -0.5vw, 0rem);
+  font-size: clamp(1.35rem, 3vw, 2.35rem);
   line-height: 1.05;
+  text-align: left;
 }
 
 .hero__build-now .word-build {
@@ -232,12 +293,12 @@
 
 .hero__stack-title {
   position: absolute;
-  left: 50%;
-  bottom: 0;
-  z-index: 1;
-  width: min(94%, 430px);
+  right: max(env(safe-area-inset-right, 0px), clamp(0.35rem, 1.4vw, 1rem));
+  bottom: max(env(safe-area-inset-bottom, 0px), clamp(0.25rem, 1vh, 0.75rem));
+  z-index: 4;
+  width: clamp(180px, 30vw, 430px);
   height: auto;
-  transform: translateX(-50%) translateY(12%);
+  transform: none;
   display: block;
   filter: drop-shadow(4px 6px 0 rgba(22, 36, 86, 0.12));
 }
@@ -264,77 +325,168 @@
 
 /* Tablet / small desktop: stack header vertically but keep logo left, nav centered */
 @media (max-width: 840px) {
-  .hero__overlay-bkg {
-    width: min(88vw, 540px);
-    opacity: 0.95;
-  }
-
   .hero__header {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    min-height: unset;
-    padding-bottom: 0.25rem;
+    display: block;
+    min-height: clamp(56px, 11svh, 86px);
+    padding-bottom: 0;
   }
 
   .hero__brand {
-    position: relative;
-    left: auto;
-    top: auto;
-    align-self: flex-start;
-    width: clamp(130px, 36vw, 200px);
+    position: absolute;
+    left: var(--hero-gutter-x);
+    top: 0;
+    margin-left: 0;
+    width: clamp(62px, 16vw, 104px);
   }
 
   .hero__nav {
-    max-width: 100%;
-    margin-top: clamp(0.65rem, 2vw, 1rem);
+    max-width: calc(100% - 2 * clamp(80px, 22vw, 160px));
+    min-height: clamp(38px, 7svh, 48px);
+    margin-top: 0;
+    padding-inline: clamp(0.45rem, 2vw, 1.25rem);
+  }
+
+  .hero__nav-bg {
+    width: min(360px, 58vw);
+    min-height: 38px;
+  }
+
+  .hero__nav-links {
+    gap: clamp(0.55rem, 2.4vw, 1.5rem);
+  }
+
+  .hero__nav-links a {
+    font-size: clamp(0.7rem, 2vw, 0.95rem);
   }
 
   .hero__blocks {
-    position: relative;
-    right: auto;
-    top: auto;
-    align-self: flex-end;
-    margin-top: clamp(0.5rem, 1.5vw, 0.85rem);
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 0.5rem;
+    position: absolute;
+    right: 0;
+    top: 0;
+    margin-top: 0;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: clamp(0.1rem, 0.8svh, 0.35rem);
   }
 
   .hero__blocks img {
-    width: clamp(132px, 36vw, 200px);
+    width: clamp(84px, 20vw, 150px);
   }
 
   .hero__main {
-    grid-template-columns: 1fr;
-    min-height: unset;
-    padding-top: clamp(0.75rem, 2vw, 1.25rem);
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    grid-template-rows: 1fr;
+    min-height: calc(100svh - clamp(56px, 11svh, 86px));
+    padding-top: clamp(0.25rem, 1svh, 0.75rem);
+    gap: clamp(0.2rem, 1.5vw, 1rem);
   }
 
   .hero__copy {
     max-width: none;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: flex-start;
     text-align: left;
+    min-height: calc(100svh - clamp(56px, 11svh, 86px));
+    padding-left: clamp(0.85rem, 3vw, 1.6rem);
+    padding-bottom: clamp(4rem, 15svh, 7rem);
   }
 
-  .hero__cta-row {
-    justify-content: flex-start;
+  .hero__lead {
+    top: clamp(0.8rem, 4svh, 2.75rem);
+    height: clamp(170px, 36svh, 340px);
+    min-height: 0;
+    max-height: none;
+    max-width: min(390px, 100%);
   }
 
-  .hero__visual {
-    justify-self: center;
-    margin-top: 0.25rem;
-    max-width: 520px;
+  .hero__headline {
+    padding-left: clamp(0.25rem, 2vw, 1rem);
+    gap: clamp(0.05rem, 0.5svh, 0.35rem);
   }
 
   .hero__headline span {
-    -webkit-text-stroke-width: 2.5px;
+    font-size: clamp(2.2rem, min(8.2vw, 8.5svh), 4.6rem);
   }
+
+  .hero__cta {
+    bottom: max(env(safe-area-inset-bottom, 0px), clamp(0.25rem, 1vh, 0.65rem));
+  }
+
+  .hero__arrow {
+    width: clamp(46px, 10vw, 82px);
+  }
+
+  .hero__build-now {
+    font-size: clamp(1rem, 3vw, 1.65rem);
+  }
+
+  .hero__visual {
+    justify-self: end;
+    align-self: center;
+    margin-top: 0;
+    max-width: min(54vw, 440px);
+    min-height: clamp(180px, 40svh, 360px);
+    padding-bottom: clamp(1.2rem, 4svh, 2.2rem);
+  }
+
+  .hero__brick {
+    width: min(100%, 410px);
+  }
+
+  .hero__stack-title {
+    width: clamp(150px, 32vw, 340px);
+  }
+
+  .hero__float--slash {
+    left: 2%;
+    top: 2%;
+    height: clamp(34px, 8vw, 62px);
+  }
+
+  .hero__float--brace {
+    right: 0;
+    top: 31%;
+    height: clamp(30px, 7vw, 56px);
+  }
+
 }
 
 @media (max-width: 480px) {
+  .hero {
+    --hero-gutter-x: max(0.75rem, clamp(0.35rem, 4vw, 1rem));
+  }
+
+  .hero__main {
+    min-height: calc(100svh - clamp(52px, 12svh, 78px));
+  }
+
+  .hero__copy {
+    min-height: calc(100svh - clamp(52px, 12svh, 78px));
+    padding-left: var(--hero-gutter-x);
+    padding-bottom: clamp(3.5rem, 14svh, 6rem);
+  }
+
+  .hero__lead {
+    top: clamp(0.6rem, 3.5svh, 2rem);
+    height: clamp(150px, 33svh, 280px);
+    min-height: 0;
+    max-height: none;
+    max-width: min(58vw, 250px);
+  }
+
+  .hero__headline {
+    padding-left: 0;
+  }
+
+  .hero__headline span {
+    font-size: clamp(1.8rem, min(12vw, 7.6svh), 3.2rem);
+  }
+
+  .hero__cta {
+    bottom: max(env(safe-area-inset-bottom, 0px), clamp(0.35rem, 1.2vh, 0.75rem));
+  }
+
   .hero__nav-links {
     gap: 0.65rem;
   }
@@ -345,12 +497,12 @@
   }
 
   .hero__blocks {
-    justify-content: center;
-    align-self: stretch;
+    justify-content: flex-start;
+    align-self: auto;
   }
 
   .hero__blocks img {
-    width: min(46vw, 168px);
+    width: clamp(76px, 25vw, 112px);
   }
 
   .hero__float--slash {
