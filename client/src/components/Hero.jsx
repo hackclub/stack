@@ -7,6 +7,10 @@ import miniLogo1 from "@assets/mainPage/section_1/miniLogo_1.png";
 import miniLogo2 from "@assets/mainPage/section_1/miniLogo_2.png";
 import stackTitle from "@assets/mainPage/section_1/Stack_title.png";
 import pageBkg from "@assets/mainPage/Bkg.png";
+import shelf from "@assets/mainPage/section_2/Shelf.png";
+import joinButton from "@assets/mainPage/section_2/join_btn.png";
+import legoChar1 from "@assets/mainPage/section_2/legoChar_1.png";
+import shopButton from "@assets/mainPage/section_2/shop_btn.png";
 import { BrickModel } from "./BrickModel.jsx";
 import "./Hero.css";
 
@@ -97,6 +101,42 @@ export function Hero() {
           />
         </div>
       </div>
+
+      <section className="section-two" aria-labelledby="section-two-heading">
+        <h2 id="section-two-heading" className="section-two__headline">
+          <span>Create a </span>
+          <span className="text-yellow">fun</span>
+          <span> open-source program,</span>
+          <br />
+          <span>get a </span>
+          <span className="text-red">free LEGO sets</span>
+          <span> of your choice</span>
+        </h2>
+
+        <div className="section-two__shelf">
+          <img className="section-two__shelf-image" src={shelf} width={768} height={640} alt="Shelf of LEGO prizes" />
+          <a className="section-two__shop" href="#prizes" aria-label="See the full prize listing">
+            <img src={shopButton} width={536} height={113} alt="See the full listing..." />
+          </a>
+        </div>
+
+        <a className="section-two__join" href="#build" aria-label="Join Stack">
+          <img src={joinButton} width={580} height={300} alt="Join!" />
+        </a>
+
+        <img
+          className="section-two__character"
+          src={legoChar1}
+          width={510}
+          height={720}
+          alt="LEGO character holding a laptop"
+        />
+
+        <p className="section-two__footer">
+          The goal isn’t to be <span className="text-yellow">useful </span>or{" "}
+          <span className="text-yellow">perfect</span>
+        </p>
+      </section>
     </section>
   );
 }

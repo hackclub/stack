@@ -4,7 +4,7 @@
   --hero-gutter-right: clamp(0.5rem, 2vw, 1.25rem);
   position: relative;
   /* Bkg.png is a tall 1:2 page background; width drives scroll height. */
-  min-height: max(100dvh, 200vw);
+  min-height: max(200svh, 200vw);
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
@@ -17,8 +17,10 @@
   left: 0;
   z-index: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
   min-width: 100%;
+  object-fit: cover;
+  object-position: top center;
   display: block;
   pointer-events: none;
   user-select: none;
@@ -357,6 +359,114 @@
   height: clamp(40px, 7.5vw, 74px);
 }
 
+.section-two {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 100svh;
+  width: 100%;
+  height: 100svh;
+  min-height: 100svh;
+  overflow: hidden;
+}
+
+.section-two__headline,
+.section-two__footer {
+  position: absolute;
+  z-index: 3;
+  margin: 0;
+  color: #fff;
+  line-height: 1.16;
+  letter-spacing: 0.01em;
+  text-align: center;
+  -webkit-text-stroke: clamp(1px, 0.035em, 2px) #162456;
+  paint-order: stroke fill;
+  filter: drop-shadow(2px 3px 0 rgba(22, 36, 86, 0.18));
+}
+
+.section-two__headline {
+  top: clamp(2.4rem, 6.5svh, 4.8rem);
+  left: clamp(0.5rem, 1.2vw, 1rem);
+  width: min(78vw, 860px);
+  font-size: clamp(1.65rem, min(3.2vw, 4.2svh), 3rem);
+}
+
+.section-two .text-yellow {
+  color: #f2e8a0;
+}
+
+.section-two .text-red {
+  color: #e32d3c;
+}
+
+.section-two__shelf {
+  position: absolute;
+  z-index: 2;
+  left: clamp(1.2rem, 3vw, 2.6rem);
+  top: clamp(8.5rem, 20svh, 12.5rem);
+  width: min(68vw, 770px);
+}
+
+.section-two__shelf-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(4px 8px 0 rgba(22, 36, 86, 0.08));
+}
+
+.section-two__shop {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: clamp(3.6rem, 1.8svh, 1.2rem);
+  width: clamp(180px, 33vw, 260px);
+  transform: translateX(-50%);
+  display: block;
+}
+
+.section-two__shop img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.section-two__join {
+  position: absolute;
+  z-index: 4;
+  top: clamp(7rem, 16svh, 9.5rem);
+  right: 0;
+  width: min(36vw, 430px);
+  transform: translateX(1.2rem) rotate(7deg);
+  transform-origin: center center;
+  display: block;
+}
+
+.section-two__join img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.section-two__character {
+  position: absolute;
+  z-index: 3;
+  right: clamp(1.4rem, 5vw, 4rem);
+  top: clamp(9.2rem, 22svh, 13.6rem);
+  bottom: auto;
+  width: min(47vw, 540px);
+  height: auto;
+  display: block;
+  transform: translateX(-16rem);
+  filter: drop-shadow(8px 14px 12px rgba(22, 36, 86, 0.2));
+}
+
+.section-two__footer {
+  left: clamp(1rem, 4vw, 3rem);
+  bottom: clamp(2.2rem, 6svh, 4.8rem);
+  width: min(54vw, 560px);
+  font-size: clamp(1.75rem, min(3.2vw, 4.5svh), 3rem);
+  white-space: nowrap;
+}
+
 /* Tablet / small desktop: stack header vertically but keep logo left, nav centered */
 @media (max-width: 840px) {
   .hero__header {
@@ -498,6 +608,41 @@
     height: clamp(30px, 7vw, 56px);
   }
 
+  .section-two__headline {
+    top: clamp(2.6rem, 7svh, 4.4rem);
+    width: min(76vw, 660px);
+    font-size: clamp(1.2rem, min(3.5vw, 3.3svh), 2rem);
+  }
+
+  .section-two__shelf {
+    top: clamp(7.4rem, 18svh, 10.2rem);
+    width: min(66vw, 600px);
+  }
+
+  .section-two__shop {
+    width: clamp(160px, 33vw, 230px);
+    bottom: clamp(0.4rem, 1.6svh, 0.9rem);
+  }
+
+  .section-two__join {
+    top: clamp(6.3rem, 15svh, 8.5rem);
+    right: clamp(2.6rem, 9vw, 5rem);
+    width: min(34vw, 295px);
+  }
+
+  .section-two__character {
+    right: clamp(1.8rem, 6vw, 4rem);
+    bottom: clamp(-1.3rem, -2svh, -0.35rem);
+    width: min(40vw, 340px);
+  }
+
+  .section-two__footer {
+    left: clamp(0.7rem, 3vw, 1.6rem);
+    bottom: clamp(1.6rem, 4.5svh, 3.3rem);
+    width: min(52vw, 430px);
+    font-size: clamp(1.25rem, min(3.7vw, 3.4svh), 2.1rem);
+  }
+
 }
 
 @media (max-width: 480px) {
@@ -583,5 +728,45 @@
 
   .hero__brick-model {
     width: min(175%, 500px);
+  }
+
+  .section-two__headline {
+    left: 0.45rem;
+    top: clamp(2rem, 6svh, 3.1rem);
+    width: min(72vw, 360px);
+    font-size: clamp(0.82rem, min(4.1vw, 2.5svh), 1.3rem);
+    line-height: 1.22;
+    -webkit-text-stroke-width: 0.8px;
+  }
+
+  .section-two__shelf {
+    left: 0.35rem;
+    top: clamp(5.7rem, 18svh, 7.8rem);
+    width: min(68vw, 320px);
+  }
+
+  .section-two__shop {
+    width: clamp(112px, 35vw, 170px);
+    bottom: clamp(0.2rem, 1.2svh, 0.55rem);
+  }
+
+  .section-two__join {
+    top: clamp(5rem, 13svh, 6.4rem);
+    right: clamp(1.25rem, 6vw, 2.4rem);
+    width: min(38vw, 170px);
+  }
+
+  .section-two__character {
+    right: clamp(0.4rem, 4vw, 1.4rem);
+    bottom: clamp(0rem, 0.5svh, 0.5rem);
+    width: min(43vw, 195px);
+  }
+
+  .section-two__footer {
+    left: 0.75rem;
+    bottom: clamp(1.1rem, 3.5svh, 2.2rem);
+    width: min(56vw, 260px);
+    font-size: clamp(1rem, min(5vw, 3.2svh), 1.55rem);
+    -webkit-text-stroke-width: 0.8px;
   }
 }
