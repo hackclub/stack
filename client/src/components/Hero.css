@@ -2,13 +2,20 @@
   /* Extra horizontal inset after shell safe-area (shell already applies env(safe-area-inset-*)) */
   --hero-gutter-x: clamp(0.35rem, 1.5vw, 0.95rem);
   --hero-gutter-right: clamp(0.5rem, 2vw, 1.25rem);
+  --hero-scroll-extra: clamp(18rem, 55svh, 36rem);
   position: relative;
   /* Bkg.png is a tall 1:2 page background; width drives scroll height. */
-  min-height: max(200svh, 200vw);
+  min-height: calc(max(300svh, 200vw) + var(--hero-scroll-extra));
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
   background: #73a5ca;
+}
+
+.hero::after {
+  content: "";
+  flex: 0 0 var(--hero-scroll-extra);
+  pointer-events: none;
 }
 
 .hero__page-bkg {
@@ -17,9 +24,10 @@
   left: 0;
   z-index: 0;
   width: 100%;
-  height: 100%;
+  height: auto;
+  min-height: 100%;
   min-width: 100%;
-  object-fit: cover;
+  object-fit: fill;
   object-position: top center;
   display: block;
   pointer-events: none;
@@ -467,6 +475,125 @@
   white-space: nowrap;
 }
 
+.section-bridge {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 100svh;
+  width: 100%;
+  height: 100svh;
+  min-height: 100svh;
+  overflow: visible;
+}
+
+.section-bridge__line,
+.section-bridge__limits {
+  position: absolute;
+  margin: 0;
+  z-index: 3;
+  color: #fff;
+  line-height: 1.16;
+  letter-spacing: 0.01em;
+  text-align: center;
+  -webkit-text-stroke: clamp(1px, 0.035em, 2px) #162456;
+  paint-order: stroke fill;
+  filter: drop-shadow(2px 3px 0 rgba(22, 36, 86, 0.18));
+}
+
+.section-bridge .text-yellow {
+  color: #f2e8a0;
+}
+
+.section-bridge .text-red {
+  color: #e32d3c;
+}
+
+.section-bridge__line--one {
+  left: clamp(1rem, 4vw, 3rem);
+  top: clamp(10rem, 1.6svh, 1.4rem);
+  width: min(42vw, 480px);
+  font-size: clamp(2.85rem, min(3.3vw, 4.2svh), 2.8rem);
+  text-align: center;
+}
+
+.section-bridge__line--two {
+  left: 50%;
+  top: clamp(29rem, 12svh, 8.4rem);
+  transform: translateX(-53%);
+  width: min(46vw, 620px);
+  font-size: clamp(2.85rem, min(3.3vw, 4.2svh), 2.8rem);
+}
+
+.section-bridge__line--three {
+  right: clamp(0.8rem, 2vw, 1.8rem);
+  top: clamp(45rem, 24svh, 14.5rem);
+  width: min(46vw, 560px);
+  font-size: clamp(2.85rem, min(3.3vw, 4.2svh), 2.8rem);
+}
+
+.section-bridge__limits {
+  left: 50%;
+  bottom: clamp(-12rem, -20svh, -25rem);
+  transform: translateX(-13%) rotate(29deg);
+  transform-origin: center center;
+  width: min(58vw, 760px);
+  font-size: clamp(2.7rem, min(6vw, 8svh), 5.4rem);
+  letter-spacing: 0;
+}
+
+.section-three {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 clamp(72rem, 145svh, 96rem);
+  width: 100%;
+  min-height: clamp(72rem, 145svh, 96rem);
+  overflow: visible;
+}
+
+.section-three__asset {
+  position: absolute;
+  z-index: 3;
+  display: block;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(8px 12px 0 rgba(22, 36, 86, 0.08));
+}
+
+.section-three__project--jokes {
+  left: clamp(0.5rem, 2.4vw, 2rem);
+  top: clamp(1.5rem, 4svh, 3.5rem);
+  width: min(50vw, 720px);
+  transform: rotate(2deg);
+}
+
+.section-three__character--player {
+  left: clamp(1.6rem, 7vw, 6rem);
+  top: clamp(20rem, 38svh, 28rem);
+  width: min(28vw, 390px);
+  transform: rotate(-8deg);
+}
+
+.section-three__project--games {
+  right: clamp(1rem, 5vw, 5rem);
+  top: clamp(21rem, 41svh, 30rem);
+  width: min(46vw, 680px);
+  transform: rotate(5deg);
+}
+
+.section-three__project--robots {
+  left: clamp(-2.2rem, -3vw, -0.75rem);
+  top: clamp(47rem, 90svh, 62rem);
+  width: min(49vw, 700px);
+  transform: rotate(-7deg);
+}
+
+.section-three__character--builder {
+  right: clamp(4rem, 10vw, 10rem);
+  top: clamp(51rem, 95svh, 66rem);
+  width: min(31vw, 410px);
+  transform: rotate(3deg);
+}
+
 /* Tablet / small desktop: stack header vertically but keep logo left, nav centered */
 @media (max-width: 840px) {
   .hero__header {
@@ -643,6 +770,68 @@
     font-size: clamp(1.25rem, min(3.7vw, 3.4svh), 2.1rem);
   }
 
+  .section-bridge__line--one {
+    left: clamp(0.65rem, 2.8vw, 1.4rem);
+    top: clamp(0.45rem, 1.6svh, 1.1rem);
+    width: min(45vw, 360px);
+    font-size: clamp(1.1rem, min(3.2vw, 3.2svh), 1.65rem);
+  }
+
+  .section-bridge__line--two {
+    top: clamp(3.9rem, 10.5svh, 6.6rem);
+    width: min(50vw, 420px);
+    font-size: clamp(1.1rem, min(3.2vw, 3.2svh), 1.65rem);
+  }
+
+  .section-bridge__line--three {
+    right: clamp(0.4rem, 1.5vw, 0.9rem);
+    top: clamp(7.6rem, 21svh, 11.5rem);
+    width: min(48vw, 390px);
+    font-size: clamp(1.1rem, min(3.2vw, 3.2svh), 1.65rem);
+  }
+
+  .section-bridge__limits {
+    bottom: clamp(2rem, 6svh, 4.2rem);
+    width: min(60vw, 500px);
+    font-size: clamp(1.9rem, min(6vw, 6.2svh), 3.8rem);
+    transform: translateX(-11%) rotate(18deg);
+  }
+
+  .section-three {
+    flex-basis: clamp(54rem, 118svh, 76rem);
+    min-height: clamp(54rem, 118svh, 76rem);
+  }
+
+  .section-three__project--jokes {
+    left: clamp(0.25rem, 1.5vw, 1rem);
+    top: clamp(0.8rem, 2svh, 1.5rem);
+    width: min(55vw, 420px);
+  }
+
+  .section-three__character--player {
+    left: clamp(1rem, 6vw, 3rem);
+    top: clamp(15rem, 31svh, 21rem);
+    width: min(31vw, 250px);
+  }
+
+  .section-three__project--games {
+    right: clamp(0.45rem, 2vw, 1rem);
+    top: clamp(17rem, 34svh, 23rem);
+    width: min(49vw, 390px);
+  }
+
+  .section-three__project--robots {
+    left: clamp(-2rem, -4vw, -0.8rem);
+    top: clamp(33rem, 68svh, 45rem);
+    width: min(54vw, 430px);
+  }
+
+  .section-three__character--builder {
+    right: clamp(1.8rem, 7vw, 4rem);
+    top: clamp(34rem, 70svh, 47rem);
+    width: min(34vw, 270px);
+  }
+
 }
 
 @media (max-width: 480px) {
@@ -768,5 +957,71 @@
     width: min(56vw, 260px);
     font-size: clamp(1rem, min(5vw, 3.2svh), 1.55rem);
     -webkit-text-stroke-width: 0.8px;
+  }
+
+  .section-bridge__line,
+  .section-bridge__limits {
+    -webkit-text-stroke-width: 0.8px;
+  }
+
+  .section-bridge__line--one {
+    left: 0.55rem;
+    top: clamp(0.35rem, 1.2svh, 0.75rem);
+    width: min(50vw, 220px);
+    font-size: clamp(0.82rem, min(3.6vw, 2.5svh), 1.12rem);
+  }
+
+  .section-bridge__line--two {
+    top: clamp(2.8rem, 8.5svh, 4.2rem);
+    width: min(58vw, 270px);
+    font-size: clamp(0.82rem, min(3.6vw, 2.5svh), 1.12rem);
+    transform: translateX(-1%);
+  }
+
+  .section-bridge__line--three {
+    right: 0.2rem;
+    top: clamp(5.8rem, 18svh, 8.1rem);
+    width: min(56vw, 240px);
+    font-size: clamp(0.82rem, min(3.6vw, 2.5svh), 1.12rem);
+  }
+
+  .section-bridge__limits {
+    bottom: clamp(1.6rem, 5.5svh, 2.8rem);
+    width: min(66vw, 320px);
+    font-size: clamp(1.25rem, min(6.8vw, 4.2svh), 2rem);
+    transform: translateX(-10%) rotate(17deg);
+  }
+
+  .section-three {
+    flex-basis: clamp(42rem, 100svh, 58rem);
+    min-height: clamp(42rem, 100svh, 58rem);
+  }
+
+  .section-three__project--jokes {
+    top: 0.5rem;
+    width: min(66vw, 300px);
+  }
+
+  .section-three__character--player {
+    left: 1rem;
+    top: clamp(11rem, 29svh, 15rem);
+    width: min(36vw, 150px);
+  }
+
+  .section-three__project--games {
+    right: 0.35rem;
+    top: clamp(13rem, 33svh, 18rem);
+    width: min(58vw, 250px);
+  }
+
+  .section-three__project--robots {
+    top: clamp(25rem, 63svh, 34rem);
+    width: min(66vw, 300px);
+  }
+
+  .section-three__character--builder {
+    right: 0.8rem;
+    top: clamp(26rem, 65svh, 35rem);
+    width: min(39vw, 170px);
   }
 }

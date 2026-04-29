@@ -11,6 +11,11 @@ import shelf from "@assets/mainPage/section_2/Shelf.png";
 import joinButton from "@assets/mainPage/section_2/join_btn.png";
 import legoChar1 from "@assets/mainPage/section_2/legoChar_1.png";
 import shopButton from "@assets/mainPage/section_2/shop_btn.png";
+import sectionThreeChar2 from "@assets/mainPage/section_3/Char2.png";
+import sectionThreeChar3 from "@assets/mainPage/section_3/Char3.png";
+import sectionThreeProject1 from "@assets/mainPage/section_3/prj1.png";
+import sectionThreeProject2 from "@assets/mainPage/section_3/prj2.png";
+import sectionThreeProject3 from "@assets/mainPage/section_3/prj3.png";
 import { BrickModel } from "./BrickModel.jsx";
 import "./Hero.css";
 
@@ -136,6 +141,68 @@ export function Hero() {
           The goal isn’t to be <span className="text-yellow">useful </span>or{" "}
           <span className="text-yellow">perfect</span>
         </p>
+      </section>
+
+      <section className="section-bridge" aria-label="Section transition message">
+        <p className="section-bridge__line section-bridge__line--one">
+          The goal isn’t to be <span className="text-yellow">useful</span> or
+          <br />
+          <span className="text-yellow">perfect</span>
+        </p>
+
+        <p className="section-bridge__line section-bridge__line--two">
+          but to make people <span className="text-red">laugh</span>,
+          <br />
+          surprise them
+        </p>
+
+        <p className="section-bridge__line section-bridge__line--three">
+          or simply create something
+          <br />
+          <span className="text-yellow">stupid</span> but brilliant.
+        </p>
+
+        <p className="section-bridge__limits">
+          There are <span className="text-red">no limits</span>...
+        </p>
+      </section>
+
+      <section className="section-three" aria-label="Project examples">
+        <img
+          className="section-three__asset section-three__project section-three__project--jokes"
+          src={sectionThreeProject1}
+          width={772}
+          height={555}
+          alt="Joke Websites project example"
+        />
+        <img
+          className="section-three__asset section-three__character section-three__character--player"
+          src={sectionThreeChar2}
+          width={820}
+          height={837}
+          alt="LEGO character holding a game controller"
+        />
+        <img
+          className="section-three__asset section-three__project section-three__project--games"
+          src={sectionThreeProject2}
+          width={716}
+          height={536}
+          alt="Absurd games project example"
+        />
+        <img
+          className="section-three__asset section-three__project section-three__project--robots"
+          src={sectionThreeProject3}
+          width={729}
+          height={591}
+          alt="Chaotic little robots project example"
+        />
+        <img
+          className="section-three__asset section-three__character section-three__character--builder"
+          src={sectionThreeChar3}
+          width={782}
+          height={782}
+          alt="LEGO character building with a robot"
+        />
       </section>
     </section>
   );
