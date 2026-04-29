@@ -561,36 +561,36 @@
 
 .section-three__project--jokes {
   left: clamp(0.5rem, 2.4vw, 2rem);
-  top: clamp(1.5rem, 4svh, 3.5rem);
-  width: min(50vw, 720px);
+  top: clamp(5rem, 4svh, 3.5rem);
+  width: min(50vw, 1000px);
   transform: rotate(2deg);
 }
 
 .section-three__character--player {
   left: clamp(1.6rem, 7vw, 6rem);
-  top: clamp(20rem, 38svh, 28rem);
-  width: min(28vw, 390px);
+  top: clamp(45rem, 38svh, 28rem);
+  width: min(30vw, 750px);
   transform: rotate(-8deg);
 }
 
 .section-three__project--games {
   right: clamp(1rem, 5vw, 5rem);
-  top: clamp(21rem, 41svh, 30rem);
-  width: min(46vw, 680px);
+  top: clamp(45rem, 41svh, 30rem);
+  width: min(50vw, 1100px);
   transform: rotate(5deg);
 }
 
 .section-three__project--robots {
-  left: clamp(-2.2rem, -3vw, -0.75rem);
-  top: clamp(47rem, 90svh, 62rem);
-  width: min(49vw, 700px);
+  left: clamp(8rem, -3vw, -0.75rem);
+  top: clamp(85rem, 90svh, 62rem);
+  width: min(49vw, 1000px);
   transform: rotate(-7deg);
 }
 
 .section-three__character--builder {
   right: clamp(4rem, 10vw, 10rem);
-  top: clamp(51rem, 95svh, 66rem);
-  width: min(31vw, 410px);
+  top: clamp(83rem, 95svh, 66rem);
+  width: min(35vw, 800px);
   transform: rotate(3deg);
 }
 
