@@ -5,9 +5,19 @@ import block2 from "@assets/mainPage/section_1/block_2.png";
 import arrow from "@assets/mainPage/section_1/arrow.png";
 import miniLogo1 from "@assets/mainPage/section_1/miniLogo_1.png";
 import miniLogo2 from "@assets/mainPage/section_1/miniLogo_2.png";
-import brick from "@assets/mainPage/section_1/brick.png";
 import stackTitle from "@assets/mainPage/section_1/Stack_title.png";
 import pageBkg from "@assets/mainPage/Bkg.png";
+import shelf from "@assets/mainPage/section_2/Shelf.png";
+import joinButton from "@assets/mainPage/section_2/join_btn.png";
+import legoChar1 from "@assets/mainPage/section_2/legoChar_1.png";
+import shopButton from "@assets/mainPage/section_2/shop_btn.png";
+import sectionThreeChar2 from "@assets/mainPage/section_3/Char2.png";
+import sectionThreeChar3 from "@assets/mainPage/section_3/Char3.png";
+import sectionThreeProject1 from "@assets/mainPage/section_3/prj1.png";
+import sectionThreeProject2 from "@assets/mainPage/section_3/prj2.png";
+import sectionThreeProject3 from "@assets/mainPage/section_3/prj3.png";
+import faqText from "@assets/mainPage/section_4/faq_txt.png";
+import { BrickModel } from "./BrickModel.jsx";
 import "./Hero.css";
 
 export function Hero() {
@@ -85,13 +95,7 @@ export function Hero() {
               alt=""
               aria-hidden="true"
             />
-            <img
-              className="hero__brick"
-              src={brick}
-              width={480}
-              height={360}
-              alt="Stack nonsense — ship anyway"
-            />
+            <BrickModel />
           </div>
 
           <img
@@ -103,6 +107,128 @@ export function Hero() {
           />
         </div>
       </div>
+
+      <section className="section-two" aria-labelledby="section-two-heading">
+        <h2 id="section-two-heading" className="section-two__headline">
+          <span>Create a </span>
+          <span className="text-yellow">fun</span>
+          <span> open-source program,</span>
+          <br />
+          <span>get a </span>
+          <span className="text-red">free LEGO sets</span>
+          <span> of your choice</span>
+        </h2>
+
+        <div className="section-two__shelf">
+          <img className="section-two__shelf-image" src={shelf} width={768} height={640} alt="Shelf of LEGO prizes" />
+          <a className="section-two__shop" href="#prizes" aria-label="See the full prize listing">
+            <img src={shopButton} width={536} height={113} alt="See the full listing..." />
+          </a>
+        </div>
+
+        <a className="section-two__join" href="#build" aria-label="Join Stack">
+          <img src={joinButton} width={580} height={300} alt="Join!" />
+        </a>
+
+        <img
+          className="section-two__character"
+          src={legoChar1}
+          width={510}
+          height={720}
+          alt="LEGO character holding a laptop"
+        />
+
+        <p className="section-two__footer">
+          The goal isn’t to be <span className="text-yellow">useful </span>or{" "}
+          <span className="text-yellow">perfect</span>
+        </p>
+      </section>
+
+      <section className="section-bridge" aria-label="Section transition message">
+        <p className="section-bridge__line section-bridge__line--one">
+          The goal isn’t to be <span className="text-yellow">useful</span> or
+          <br />
+          <span className="text-yellow">perfect</span>
+        </p>
+
+        <p className="section-bridge__line section-bridge__line--two">
+          but to make people <span className="text-red">laugh</span>,
+          <br />
+          surprise them
+        </p>
+
+        <p className="section-bridge__line section-bridge__line--three">
+          or simply create something
+          <br />
+          <span className="text-yellow">stupid</span> but brilliant.
+        </p>
+
+        <p className="section-bridge__limits">
+          There are <span className="text-red">no limits</span>...
+        </p>
+      </section>
+
+      <section className="section-three" aria-label="Project examples">
+        <img
+          className="section-three__asset section-three__project section-three__project--jokes"
+          src={sectionThreeProject1}
+          width={772}
+          height={555}
+          alt="Joke Websites project example"
+        />
+        <img
+          className="section-three__asset section-three__character section-three__character--player"
+          src={sectionThreeChar2}
+          width={820}
+          height={837}
+          alt="LEGO character holding a game controller"
+        />
+        <img
+          className="section-three__asset section-three__project section-three__project--games"
+          src={sectionThreeProject2}
+          width={716}
+          height={536}
+          alt="Absurd games project example"
+        />
+        <img
+          className="section-three__asset section-three__project section-three__project--robots"
+          src={sectionThreeProject3}
+          width={729}
+          height={591}
+          alt="Chaotic little robots project example"
+        />
+        <img
+          className="section-three__asset section-three__character section-three__character--builder"
+          src={sectionThreeChar3}
+          width={782}
+          height={782}
+          alt="LEGO character building with a robot"
+        />
+      </section>
+
+      <section className="section-four" aria-labelledby="faq-heading">
+        <div className="section-four__faq-strip" aria-hidden="true">
+          <img className="section-four__faq-title section-four__faq-title--left" src={faqText} width={623} height={380} alt="" />
+          <img className="section-four__faq-title section-four__faq-title--center" src={faqText} width={623} height={380} alt="" />
+          <img className="section-four__faq-title section-four__faq-title--right" src={faqText} width={623} height={380} alt="" />
+        </div>
+
+        <h2 id="faq-heading" className="section-four__heading">
+          FAQ
+        </h2>
+
+        <div className="section-four__questions">
+          <button className="section-four__question" type="button">
+            What can I build for Stack?
+          </button>
+          <button className="section-four__question" type="button">
+            How do I submit my project?
+          </button>
+          <button className="section-four__question" type="button">
+            When do I get my LEGO set?
+          </button>
+        </div>
+      </section>
     </section>
   );
 }
