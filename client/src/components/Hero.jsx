@@ -16,6 +16,7 @@ import sectionThreeChar3 from "@assets/mainPage/section_3/Char3.png";
 import sectionThreeProject1 from "@assets/mainPage/section_3/prj1.png";
 import sectionThreeProject2 from "@assets/mainPage/section_3/prj2.png";
 import sectionThreeProject3 from "@assets/mainPage/section_3/prj3.png";
+import faqText from "@assets/mainPage/section_4/faq_txt.png";
 import { BrickModel } from "./BrickModel.jsx";
 import "./Hero.css";
 
@@ -203,6 +204,30 @@ export function Hero() {
           height={782}
           alt="LEGO character building with a robot"
         />
+      </section>
+
+      <section className="section-four" aria-labelledby="faq-heading">
+        <div className="section-four__faq-strip" aria-hidden="true">
+          <img className="section-four__faq-title section-four__faq-title--left" src={faqText} width={623} height={380} alt="" />
+          <img className="section-four__faq-title section-four__faq-title--center" src={faqText} width={623} height={380} alt="" />
+          <img className="section-four__faq-title section-four__faq-title--right" src={faqText} width={623} height={380} alt="" />
+        </div>
+
+        <h2 id="faq-heading" className="section-four__heading">
+          FAQ
+        </h2>
+
+        <div className="section-four__questions">
+          <button className="section-four__question" type="button">
+            What can I build for Stack?
+          </button>
+          <button className="section-four__question" type="button">
+            How do I submit my project?
+          </button>
+          <button className="section-four__question" type="button">
+            When do I get my LEGO set?
+          </button>
+        </div>
       </section>
     </section>
   );
