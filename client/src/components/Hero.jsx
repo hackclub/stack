@@ -133,7 +133,7 @@ export function Hero() {
           </a>
         </div>
 
-        <a className="section-two__join" href="URL/main" aria-label="Join Stack">
+        <a className="section-two__join" href="/main" aria-label="Join Stack">
           <img src={joinButton} width={580} height={300} alt="Join!" />
         </a>
 
