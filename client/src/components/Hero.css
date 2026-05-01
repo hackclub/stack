@@ -62,6 +62,16 @@
   height: auto;
   display: block;
   filter: drop-shadow(4px 6px 0 rgba(22, 36, 86, 0.12));
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+.hero__brand:hover {
+  transform: translateY(-2px) scale(1.02);
+  filter: drop-shadow(6px 9px 0 rgba(22, 36, 86, 0.15));
+}
+
+.hero__brand:active {
+  transform: translateY(0) scale(0.99);
 }
 
 .hero__nav {
@@ -422,6 +432,16 @@
   width: clamp(180px, 33vw, 260px);
   transform: translateX(-50%);
   display: block;
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+.section-two__shop:hover {
+  transform: translateX(-50%) translateY(-2px) scale(1.02);
+  filter: drop-shadow(0 8px 10px rgba(22, 36, 86, 0.18));
+}
+
+.section-two__shop:active {
+  transform: translateX(-50%) scale(0.99);
 }
 
 .section-two__shop img {
@@ -439,6 +459,16 @@
   transform: translateX(1.2rem) rotate(7deg);
   transform-origin: center center;
   display: block;
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+.section-two__join:hover {
+  transform: translateX(1.2rem) rotate(7deg) translateY(-2px) scale(1.02);
+  filter: drop-shadow(0 10px 12px rgba(22, 36, 86, 0.2));
+}
+
+.section-two__join:active {
+  transform: translateX(1.2rem) rotate(7deg) scale(0.99);
 }
 
 .section-two__join img {
@@ -536,7 +566,7 @@
 
 .section-three {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   --section-three-shift-y: clamp(15rem, 26svh, 25rem);
   flex: 0 0 clamp(72rem, 145svh, 96rem);
   width: 100%;
@@ -552,6 +582,22 @@
   pointer-events: none;
   user-select: none;
   filter: drop-shadow(8px 12px 0 rgba(22, 36, 86, 0.08));
+}
+
+.section-three__project {
+  z-index: 5;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), filter 240ms ease;
+}
+
+.section-three__project--jokes:hover {
+  transform: rotate(2deg) translateY(-10px) scale(1.035);
+  filter: drop-shadow(0 22px 24px rgba(22, 36, 86, 0.28));
+}
+
+.section-three__project--jokes:active {
+  transform: rotate(2deg) translateY(-4px) scale(1.01);
 }
 
 .section-three__project--jokes {
@@ -575,11 +621,29 @@
   transform: rotate(5deg);
 }
 
+.section-three__project--games:hover {
+  transform: rotate(5deg) translateY(-10px) scale(1.035);
+  filter: drop-shadow(0 22px 24px rgba(22, 36, 86, 0.28));
+}
+
+.section-three__project--games:active {
+  transform: rotate(5deg) translateY(-4px) scale(1.01);
+}
+
 .section-three__project--robots {
   left: clamp(8rem, -3vw, -0.75rem);
   top: calc(clamp(85rem, 90svh, 62rem) + var(--section-three-shift-y));
   width: min(49vw, 1000px);
   transform: rotate(-7deg);
+}
+
+.section-three__project--robots:hover {
+  transform: rotate(-7deg) translateY(-10px) scale(1.035);
+  filter: drop-shadow(0 22px 24px rgba(22, 36, 86, 0.28));
+}
+
+.section-three__project--robots:active {
+  transform: rotate(-7deg) translateY(-4px) scale(1.01);
 }
 
 .section-three__character--builder {
