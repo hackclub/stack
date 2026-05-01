@@ -34,13 +34,20 @@ export function Hero() {
 
       <div className="hero__shell">
         <header className="hero__header">
-          <img
-            className="hero__brand"
-            src={brandingLogo}
-            width={130}
-            height={72}
-            alt="Hack Club"
-          />
+          <a
+            href="https://hackclub.com"
+            aria-label="Go to Hack Club"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img
+              className="hero__brand"
+              src={brandingLogo}
+              width={130}
+              height={72}
+              alt="Hack Club"
+            />
+          </a>
 
           <nav className="hero__nav" aria-label="Primary">
             <img className="hero__nav-bg" src={toolbar} alt="" width={420} height={56} />
@@ -121,12 +128,12 @@ export function Hero() {
 
         <div className="section-two__shelf">
           <img className="section-two__shelf-image" src={shelf} width={768} height={640} alt="Shelf of LEGO prizes" />
-          <a className="section-two__shop" href="#prizes" aria-label="See the full prize listing">
+          <a className="section-two__shop" href="URL/shop" aria-label="See the full prize listing">
             <img src={shopButton} width={536} height={113} alt="See the full listing..." />
           </a>
         </div>
 
-        <a className="section-two__join" href="#build" aria-label="Join Stack">
+        <a className="section-two__join" href="URL/main" aria-label="Join Stack">
           <img src={joinButton} width={580} height={300} alt="Join!" />
         </a>
 
@@ -169,13 +176,20 @@ export function Hero() {
       </section>
 
       <section className="section-three" aria-label="Project examples">
-        <img
-          className="section-three__asset section-three__project section-three__project--jokes"
-          src={sectionThreeProject1}
-          width={772}
-          height={555}
-          alt="Joke Websites project example"
-        />
+        <a
+          href="https://what-the-duck-ten.vercel.app/"
+          aria-label="Open joke website example"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            className="section-three__asset section-three__project section-three__project--jokes"
+            src={sectionThreeProject1}
+            width={772}
+            height={555}
+            alt="Joke Websites project example"
+          />
+        </a>
         <img
           className="section-three__asset section-three__character section-three__character--player"
           src={sectionThreeChar2}
@@ -183,20 +197,34 @@ export function Hero() {
           height={837}
           alt="LEGO character holding a game controller"
         />
-        <img
-          className="section-three__asset section-three__project section-three__project--games"
-          src={sectionThreeProject2}
-          width={716}
-          height={536}
-          alt="Absurd games project example"
-        />
-        <img
-          className="section-three__asset section-three__project section-three__project--robots"
-          src={sectionThreeProject3}
-          width={729}
-          height={591}
-          alt="Chaotic little robots project example"
-        />
+        <a
+          href="https://fatsermint.itch.io/food-delivery"
+          aria-label="Open absurd game example"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            className="section-three__asset section-three__project section-three__project--games"
+            src={sectionThreeProject2}
+            width={716}
+            height={536}
+            alt="Absurd games project example"
+          />
+        </a>
+        <a
+          href="https://youtu.be/M7OH803nQkw?si=8bFbovESammWmdY8"
+          aria-label="Open little robots example video"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            className="section-three__asset section-three__project section-three__project--robots"
+            src={sectionThreeProject3}
+            width={729}
+            height={591}
+            alt="Chaotic little robots project example"
+          />
+        </a>
         <img
           className="section-three__asset section-three__character section-three__character--builder"
           src={sectionThreeChar3}
