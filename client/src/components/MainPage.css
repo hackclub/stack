@@ -7,8 +7,232 @@
 }
 
 .platform-main__background {
-  display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  z-index: 0;
+}
+
+.platform-main__status {
+  position: absolute;
+  top: 1.2rem;
+  left: 1.2rem;
+  width: min(30rem, 42vw);
+  z-index: 3;
+}
+
+.platform-main__status-frame {
+  width: 100%;
+  display: block;
+}
+
+.platform-main__status-avatar {
+  position: absolute;
+  width: 14%;
+  aspect-ratio: 1 / 1;
+  top: 18%;
+  left: 4%;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.platform-main__status-content {
+  position: absolute;
+  top: 20%;
+  left: 21%;
+  right: 6%;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.platform-main__status-row {
+  display: flex;
+  align-items: center;
+}
+
+.platform-main__icon {
+  display: block;
+  max-width: 100%;
+}
+
+.platform-main__icon--coin {
+  width: 7.8rem;
+}
+
+.platform-main__icon--hearts {
+  width: 8.5rem;
+}
+
+.platform-main__status-text {
+  margin-left: 0.45rem;
+  color: #4bb3ff;
+  font-size: clamp(1.1rem, 1.5vw, 1.55rem);
+  line-height: 1;
+}
+
+.platform-main__nav {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.platform-main__block {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: #f7cf57;
+  font-size: clamp(1.6rem, 3vw, 3rem);
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 0 #8d1f38;
+  border-radius: 16px;
+  background: linear-gradient(140deg, #ffe9bd 0%, #d8d2c8 100%);
+  border: 4px dashed rgba(109, 104, 98, 0.85);
+  box-shadow: 0 14px 0 rgba(85, 81, 76, 0.4);
+  transform: rotate(-14deg);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.platform-main__block span {
+  transform: rotate(0deg);
+}
+
+.platform-main__block:hover {
+  transform: rotate(-14deg) translateY(-4px);
+  box-shadow: 0 18px 0 rgba(85, 81, 76, 0.36);
+}
+
+.platform-main__block:focus-visible {
+  outline: 3px solid #1d55c9;
+  outline-offset: 4px;
+}
+
+.platform-main__block--shop {
+  top: 30%;
+  left: 20%;
+  width: min(18rem, 24vw);
+  height: min(10rem, 15vw);
+}
+
+.platform-main__block--user {
+  top: 28%;
+  left: 57%;
+  width: min(18rem, 24vw);
+  height: min(10rem, 15vw);
+}
+
+.platform-main__block--projects {
+  top: 56%;
+  left: 39%;
+  width: min(18rem, 24vw);
+  height: min(10rem, 15vw);
+}
+
+.platform-main__block--faq {
+  top: 55%;
+  left: 73%;
+  width: min(18rem, 24vw);
+  height: min(10rem, 15vw);
+}
+
+@media (max-width: 900px) {
+  .platform-main__status {
+    width: min(26rem, 72vw);
+  }
+
+  .platform-main__block {
+    font-size: clamp(1.3rem, 5vw, 2.4rem);
+  }
+
+  .platform-main__block--shop {
+    top: 29%;
+    left: 11%;
+    width: 36vw;
+    height: 18vw;
+  }
+
+  .platform-main__block--user {
+    top: 29%;
+    left: 53%;
+    width: 36vw;
+    height: 18vw;
+  }
+
+  .platform-main__block--projects {
+    top: 55%;
+    left: 29%;
+    width: 36vw;
+    height: 18vw;
+  }
+
+  .platform-main__block--faq {
+    top: 55%;
+    left: 63%;
+    width: 33vw;
+    height: 18vw;
+  }
+}
+
+@media (max-width: 640px) {
+  .platform-main {
+    min-height: 100dvh;
+  }
+
+  .platform-main__status {
+    width: min(22rem, 85vw);
+    top: 0.8rem;
+    left: 0.8rem;
+  }
+
+  .platform-main__status-content {
+    gap: 0.2rem;
+  }
+
+  .platform-main__icon--coin {
+    width: 6rem;
+  }
+
+  .platform-main__icon--hearts {
+    width: 6.6rem;
+  }
+
+  .platform-main__block {
+    transform: rotate(-9deg);
+    box-shadow: 0 10px 0 rgba(85, 81, 76, 0.4);
+  }
+
+  .platform-main__block:hover {
+    transform: rotate(-9deg) translateY(-2px);
+  }
+
+  .platform-main__block--shop,
+  .platform-main__block--user,
+  .platform-main__block--projects,
+  .platform-main__block--faq {
+    width: 43vw;
+    height: 20vw;
+  }
+
+  .platform-main__block--shop {
+    top: 27%;
+    left: 6%;
+  }
+
+  .platform-main__block--user {
+    top: 27%;
+    left: 51%;
+  }
+
+  .platform-main__block--projects {
+    top: 52%;
+    left: 14%;
+  }
+
+  .platform-main__block--faq {
+    top: 52%;
+    left: 57%;
+  }
 }

@@ -1,5 +1,7 @@
 import { Hero } from "./components/Hero.jsx";
 import { MainPage } from "./components/MainPage.jsx";
+import { ProjectsPage } from "./components/ProjectsPage.jsx";
+import { ShopPage } from "./components/ShopPage.jsx";
 import { TestPage } from "./components/TestPage.jsx";
 
 export default function App() {
@@ -11,6 +13,14 @@ export default function App() {
 
   if (pathname === "/test") {
     return <TestPage />;
+  }
+
+  if (pathname === "/projects") {
+    return <ProjectsPage />;
+  }
+
+  if (pathname === "/shop") {
+    return <ShopPage />;
   }
 
   return <Hero />;
