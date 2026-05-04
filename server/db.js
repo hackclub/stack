@@ -40,3 +40,12 @@ export async function checkDatabaseConnection() {
     now: result.rows[0].now,
   };
 }
+
+export async function getTestRows() {
+  if (!pool) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const result = await pool.query("select * from test");
+  return result.rows;
+}

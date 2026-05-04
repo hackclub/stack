@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { checkDatabaseConnection } from "./db.js";
+import { checkDatabaseConnection, getTestRows } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -68,6 +68,18 @@ if (siteLockEnabled) {
     next();
   });
 }
+
+app.get("/api/test", async (req, res) => {
+  try {
+    const rows = await getTestRows();
+    res.json({ rows });
+  } catch (error) {
+    console.error("Failed to load test rows:", error);
+    res.status(500).json({
+      error: "Failed to load test rows.",
+    });
+  }
+});
 
 if (isProd) {
   const dist = path.join(__dirname, "../client/dist");
