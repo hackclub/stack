@@ -1,8 +1,6 @@
 import platformBackground from "@assets/platform/main/bkg.png";
-import profileFrame from "@assets/platform/main/pfp_bar_square.png";
-import profilePicture from "@assets/platform/main/pfp.png";
-import coinIcon from "@assets/platform/main/coin.png";
-import heartsIcon from "@assets/platform/main/hearts.png";
+import { useAuth } from "../auth/AuthContext.jsx";
+import { PlatformStatusBar } from "./PlatformStatusBar.jsx";
 import shelfBox from "@assets/platform/shop/shelfBox.png";
 import shopCoin from "@assets/platform/shop/shop_coin.png";
 import buyBtn from "@assets/platform/shop/buy_btn.png";
@@ -22,23 +20,13 @@ const shopItems = [
 ];
 
 export function ShopPage() {
+  const { user } = useAuth();
+
   return (
     <main className="shop-page" aria-label="Shop page">
       <img className="shop-page__background" src={platformBackground} alt="" aria-hidden="true" />
 
-      <section className="shop-page__status" aria-label="User status">
-        <img className="shop-page__status-frame" src={profileFrame} alt="" aria-hidden="true" />
-        <img className="shop-page__status-avatar" src={profilePicture} alt="User avatar" />
-        <div className="shop-page__status-content">
-          <div className="shop-page__status-row">
-            <img className="shop-page__icon shop-page__icon--coin" src={coinIcon} alt="" aria-hidden="true" />
-            <span className="shop-page__status-text">1234</span>
-          </div>
-          <div className="shop-page__status-row">
-            <img className="shop-page__icon shop-page__icon--hearts" src={heartsIcon} alt="" aria-hidden="true" />
-          </div>
-        </div>
-      </section>
+      <PlatformStatusBar user={user} />
 
       <section className="shop-page__left-panel" aria-label="Inspiration panel">
         <p className="shop-page__inspired">Be inspired!</p>

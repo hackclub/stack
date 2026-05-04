@@ -15,62 +15,6 @@
   z-index: 0;
 }
 
-.projects-page__status {
-  position: absolute;
-  top: 1.1rem;
-  left: 1.2rem;
-  width: min(30rem, 42vw);
-  z-index: 4;
-}
-
-.projects-page__status-frame {
-  width: 100%;
-  display: block;
-}
-
-.projects-page__status-avatar {
-  position: absolute;
-  width: 14%;
-  aspect-ratio: 1 / 1;
-  top: 18%;
-  left: 4%;
-  border-radius: 999px;
-  object-fit: cover;
-}
-
-.projects-page__status-content {
-  position: absolute;
-  top: 20%;
-  left: 21%;
-  right: 6%;
-  display: grid;
-  gap: 0.45rem;
-}
-
-.projects-page__status-row {
-  display: flex;
-  align-items: center;
-}
-
-.projects-page__icon {
-  display: block;
-}
-
-.projects-page__icon--coin {
-  width: 7.8rem;
-}
-
-.projects-page__icon--hearts {
-  width: 8.5rem;
-}
-
-.projects-page__status-text {
-  margin-left: 0.45rem;
-  color: #4bb3ff;
-  font-size: clamp(1.1rem, 1.5vw, 1.55rem);
-  line-height: 1;
-}
-
 .projects-page__grid {
   position: relative;
   z-index: 3;
@@ -193,10 +137,6 @@
 }
 
 @media (max-width: 980px) {
-  .projects-page__status {
-    width: min(26rem, 72vw);
-  }
-
   .projects-page__grid {
     width: min(45rem, 88vw);
     margin-top: 9.8rem;

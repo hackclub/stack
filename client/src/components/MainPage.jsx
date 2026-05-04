@@ -1,8 +1,6 @@
 import platformBackground from "@assets/platform/main/bkg.png";
-import profileFrame from "@assets/platform/main/pfp_bar_square.png";
-import profilePicture from "@assets/platform/main/pfp.png";
-import coinIcon from "@assets/platform/main/coin.png";
-import heartsIcon from "@assets/platform/main/hearts.png";
+import { useAuth } from "../auth/AuthContext.jsx";
+import { PlatformStatusBar } from "./PlatformStatusBar.jsx";
 import "./MainPage.css";
 
 const navBlocks = [
@@ -13,6 +11,8 @@ const navBlocks = [
 ];
 
 export function MainPage() {
+  const { user } = useAuth();
+
   return (
     <main className="platform-main" aria-label="Platform main page">
       <img
@@ -21,19 +21,7 @@ export function MainPage() {
         alt=""
         aria-hidden="true"
       />
-      <section className="platform-main__status" aria-label="User status">
-        <img className="platform-main__status-frame" src={profileFrame} alt="" aria-hidden="true" />
-        <img className="platform-main__status-avatar" src={profilePicture} alt="User avatar" />
-        <div className="platform-main__status-content">
-          <div className="platform-main__status-row">
-            <img className="platform-main__icon platform-main__icon--coin" src={coinIcon} alt="" aria-hidden="true" />
-            <span className="platform-main__status-text">1234</span>
-          </div>
-          <div className="platform-main__status-row">
-            <img className="platform-main__icon platform-main__icon--hearts" src={heartsIcon} alt="" aria-hidden="true" />
-          </div>
-        </div>
-      </section>
+      <PlatformStatusBar user={user} />
       <nav className="platform-main__nav" aria-label="Main navigation">
         {navBlocks.map((block) => (
           <a key={block.path} className={`platform-main__block ${block.className}`} href={block.path}>

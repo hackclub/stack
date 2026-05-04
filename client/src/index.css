@@ -25,3 +25,12 @@ body {
   color: #162456;
   overflow-x: hidden;
 }
+
+.app-auth-loading {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  font-size: 1.25rem;
+  color: #162456;
+}

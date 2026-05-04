@@ -15,58 +15,6 @@
   z-index: 0;
 }
 
-.shop-page__status {
-  position: absolute;
-  top: 1.1rem;
-  left: 1.2rem;
-  width: min(30rem, 42vw);
-  z-index: 4;
-}
-
-.shop-page__status-frame {
-  width: 100%;
-  display: block;
-}
-
-.shop-page__status-avatar {
-  position: absolute;
-  width: 14%;
-  aspect-ratio: 1 / 1;
-  top: 18%;
-  left: 4%;
-  border-radius: 999px;
-  object-fit: cover;
-}
-
-.shop-page__status-content {
-  position: absolute;
-  top: 20%;
-  left: 21%;
-  right: 6%;
-  display: grid;
-  gap: 0.45rem;
-}
-
-.shop-page__status-row {
-  display: flex;
-  align-items: center;
-}
-
-.shop-page__icon--coin {
-  width: 7.8rem;
-}
-
-.shop-page__icon--hearts {
-  width: 8.5rem;
-}
-
-.shop-page__status-text {
-  margin-left: 0.45rem;
-  color: #4bb3ff;
-  font-size: clamp(1.1rem, 1.5vw, 1.55rem);
-  line-height: 1;
-}
-
 .shop-page__left-panel {
   position: absolute;
   left: 0.8rem;
@@ -230,10 +178,6 @@
 }
 
 @media (max-width: 980px) {
-  .shop-page__status {
-    width: min(26rem, 72vw);
-  }
-
   .shop-page__left-panel {
     width: min(12rem, 24vw);
     top: 9.2rem;
