@@ -1,6 +1,8 @@
+import "dotenv/config";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { checkDatabaseConnection, getTestRows } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -16,9 +18,23 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true, service: "stack-api" });
 });
 
+app.get("/api/db/health", async (req, res) => {
+  try {
+    const health = await checkDatabaseConnection();
+    res.status(health.ok ? 200 : 503).json(health);
+  } catch (error) {
+    console.error("Database health check failed:", error);
+    res.status(500).json({
+      ok: false,
+      configured: true,
+      message: "Database health check failed.",
+    });
+  }
+});
+
 if (siteLockEnabled) {
   app.use((req, res, next) => {
-    if (req.path === "/api/health") {
+    if (req.path === "/api/health" || req.path === "/api/db/health") {
       next();
       return;
     }
@@ -52,6 +68,18 @@ if (siteLockEnabled) {
     next();
   });
 }
+
+app.get("/api/test", async (req, res) => {
+  try {
+    const rows = await getTestRows();
+    res.json({ rows });
+  } catch (error) {
+    console.error("Failed to load test rows:", error);
+    res.status(500).json({
+      error: "Failed to load test rows.",
+    });
+  }
+});
 
 if (isProd) {
   const dist = path.join(__dirname, "../client/dist");
