@@ -70,6 +70,20 @@
   color: #146c2e;
 }
 
+.test-page__sync-details {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 24px;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.test-page__sync-details p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
 .test-page__rows {
   display: grid;
   gap: 16px;

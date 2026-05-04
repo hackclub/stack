@@ -101,6 +101,7 @@ app.post("/api/airtable/sync", async (req, res) => {
     res.status(500).json({
       ok: false,
       error: "Manual Airtable sync failed.",
+      message: error instanceof Error ? error.message : String(error),
     });
   }
 });
