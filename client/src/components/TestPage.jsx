@@ -122,6 +122,8 @@ export function TestPage() {
   const lastSyncTime = syncStatus?.lastSync?.syncedAt
     ? new Date(syncStatus.lastSync.syncedAt).toLocaleString()
     : "Never synced";
+  const syncTables = syncStatus?.lastSync?.tables || [];
+  const lastSyncError = syncStatus?.lastSync?.ok === false ? syncStatus.lastSync.error : "";
 
   return (
     <main className="test-page">
@@ -141,6 +143,21 @@ export function TestPage() {
 
         {syncMessage && <p className="test-page__success">{syncMessage}</p>}
         {syncError && <p className="test-page__error">{syncError}</p>}
+        {lastSyncError && <p className="test-page__error">Last sync error: {lastSyncError}</p>}
+
+        {syncTables.length > 0 && (
+          <div className="test-page__sync-details">
+            <strong>Sync details</strong>
+            {syncTables.map((table) => (
+              <p key={table.table}>
+                <code>{table.table}</code>:{" "}
+                {table.skipped
+                  ? `Skipped (${table.reason})`
+                  : `Synced ${table.synced}/${table.sourceRows} rows using ${table.mergeFields.join(", ")}`}
+              </p>
+            ))}
+          </div>
+        )}
 
         {status && <p>{status}</p>}
         {error && <p className="test-page__error">{error}</p>}

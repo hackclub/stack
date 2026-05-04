@@ -106,6 +106,10 @@ function chooseMergeFields(primaryKeyColumns, sharedFields) {
   return sharedFields.slice(0, 1);
 }
 
+function getErrorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function syncDatabaseToAirtable() {
   if (!hasAirtableConfig) {
     return {
@@ -191,6 +195,15 @@ export async function syncDatabaseToAirtable() {
     };
 
     return lastSync;
+  } catch (error) {
+    lastSync = {
+      ok: false,
+      configured: true,
+      error: getErrorMessage(error),
+      syncedAt: new Date().toISOString(),
+    };
+
+    throw error;
   } finally {
     syncInProgress = false;
   }
