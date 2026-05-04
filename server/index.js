@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { getAirtableSyncStatus, startAirtableAutoSync, syncDatabaseToAirtable } from "./airtable.js";
 import { checkDatabaseConnection, getTestRows } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -11,6 +12,7 @@ const isProd = process.env.NODE_ENV === "production";
 const LOCK_USERNAME = process.env.SITE_LOCK_USERNAME;
 const LOCK_PASSWORD = process.env.SITE_LOCK_PASSWORD;
 const siteLockEnabled = Boolean(LOCK_USERNAME && LOCK_PASSWORD);
+const AIRTABLE_SYNC_SECRET = process.env.AIRTABLE_SYNC_SECRET;
 
 app.use(express.json());
 
@@ -81,6 +83,28 @@ app.get("/api/test", async (req, res) => {
   }
 });
 
+app.get("/api/airtable/status", (req, res) => {
+  res.json(getAirtableSyncStatus());
+});
+
+app.post("/api/airtable/sync", async (req, res) => {
+  if (AIRTABLE_SYNC_SECRET && req.headers["x-sync-secret"] !== AIRTABLE_SYNC_SECRET) {
+    res.status(401).json({ error: "Invalid sync secret." });
+    return;
+  }
+
+  try {
+    const result = await syncDatabaseToAirtable();
+    res.status(result.ok ? 200 : 503).json(result);
+  } catch (error) {
+    console.error("Manual Airtable sync failed:", error);
+    res.status(500).json({
+      ok: false,
+      error: "Manual Airtable sync failed.",
+    });
+  }
+});
+
 if (isProd) {
   const dist = path.join(__dirname, "../client/dist");
   app.use(express.static(dist));
@@ -94,3 +118,7 @@ app.listen(PORT, () => {
     `Server http://localhost:${PORT} (${isProd ? "serving React build" : "API only — use Vite on :5173 for UI"})${siteLockEnabled ? " [site lock enabled]" : " [site lock disabled]"}`
   );
 });
+
+if (isProd) {
+  startAirtableAutoSync();
+}
