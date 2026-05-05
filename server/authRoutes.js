@@ -27,10 +27,50 @@ const oauthCallbackLimiter = rateLimit({
   message: "Too many callback attempts. Please try again shortly.",
 });
 
+function isLocalhostRequest(req) {
+  const hostHeader = (req.get("X-Forwarded-Host") || req.get("Host") || "")
+    .split(",")[0]
+    .trim()
+    .toLowerCase();
+  const hostname = hostHeader.split(":")[0];
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+function shouldBypassAuth(req) {
+  return process.env.NODE_ENV !== "production" && isLocalhostRequest(req);
+}
+
+function getLocalBypassUser() {
+  return {
+    id: "local-dev",
+    hackclubSub: "local-dev",
+    email: "local@stack.dev",
+    name: "Local Dev",
+    slug: "local-dev",
+    profileImageUrl: null,
+    slackId: null,
+    verificationStatus: "unverified",
+    role: "admin",
+  };
+}
+
+function clearBypassSession(req) {
+  if (!req.session) return;
+  delete req.session.devBypassUser;
+  delete req.session.devBypassLoggedOut;
+}
+
 export function createAuthRouter() {
   const router = express.Router();
 
   router.get("/hackclub/login", oauthStartLimiter, (req, res) => {
+    if (shouldBypassAuth(req)) {
+      clearBypassSession(req);
+      req.session.devBypassUser = getLocalBypassUser();
+      res.redirect(302, `${getAppOrigin()}/main`);
+      return;
+    }
+
     let redirectUri;
     try {
       redirectUri = resolveOAuthRedirectUri(req);
@@ -110,6 +150,20 @@ export function createAuthRouter() {
 
   router.get("/me", async (req, res) => {
     try {
+      if (shouldBypassAuth(req)) {
+        if (req.session?.devBypassLoggedOut) {
+          res.json({ user: null });
+          return;
+        }
+
+        const bypassUser = req.session?.devBypassUser || getLocalBypassUser();
+        if (req.session) {
+          req.session.devBypassUser = bypassUser;
+        }
+        res.json({ user: bypassUser });
+        return;
+      }
+
       const userId = req.session?.userId;
       if (!userId) {
         res.json({ user: null });
@@ -125,6 +179,15 @@ export function createAuthRouter() {
   });
 
   router.post("/logout", (req, res) => {
+    if (shouldBypassAuth(req) && req.session) {
+      req.session.devBypassLoggedOut = true;
+      delete req.session.devBypassUser;
+      delete req.session.userId;
+      delete req.session.hackclubSub;
+      res.json({ ok: true });
+      return;
+    }
+
     req.session.destroy((err) => {
       if (err) {
         console.error("[auth] logout failed:", err);

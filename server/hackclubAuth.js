@@ -14,11 +14,7 @@ function requiredEnv(name) {
   return value;
 }
 
-/**
- * Every URI here must appear exactly in Hack Club → Developer → your app → redirect URIs.
- * HC_REDIRECT_URI is always included; OAUTH_ALLOWED_REDIRECT_URIS adds more (comma-separated).
- * For dev we also add the twin host (localhost ↔ 127.0.0.1) when HC_REDIRECT_URI uses one of them.
- */
+
 export function getAllowedRedirectUris() {
   const primary = process.env.HC_REDIRECT_URI?.trim();
   const set = new Set();
@@ -61,7 +57,6 @@ function parseRequestOrigin(req) {
       const parsed = new URL(originHeader);
       return parsed.origin;
     } catch {
-      // ignore invalid origin header
     }
   }
 
@@ -88,9 +83,7 @@ function parseRequestOrigin(req) {
   return null;
 }
 
-/**
- * Picks redirect_uri for authorize + token exchange. Must match a URI registered at Hack Club exactly.
- */
+
 export function resolveOAuthRedirectUri(req) {
   const allowed = getAllowedRedirectUris();
   const origin = parseRequestOrigin(req);
