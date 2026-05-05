@@ -126,9 +126,11 @@ export function appOriginFromRedirectUri(redirectUri) {
 
 export function getAuthorizeUrl({ state, redirectUri }) {
   const clientId = requiredEnv("HC_CLIENT_ID");
-  const scope =
-    process.env.HC_SCOPES ||
-    "openid profile email name slack_id verification_status";
+  const configuredScopes = (process.env.HC_SCOPES || "").trim();
+  const scopeList = configuredScopes
+    ? configuredScopes.split(/\s+/).filter(Boolean)
+    : ["basic_info"];
+  const scope = [...new Set(scopeList)].join(" ");
 
   const params = new URLSearchParams({
     client_id: clientId,
