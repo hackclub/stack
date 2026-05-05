@@ -38,7 +38,8 @@ export default function App() {
   }
 
   if (PROTECTED.has(pathname) && !auth.user) {
-    window.location.replace("/api/auth/hackclub/login");
+    const returnTo = `${pathname}${window.location.search}${window.location.hash}`;
+    window.location.replace(`/api/auth/hackclub/login?returnTo=${encodeURIComponent(returnTo)}`);
     return null;
   }
 

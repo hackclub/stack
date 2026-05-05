@@ -60,14 +60,26 @@ function clearBypassSession(req) {
   delete req.session.devBypassLoggedOut;
 }
 
+function normalizeReturnTo(value) {
+  if (typeof value !== "string") return "/main";
+  const trimmed = value.trim();
+  if (!trimmed || !trimmed.startsWith("/") || trimmed.startsWith("//")) {
+    return "/main";
+  }
+  return trimmed;
+}
+
 export function createAuthRouter() {
   const router = express.Router();
 
   router.get("/hackclub/login", oauthStartLimiter, (req, res) => {
+    const returnTo = normalizeReturnTo(req.query?.returnTo);
+
     if (shouldBypassAuth(req)) {
       clearBypassSession(req);
       req.session.devBypassUser = getLocalBypassUser();
-      res.redirect(302, `${getAppOrigin()}/main`);
+      req.session.devBypassReturnTo = returnTo;
+      res.redirect(302, `${getAppOrigin()}${returnTo}`);
       return;
     }
 
@@ -89,6 +101,7 @@ export function createAuthRouter() {
 
     req.session.oauthState = state;
     req.session.oauthRedirectUri = redirectUri;
+    req.session.oauthReturnTo = returnTo;
 
     const url = getAuthorizeUrl({ state, redirectUri });
     res.redirect(302, url);
@@ -97,6 +110,7 @@ export function createAuthRouter() {
   router.get("/hackclub/callback", oauthCallbackLimiter, async (req, res) => {
     const storedRedirectUri = req.session?.oauthRedirectUri;
     const sessionState = req.session?.oauthState;
+    const returnTo = normalizeReturnTo(req.session?.oauthReturnTo);
     const redirectUri =
       typeof storedRedirectUri === "string" && storedRedirectUri
         ? storedRedirectUri
@@ -105,6 +119,7 @@ export function createAuthRouter() {
     if (req.session) {
       delete req.session.oauthState;
       delete req.session.oauthRedirectUri;
+      delete req.session.oauthReturnTo;
     }
 
     const appOrigin = redirectUri ? appOriginFromRedirectUri(redirectUri) : getAppOrigin();
@@ -141,7 +156,7 @@ export function createAuthRouter() {
       req.session.userId = user.id;
       req.session.hackclubSub = user.hackclub_sub;
 
-      res.redirect(302, `${appOrigin}/main`);
+      res.redirect(302, `${appOrigin}${returnTo}`);
     } catch (error) {
       console.error("[auth] Hack Club callback failed:", error);
       res.redirect(302, `${getAppOrigin()}/?error=oauth_callback`);
