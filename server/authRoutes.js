@@ -37,8 +37,7 @@ function isLocalhostRequest(req) {
 }
 
 function shouldBypassAuth(req) {
-  const bypassEnabled = process.env.LOCAL_AUTH_BYPASS === "true";
-  return bypassEnabled && process.env.NODE_ENV !== "production" && isLocalhostRequest(req);
+  return process.env.NODE_ENV !== "production" && isLocalhostRequest(req);
 }
 
 function getLocalBypassUser() {
