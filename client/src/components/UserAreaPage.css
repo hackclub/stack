@@ -1,0 +1,87 @@
+.user-area-page {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #73a5ca;
+}
+
+.user-area-page__background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.user-area-page__panel {
+  position: relative;
+  z-index: 2;
+  max-width: 28rem;
+  margin: 10rem auto 0;
+  padding: 1.5rem 1.75rem;
+  background: rgba(27, 58, 122, 0.72);
+  border: 3px solid #4bb3ff;
+  border-radius: 14px;
+  color: #e8f4ff;
+}
+
+.user-area-page__heading {
+  margin: 0 0 1rem;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+}
+
+.user-area-page__details {
+  margin: 0;
+}
+
+.user-area-page__details div {
+  margin-bottom: 0.85rem;
+}
+
+.user-area-page__details div:last-child {
+  margin-bottom: 0;
+}
+
+.user-area-page__details dt {
+  font-size: 0.85rem;
+  opacity: 0.85;
+  margin-bottom: 0.15rem;
+}
+
+.user-area-page__details dd {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.user-area-page__back {
+  position: absolute;
+  left: 1.2rem;
+  bottom: 1.1rem;
+  z-index: 4;
+  text-decoration: none;
+  color: #f8f4f4;
+  transform: rotate(-9deg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-area-page__back img {
+  width: min(8.5rem, 24vw);
+}
+
+.user-area-page__back span {
+  position: absolute;
+  font-size: clamp(2.1rem, 3vw, 3rem);
+  text-shadow: 0 3px 0 #882030;
+}
+
+.user-area-page__brand {
+  position: absolute;
+  right: 1.3rem;
+  bottom: 0.7rem;
+  width: min(11rem, 30vw);
+  z-index: 4;
+}

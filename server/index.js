@@ -1,20 +1,49 @@
-import "dotenv/config";
+import "./env.js";
+import cookieParser from "cookie-parser";
 import express from "express";
+import session from "express-session";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createAuthRouter } from "./authRoutes.js";
 import { getAirtableSyncStatus, startAirtableAutoSync, syncDatabaseToAirtable } from "./airtable.js";
 import { checkDatabaseConnection, getTestRows } from "./db.js";
+import { ensureUsersTable } from "./users.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === "production";
+
+if (isProd) {
+  app.set("trust proxy", 1);
+}
 const LOCK_USERNAME = process.env.SITE_LOCK_USERNAME;
 const LOCK_PASSWORD = process.env.SITE_LOCK_PASSWORD;
 const siteLockEnabled = Boolean(LOCK_USERNAME && LOCK_PASSWORD);
 const AIRTABLE_SYNC_SECRET = process.env.AIRTABLE_SYNC_SECRET;
+const SESSION_SECRET = process.env.SESSION_SECRET;
+
+if (isProd && !SESSION_SECRET) {
+  console.warn("[session] SESSION_SECRET is not set; using insecure default. Set SESSION_SECRET in production.");
+}
 
 app.use(express.json());
+app.use(cookieParser());
+app.use(
+  session({
+    name: "stack.sid",
+    secret: SESSION_SECRET || "dev-insecure-session-secret-change-me",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProd,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    },
+  })
+);
+app.use("/api/auth", createAuthRouter());
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, service: "stack-api" });
@@ -36,7 +65,11 @@ app.get("/api/db/health", async (req, res) => {
 
 if (siteLockEnabled) {
   app.use((req, res, next) => {
-    if (req.path === "/api/health" || req.path === "/api/db/health") {
+    if (
+      req.path === "/api/health" ||
+      req.path === "/api/db/health" ||
+      req.path.startsWith("/api/auth")
+    ) {
       next();
       return;
     }
@@ -114,12 +147,22 @@ if (isProd) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(
-    `Server http://localhost:${PORT} (${isProd ? "serving React build" : "API only — use Vite on :5173 for UI"})${siteLockEnabled ? " [site lock enabled]" : " [site lock disabled]"}`
-  );
-});
+async function startServer() {
+  try {
+    await ensureUsersTable();
+  } catch (error) {
+    console.error("[users] Failed to ensure users table:", error);
+  }
 
-if (isProd) {
-  startAirtableAutoSync();
+  app.listen(PORT, () => {
+    console.log(
+      `Server http://localhost:${PORT} (${isProd ? "serving React build" : "API only — use Vite on :5173 for UI"})${siteLockEnabled ? " [site lock enabled]" : " [site lock disabled]"}`
+    );
+  });
+
+  if (isProd) {
+    startAirtableAutoSync();
+  }
 }
+
+startServer();

@@ -128,12 +128,12 @@ export function Hero() {
 
         <div className="section-two__shelf">
           <img className="section-two__shelf-image" src={shelf} width={768} height={640} alt="Shelf of LEGO prizes" />
-          <a className="section-two__shop" href="URL/shop" aria-label="See the full prize listing">
+          <a className="section-two__shop" href="/shop" aria-label="See the full prize listing">
             <img src={shopButton} width={536} height={113} alt="See the full listing..." />
           </a>
         </div>
 
-        <a className="section-two__join" href="/main" aria-label="Join Stack">
+        <a className="section-two__join" href="/api/auth/hackclub/login" aria-label="Sign in with Hack Club to join Stack">
           <img src={joinButton} width={580} height={300} alt="Join!" />
         </a>
 

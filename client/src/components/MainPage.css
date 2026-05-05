@@ -15,63 +15,6 @@
   z-index: 0;
 }
 
-.platform-main__status {
-  position: absolute;
-  top: 1.2rem;
-  left: 1.2rem;
-  width: min(30rem, 42vw);
-  z-index: 3;
-}
-
-.platform-main__status-frame {
-  width: 100%;
-  display: block;
-}
-
-.platform-main__status-avatar {
-  position: absolute;
-  width: 14%;
-  aspect-ratio: 1 / 1;
-  top: 18%;
-  left: 4%;
-  border-radius: 999px;
-  object-fit: cover;
-}
-
-.platform-main__status-content {
-  position: absolute;
-  top: 20%;
-  left: 21%;
-  right: 6%;
-  display: grid;
-  gap: 0.45rem;
-}
-
-.platform-main__status-row {
-  display: flex;
-  align-items: center;
-}
-
-.platform-main__icon {
-  display: block;
-  max-width: 100%;
-}
-
-.platform-main__icon--coin {
-  width: 7.8rem;
-}
-
-.platform-main__icon--hearts {
-  width: 8.5rem;
-}
-
-.platform-main__status-text {
-  margin-left: 0.45rem;
-  color: #4bb3ff;
-  font-size: clamp(1.1rem, 1.5vw, 1.55rem);
-  line-height: 1;
-}
-
 .platform-main__nav {
   position: absolute;
   inset: 0;
@@ -139,10 +82,6 @@
 }
 
 @media (max-width: 900px) {
-  .platform-main__status {
-    width: min(26rem, 72vw);
-  }
-
   .platform-main__block {
     font-size: clamp(1.3rem, 5vw, 2.4rem);
   }
@@ -179,24 +118,6 @@
 @media (max-width: 640px) {
   .platform-main {
     min-height: 100dvh;
-  }
-
-  .platform-main__status {
-    width: min(22rem, 85vw);
-    top: 0.8rem;
-    left: 0.8rem;
-  }
-
-  .platform-main__status-content {
-    gap: 0.2rem;
-  }
-
-  .platform-main__icon--coin {
-    width: 6rem;
-  }
-
-  .platform-main__icon--hearts {
-    width: 6.6rem;
   }
 
   .platform-main__block {
