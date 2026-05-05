@@ -35,6 +35,38 @@ export async function ensureUsersTable() {
     )
   `);
 
+  // Backfill schema for older deployments where `users` already existed.
+  // These are idempotent and safe to run on every boot.
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hackclub_sub TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS name TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS slug TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image_url TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS slack_id TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_status TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS access_token TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS refresh_token TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS token_type TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS token_expires_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS expires_in_seconds INTEGER`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS scope TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS raw_profile JSONB`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS raw_token JSONB`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+
+  await pool.query(`
+    UPDATE users
+    SET role = '${DEFAULT_ROLE}'
+    WHERE role IS NULL
+  `);
+
+  await pool.query(`
+    ALTER TABLE users
+    ALTER COLUMN role SET DEFAULT '${DEFAULT_ROLE}'
+  `);
+
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)
   `);
@@ -47,6 +79,7 @@ export async function ensureUsersTable() {
         id,
         ROW_NUMBER() OVER (PARTITION BY hackclub_sub ORDER BY id ASC) AS row_num
       FROM users
+      WHERE hackclub_sub IS NOT NULL
     ),
     deleted AS (
       DELETE FROM users u
