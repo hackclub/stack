@@ -113,11 +113,25 @@ function resolveRole(email) {
 }
 
 function hackclubSubFromProfile(profile) {
-  const sub = profile?.sub ?? profile?.id;
-  if (sub === undefined || sub === null) {
-    throw new Error("Hack Club profile missing sub/id.");
+  const subCandidate =
+    profile?.sub ??
+    profile?.id ??
+    profile?.user_id ??
+    profile?.uid ??
+    profile?.hc_id ??
+    profile?.slack_id ??
+    null;
+
+  if (subCandidate !== undefined && subCandidate !== null && String(subCandidate).trim()) {
+    return String(subCandidate);
   }
-  return String(sub);
+
+  const emailCandidate = profile?.email ?? profile?.email_address ?? null;
+  if (typeof emailCandidate === "string" && emailCandidate.trim()) {
+    return `email:${emailCandidate.trim().toLowerCase()}`;
+  }
+
+  throw new Error("Hack Club profile missing stable identifier.");
 }
 
 /**
@@ -169,7 +183,7 @@ export async function upsertUserFromHackClub({ profile, token }) {
       raw_profile,
       raw_token
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16::jsonb
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
     )
     ON CONFLICT (hackclub_sub) DO UPDATE SET
       email = COALESCE(EXCLUDED.email, users.email),

@@ -76,6 +76,9 @@ function oauthCallbackErrorCode(error) {
   if (message.includes("Token exchange failed")) return "oauth_token_exchange";
   if (message.includes("/api/v1/me failed")) return "oauth_profile_fetch";
   if (message.includes("DATABASE_URL is not set")) return "oauth_db_config";
+  if (message.includes("profile missing stable identifier")) return "oauth_profile_identifier";
+  if (message.includes("column") && message.includes("does not exist")) return "oauth_db_schema";
+  if (message.includes("is of type") && message.includes("but expression is of type")) return "oauth_db_schema";
   if (message.includes("there is no unique or exclusion constraint matching the ON CONFLICT specification")) {
     return "oauth_db_schema";
   }
