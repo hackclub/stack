@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import express from "express";
+import rateLimit from "express-rate-limit";
 import {
   appOriginFromRedirectUri,
   exchangeAuthorizationCode,
@@ -10,20 +11,26 @@ import {
 } from "./hackclubAuth.js";
 import { getUserById, toPublicUser, upsertUserFromHackClub } from "./users.js";
 
-function oauthCookieOptions() {
-  return {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 10 * 60 * 1000,
-    path: "/",
-  };
-}
+const oauthStartLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 25,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many login attempts. Please try again in a few minutes.",
+});
+
+const oauthCallbackLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many callback attempts. Please try again shortly.",
+});
 
 export function createAuthRouter() {
   const router = express.Router();
 
-  router.get("/hackclub/login", (req, res) => {
+  router.get("/hackclub/login", oauthStartLimiter, (req, res) => {
     let redirectUri;
     try {
       redirectUri = resolveOAuthRedirectUri(req);
@@ -35,23 +42,30 @@ export function createAuthRouter() {
 
     const state = crypto.randomBytes(24).toString("hex");
 
-    res.cookie("hc_oauth_state", state, oauthCookieOptions());
-    res.cookie("hc_oauth_redirect_uri", redirectUri, oauthCookieOptions());
+    if (!req.session) {
+      res.redirect(302, `${getAppOrigin()}/?error=session_unavailable`);
+      return;
+    }
+
+    req.session.oauthState = state;
+    req.session.oauthRedirectUri = redirectUri;
 
     const url = getAuthorizeUrl({ state, redirectUri });
     res.redirect(302, url);
   });
 
-  router.get("/hackclub/callback", async (req, res) => {
-    const storedRedirectUri = req.cookies?.hc_oauth_redirect_uri;
-    const cookieState = req.cookies?.hc_oauth_state;
+  router.get("/hackclub/callback", oauthCallbackLimiter, async (req, res) => {
+    const storedRedirectUri = req.session?.oauthRedirectUri;
+    const sessionState = req.session?.oauthState;
     const redirectUri =
       typeof storedRedirectUri === "string" && storedRedirectUri
         ? storedRedirectUri
         : process.env.HC_REDIRECT_URI?.trim() || null;
 
-    res.clearCookie("hc_oauth_state", { path: "/" });
-    res.clearCookie("hc_oauth_redirect_uri", { path: "/" });
+    if (req.session) {
+      delete req.session.oauthState;
+      delete req.session.oauthRedirectUri;
+    }
 
     const appOrigin = redirectUri ? appOriginFromRedirectUri(redirectUri) : getAppOrigin();
 
@@ -64,7 +78,7 @@ export function createAuthRouter() {
         return;
       }
 
-      if (typeof state !== "string" || !cookieState || state !== cookieState) {
+      if (typeof state !== "string" || !sessionState || state !== sessionState) {
         res.redirect(302, `${appOrigin}/?error=oauth_state`);
         return;
       }
