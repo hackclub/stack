@@ -1,4 +1,10 @@
 const AUTH_BASE = "https://auth.hackclub.com";
+const OAUTH_CALLBACK_PATH = "/api/auth/hackclub/callback";
+
+function buildCallbackUri(origin) {
+  const trimmedOrigin = origin.endsWith("/") ? origin.slice(0, -1) : origin;
+  return `${trimmedOrigin}${OAUTH_CALLBACK_PATH}`;
+}
 
 function requiredEnv(name) {
   const value = process.env[name];
@@ -21,6 +27,11 @@ export function getAllowedRedirectUris() {
     set.add(primary);
   }
 
+  const appOrigin = process.env.APP_ORIGIN?.trim();
+  if (appOrigin) {
+    set.add(buildCallbackUri(appOrigin));
+  }
+
   for (const piece of (process.env.OAUTH_ALLOWED_REDIRECT_URIS || "").split(",")) {
     const u = piece.trim();
     if (u) set.add(u);
@@ -31,9 +42,9 @@ export function getAllowedRedirectUris() {
       const url = new URL(primary);
       const port = url.port ? `:${url.port}` : "";
       if (url.hostname === "localhost") {
-        set.add(`http://127.0.0.1${port}${url.pathname}`);
+        set.add(`${url.protocol}//127.0.0.1${port}${url.pathname}`);
       } else if (url.hostname === "127.0.0.1") {
-        set.add(`http://localhost${port}${url.pathname}`);
+        set.add(`${url.protocol}//localhost${port}${url.pathname}`);
       }
     } catch {
       // ignore
@@ -45,7 +56,14 @@ export function getAllowedRedirectUris() {
 
 function parseRequestOrigin(req) {
   const originHeader = req.get("Origin");
-  if (originHeader) return originHeader;
+  if (originHeader) {
+    try {
+      const parsed = new URL(originHeader);
+      return parsed.origin;
+    } catch {
+      // ignore invalid origin header
+    }
+  }
 
   const referer = req.get("Referer");
   if (referer) {
@@ -56,6 +74,17 @@ function parseRequestOrigin(req) {
     }
   }
 
+  const forwardedHost = req.get("X-Forwarded-Host");
+  const host = (forwardedHost || req.get("Host") || "").split(",")[0].trim();
+  const forwardedProto = req.get("X-Forwarded-Proto");
+  const protocol =
+    (forwardedProto || req.protocol || "").split(",")[0].trim() ||
+    (process.env.NODE_ENV === "production" ? "https" : "http");
+
+  if (host && protocol) {
+    return `${protocol}://${host}`;
+  }
+
   return null;
 }
 
@@ -64,22 +93,30 @@ function parseRequestOrigin(req) {
  */
 export function resolveOAuthRedirectUri(req) {
   const allowed = getAllowedRedirectUris();
+  const origin = parseRequestOrigin(req);
   if (allowed.length === 0) {
-    throw new Error("HC_REDIRECT_URI is not set.");
+    if (origin) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          `[auth] No explicit OAuth redirect URI configured; using request origin callback ${buildCallbackUri(origin)}`
+        );
+      }
+      return buildCallbackUri(origin);
+    }
+    throw new Error("HC_REDIRECT_URI (or APP_ORIGIN) is not set.");
   }
 
-  const origin = parseRequestOrigin(req);
   if (origin) {
-    const candidate = `${origin}/api/auth/hackclub/callback`;
+    const candidate = buildCallbackUri(origin);
     if (allowed.includes(candidate)) {
       return candidate;
     }
   }
 
-  const fallback = requiredEnv("HC_REDIRECT_URI");
+  const fallback = process.env.HC_REDIRECT_URI?.trim() || allowed[0];
   if (process.env.NODE_ENV !== "production" && origin) {
     console.warn(
-      `[auth] No allowlisted redirect for origin ${origin}. Using HC_REDIRECT_URI. Register in Hack Club: ${origin}/api/auth/hackclub/callback`
+      `[auth] No allowlisted redirect for origin ${origin}. Using configured fallback ${fallback}. Register in Hack Club: ${origin}/api/auth/hackclub/callback`
     );
   }
 
