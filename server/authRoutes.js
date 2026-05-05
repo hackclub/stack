@@ -37,7 +37,8 @@ function isLocalhostRequest(req) {
 }
 
 function shouldBypassAuth(req) {
-  return process.env.NODE_ENV !== "production" && isLocalhostRequest(req);
+  const bypassEnabled = process.env.LOCAL_AUTH_BYPASS === "true";
+  return bypassEnabled && process.env.NODE_ENV !== "production" && isLocalhostRequest(req);
 }
 
 function getLocalBypassUser() {
@@ -69,6 +70,19 @@ function normalizeReturnTo(value) {
   return trimmed;
 }
 
+function oauthCallbackErrorCode(error) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes("Token exchange failed")) return "oauth_token_exchange";
+  if (message.includes("/api/v1/me failed")) return "oauth_profile_fetch";
+  if (message.includes("DATABASE_URL is not set")) return "oauth_db_config";
+  if (message.includes("there is no unique or exclusion constraint matching the ON CONFLICT specification")) {
+    return "oauth_db_schema";
+  }
+
+  return "oauth_callback";
+}
+
 export function createAuthRouter() {
   const router = express.Router();
 
@@ -78,7 +92,6 @@ export function createAuthRouter() {
     if (shouldBypassAuth(req)) {
       clearBypassSession(req);
       req.session.devBypassUser = getLocalBypassUser();
-      req.session.devBypassReturnTo = returnTo;
       res.redirect(302, `${getAppOrigin()}${returnTo}`);
       return;
     }
@@ -159,7 +172,8 @@ export function createAuthRouter() {
       res.redirect(302, `${appOrigin}${returnTo}`);
     } catch (error) {
       console.error("[auth] Hack Club callback failed:", error);
-      res.redirect(302, `${getAppOrigin()}/?error=oauth_callback`);
+      const errorCode = oauthCallbackErrorCode(error);
+      res.redirect(302, `${getAppOrigin()}/?error=${errorCode}`);
     }
   });
 

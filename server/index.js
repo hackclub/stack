@@ -24,7 +24,7 @@ const AIRTABLE_SYNC_SECRET = process.env.AIRTABLE_SYNC_SECRET;
 const SESSION_SECRET = process.env.SESSION_SECRET;
 
 if (isProd && !SESSION_SECRET) {
-  console.warn("[session] SESSION_SECRET is not set; using insecure default. Set SESSION_SECRET in production.");
+  throw new Error("[session] SESSION_SECRET must be set in production.");
 }
 
 app.use(express.json());
