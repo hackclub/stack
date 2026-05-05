@@ -11,6 +11,11 @@ export async function ensureUsersTable() {
     return;
   }
 
+  if (process.env.RECREATE_USERS_TABLE === "true") {
+    console.warn("[users] RECREATE_USERS_TABLE=true, dropping users table before rebuild.");
+    await pool.query(`DROP TABLE IF EXISTS users`);
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
