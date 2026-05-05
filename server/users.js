@@ -38,6 +38,34 @@ export async function ensureUsersTable() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)
   `);
+
+  // Older deployments may have been created before hackclub_sub uniqueness was enforced.
+  // Remove duplicates (keep oldest row) so upsert with ON CONFLICT works reliably.
+  const dedupeResult = await pool.query(`
+    WITH ranked AS (
+      SELECT
+        id,
+        ROW_NUMBER() OVER (PARTITION BY hackclub_sub ORDER BY id ASC) AS row_num
+      FROM users
+    ),
+    deleted AS (
+      DELETE FROM users u
+      USING ranked r
+      WHERE u.id = r.id
+        AND r.row_num > 1
+      RETURNING u.id
+    )
+    SELECT COUNT(*)::int AS deleted_count FROM deleted
+  `);
+
+  const deletedCount = dedupeResult.rows?.[0]?.deleted_count ?? 0;
+  if (deletedCount > 0) {
+    console.warn(`[users] Removed ${deletedCount} duplicate user rows by hackclub_sub.`);
+  }
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_hackclub_sub_unique ON users (hackclub_sub)
+  `);
 }
 
 function resolveRole(email) {
