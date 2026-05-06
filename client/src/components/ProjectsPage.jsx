@@ -101,6 +101,16 @@ export function ProjectsPage() {
 
     setError("");
     const isNew = !editingProject.id;
+    const duplicateProject = projects.some(
+      (project) =>
+        project.id !== editingProject.id &&
+        project.name?.trim().toLowerCase() === editingProject.name?.trim().toLowerCase()
+    );
+    if (duplicateProject) {
+      setError("You already have a project with that name.");
+      return;
+    }
+
     try {
       const response = await fetch(isNew ? "/api/projects" : `/api/projects/${editingProject.id}`, {
         method: isNew ? "POST" : "PATCH",
@@ -248,7 +258,9 @@ export function ProjectsPage() {
             onClick={() => setSelectedProject(project)}
           >
             <img className="projects-page__studs" src={sideBrick} alt="" aria-hidden="true" />
-            <h2 className="projects-page__title">{project.name}</h2>
+            <h2 className="projects-page__title" title={project.name}>
+              {project.name}
+            </h2>
             <div className="projects-page__meta">
               <div className="projects-page__meta-chip">
                 <img src={statusBtn} alt="" aria-hidden="true" />

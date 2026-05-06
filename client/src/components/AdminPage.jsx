@@ -13,7 +13,7 @@ const adminLinks = [
 
 export function AdminPage() {
   const { user } = useAuth();
-  const showSuperAdmin = user?.role === "super_admin";
+  const showSuperAdmin = user?.role === "superadmin";
 
   return (
     <main className="admin-page" aria-label="Admin page">

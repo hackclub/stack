@@ -12,21 +12,37 @@ import {
   deleteShopItem,
   ensureShopItemsTable,
   listShopItems,
+  purchaseShopItemForUser,
   setAllShopItemsActive,
   updateShopItem,
 } from "./shopItems.js";
 import {
+  approveAdminReviewProject,
   createProjectForUser,
   createJournalEntryForUser,
   deleteProjectForUser,
+  deleteProjectBySuperadmin,
   ensureProjectsTable,
+  getAdminReviewProject,
   getJournalEntriesCsv,
   listJournalEntriesForUserProject,
+  listAdminReviewProjects,
+  patchAdminReviewProjectFlags,
   listProjectsForUser,
+  rejectAdminReviewProject,
   shipProjectForUser,
   updateProjectForUser,
 } from "./projects.js";
-import { ensureUsersTable, getAdminUserById, getUserById, listAdminUsers } from "./users.js";
+import {
+  canAccessFullAdmin,
+  canAccessStaffReview,
+  canPerformDestructiveAdmin,
+  effectiveRole,
+  ensureUsersTable,
+  getAdminUserById,
+  getUserById,
+  listAdminUsers,
+} from "./users.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -64,7 +80,7 @@ app.use(
 );
 app.use("/api/auth", createAuthRouter());
 
-async function requireAdmin(req, res, next) {
+async function requireFullAdmin(req, res, next) {
   const userId = req.session?.userId;
   if (!userId) {
     res.status(401).json({ error: "Authentication required." });
@@ -72,8 +88,8 @@ async function requireAdmin(req, res, next) {
   }
 
   try {
-    const user = await getUserById(userId);
-    if (user?.role !== "admin") {
+    const row = await getUserById(userId);
+    if (!canAccessFullAdmin(effectiveRole(row))) {
       res.status(403).json({ error: "Admin only." });
       return;
     }
@@ -81,6 +97,46 @@ async function requireAdmin(req, res, next) {
   } catch (error) {
     console.error("[admin] auth check failed:", error);
     res.status(500).json({ error: "Failed to verify admin access." });
+  }
+}
+
+async function requireStaffReview(req, res, next) {
+  const userId = req.session?.userId;
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required." });
+    return;
+  }
+
+  try {
+    const row = await getUserById(userId);
+    if (!canAccessStaffReview(effectiveRole(row))) {
+      res.status(403).json({ error: "Staff review access only." });
+      return;
+    }
+    next();
+  } catch (error) {
+    console.error("[review] auth check failed:", error);
+    res.status(500).json({ error: "Failed to verify review access." });
+  }
+}
+
+async function requireSuperAdmin(req, res, next) {
+  const userId = req.session?.userId;
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required." });
+    return;
+  }
+
+  try {
+    const row = await getUserById(userId);
+    if (!canPerformDestructiveAdmin(effectiveRole(row))) {
+      res.status(403).json({ error: "Superadmin only." });
+      return;
+    }
+    next();
+  } catch (error) {
+    console.error("[superadmin] auth check failed:", error);
+    res.status(500).json({ error: "Failed to verify superadmin access." });
   }
 }
 
@@ -174,6 +230,16 @@ app.get("/api/shop/items", async (req, res) => {
   }
 });
 
+app.post("/api/shop/items/:id/buy", requireUser, async (req, res) => {
+  try {
+    const purchase = await purchaseShopItemForUser(req.session.userId, req.params.id, req.body);
+    res.json({ purchase });
+  } catch (error) {
+    console.error("Failed to buy shop item:", error);
+    res.status(400).json({ error: error.message || "Failed to buy shop item." });
+  }
+});
+
 app.get("/api/projects", requireUser, async (req, res) => {
   try {
     const projects = await listProjectsForUser(req.session.userId);
@@ -255,7 +321,7 @@ app.post("/api/projects/:id/journal_entries", requireUser, async (req, res) => {
   }
 });
 
-app.get("/api/admin/journals.csv", requireAdmin, async (req, res) => {
+app.get("/api/admin/journals.csv", requireFullAdmin, async (req, res) => {
   try {
     const csv = await getJournalEntriesCsv();
     const today = new Date().toISOString().slice(0, 10);
@@ -268,7 +334,75 @@ app.get("/api/admin/journals.csv", requireAdmin, async (req, res) => {
   }
 });
 
-app.get("/api/admin/shop/items", requireAdmin, async (req, res) => {
+app.get("/api/admin/review/projects", requireStaffReview, async (req, res) => {
+  try {
+    const review = await listAdminReviewProjects({ shipSort: req.query.shipSort });
+    res.json(review);
+  } catch (error) {
+    console.error("Failed to load review projects:", error);
+    res.status(500).json({ error: "Failed to load review projects." });
+  }
+});
+
+app.get("/api/admin/review/projects/:id", requireStaffReview, async (req, res) => {
+  try {
+    const reviewProject = await getAdminReviewProject(req.params.id);
+    if (!reviewProject) {
+      res.status(404).json({ error: "Project not found." });
+      return;
+    }
+    res.json(reviewProject);
+  } catch (error) {
+    console.error("Failed to load review project:", error);
+    res.status(500).json({ error: "Failed to load review project." });
+  }
+});
+
+app.post("/api/admin/review/projects/:id/approve", requireStaffReview, async (req, res) => {
+  try {
+    const result = await approveAdminReviewProject(req.session.userId, req.params.id, req.body);
+    res.json(result);
+  } catch (error) {
+    console.error("Failed to approve review project:", error);
+    res.status(400).json({ error: error.message || "Failed to approve project." });
+  }
+});
+
+app.post("/api/admin/review/projects/:id/reject", requireStaffReview, async (req, res) => {
+  try {
+    const project = await rejectAdminReviewProject(req.session.userId, req.params.id, req.body);
+    res.json({ project });
+  } catch (error) {
+    console.error("Failed to reject review project:", error);
+    res.status(400).json({ error: error.message || "Failed to reject project." });
+  }
+});
+
+app.patch("/api/admin/review/projects/:id", requireStaffReview, async (req, res) => {
+  try {
+    const reviewProject = await patchAdminReviewProjectFlags(req.params.id, req.body);
+    res.json(reviewProject);
+  } catch (error) {
+    console.error("Failed to update review project:", error);
+    res.status(400).json({ error: error.message || "Failed to update project." });
+  }
+});
+
+app.delete("/api/admin/review/projects/:id", requireSuperAdmin, async (req, res) => {
+  try {
+    const deleted = await deleteProjectBySuperadmin(req.params.id);
+    if (!deleted) {
+      res.status(404).json({ error: "Project not found." });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Failed to delete review project:", error);
+    res.status(500).json({ error: "Failed to delete project." });
+  }
+});
+
+app.get("/api/admin/shop/items", requireFullAdmin, async (req, res) => {
   try {
     const items = await listShopItems({ includeInactive: true });
     res.json({ items });
@@ -278,7 +412,7 @@ app.get("/api/admin/shop/items", requireAdmin, async (req, res) => {
   }
 });
 
-app.post("/api/admin/shop/items", requireAdmin, async (req, res) => {
+app.post("/api/admin/shop/items", requireFullAdmin, async (req, res) => {
   try {
     const item = await createShopItem(req.body);
     res.status(201).json({ item });
@@ -288,7 +422,7 @@ app.post("/api/admin/shop/items", requireAdmin, async (req, res) => {
   }
 });
 
-app.patch("/api/admin/shop/items/:id", requireAdmin, async (req, res) => {
+app.patch("/api/admin/shop/items/:id", requireFullAdmin, async (req, res) => {
   try {
     const item = await updateShopItem(req.params.id, req.body);
     if (!item) {
@@ -302,7 +436,7 @@ app.patch("/api/admin/shop/items/:id", requireAdmin, async (req, res) => {
   }
 });
 
-app.delete("/api/admin/shop/items/:id", requireAdmin, async (req, res) => {
+app.delete("/api/admin/shop/items/:id", requireFullAdmin, async (req, res) => {
   try {
     const deleted = await deleteShopItem(req.params.id);
     if (!deleted) {
@@ -316,7 +450,7 @@ app.delete("/api/admin/shop/items/:id", requireAdmin, async (req, res) => {
   }
 });
 
-app.post("/api/admin/shop/items/bulk_active", requireAdmin, async (req, res) => {
+app.post("/api/admin/shop/items/bulk_active", requireFullAdmin, async (req, res) => {
   try {
     await setAllShopItemsActive(req.body?.active);
     res.json({ ok: true });
@@ -326,7 +460,7 @@ app.post("/api/admin/shop/items/bulk_active", requireAdmin, async (req, res) => 
   }
 });
 
-app.get("/api/admin/users", requireAdmin, async (req, res) => {
+app.get("/api/admin/users", requireFullAdmin, async (req, res) => {
   try {
     const users = await listAdminUsers();
     res.json({ users });
@@ -336,7 +470,7 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
   }
 });
 
-app.get("/api/admin/users/:id", requireAdmin, async (req, res) => {
+app.get("/api/admin/users/:id", requireFullAdmin, async (req, res) => {
   try {
     const user = await getAdminUserById(req.params.id);
     if (!user) {

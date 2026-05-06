@@ -9,19 +9,28 @@ import { ShopPage } from "./components/ShopPage.jsx";
 import { TestPage } from "./components/TestPage.jsx";
 import { AdminAirtableSyncPage } from "./components/AdminAirtableSyncPage.jsx";
 import { AdminPage } from "./components/AdminPage.jsx";
+import { AdminReviewPage } from "./components/AdminReviewPage.jsx";
 import { AdminShopPage } from "./components/AdminShopPage.jsx";
 import { AdminShopOrdersPage } from "./components/AdminShopOrdersPage.jsx";
 import { AdminUsersPage } from "./components/AdminUsersPage.jsx";
 import { UserAreaPage } from "./components/UserAreaPage.jsx";
 
 const PROTECTED = new Set(["/main", "/shop", "/projects", "/faq", "/user", "/test", "/admin"]);
-const ADMIN_ONLY = new Set(["/admin"]);
+
+function canStaffReviewRole(role) {
+  return role === "reviewer" || role === "admin" || role === "superadmin";
+}
+
+function canFullAdminRole(role) {
+  return role === "admin" || role === "superadmin";
+}
 
 export default function App() {
   const [auth, setAuth] = useState({ status: "loading", user: null });
   const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
   const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
-  const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isAnyAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isReviewPath = pathname === "/admin/review" || pathname.startsWith("/admin/review/");
 
   const loadMe = useCallback(async () => {
     try {
@@ -45,15 +54,24 @@ export default function App() {
     );
   }
 
-  if ((PROTECTED.has(pathname) || isAdminPath) && !auth.user) {
+  if ((PROTECTED.has(pathname) || isAnyAdminPath) && !auth.user) {
     const returnTo = `${pathname}${window.location.search}${window.location.hash}`;
     window.location.replace(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     return null;
   }
 
-  if ((ADMIN_ONLY.has(pathname) || isAdminPath) && auth.user?.role !== "admin") {
-    window.location.replace("/main");
-    return null;
+  const role = auth.user?.role;
+
+  if (isAnyAdminPath && auth.user) {
+    if (isReviewPath) {
+      if (!canStaffReviewRole(role)) {
+        window.location.replace("/main");
+        return null;
+      }
+    } else if (!canFullAdminRole(role)) {
+      window.location.replace(canStaffReviewRole(role) ? "/admin/review" : "/main");
+      return null;
+    }
   }
 
   if (pathname === "/" && auth.user) {
@@ -110,9 +128,14 @@ export default function App() {
     case "/admin/shop/orders":
       page = <AdminShopOrdersPage />;
       break;
+    case "/admin/review":
+      page = <AdminReviewPage />;
+      break;
     default:
       if (pathname.startsWith("/admin/users/")) {
         page = <AdminUsersPage userId={pathname.split("/").pop()} />;
+      } else if (pathname.startsWith("/admin/review/project/")) {
+        page = <AdminReviewPage projectId={pathname.split("/").pop()} />;
       } else {
         page = <Hero />;
       }

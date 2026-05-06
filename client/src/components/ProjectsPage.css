@@ -75,11 +75,14 @@
 }
 
 .projects-page__title {
+  position: relative;
+  z-index: 1;
   margin: 0;
   color: #f5f5f5;
   text-shadow: 0 3px 0 #50483f;
   font-size: clamp(2rem, 3vw, 3.1rem);
   line-height: 1.05;
+  overflow-wrap: anywhere;
 }
 
 .projects-page__meta {

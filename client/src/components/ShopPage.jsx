@@ -13,10 +13,11 @@ import legoCharacter from "@assets/mainPage/section_2/legoChar_1.png";
 import "./ShopPage.css";
 
 export function ShopPage() {
-  const { user } = useAuth();
+  const { user, reload } = useAuth();
   const [shopItems, setShopItems] = useState([]);
   const [status, setStatus] = useState("Loading shop items...");
   const [error, setError] = useState("");
+  const [purchaseMessage, setPurchaseMessage] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
   const [purchaseQuantity, setPurchaseQuantity] = useState(1);
   const [shippingTaxUsd, setShippingTaxUsd] = useState("");
@@ -53,12 +54,38 @@ export function ShopPage() {
     setPurchaseQuantity(1);
     setShippingTaxUsd("");
     setRulesAccepted(false);
+    setPurchaseMessage("");
   }
 
   const baseCoins = selectedItem?.price ? Number(selectedItem.price) : 0;
   const quantity = Math.max(1, Number(purchaseQuantity) || 1);
   const shippingCoins = shippingTaxUsd ? Math.ceil(Number(shippingTaxUsd) * 10) : 0;
   const totalCoins = baseCoins * quantity + (Number.isFinite(shippingCoins) ? shippingCoins : 0);
+  const userCoins = Number(user?.coins ?? 0);
+  const hasEnoughCoins = userCoins >= totalCoins;
+
+  async function buySelectedItem() {
+    if (!selectedItem || !rulesAccepted || !hasEnoughCoins) return;
+
+    setPurchaseMessage("");
+    try {
+      const response = await fetch(`/api/shop/items/${selectedItem.id}/buy`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quantity,
+          shippingTaxUsd: shippingTaxUsd || 0,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to buy item.");
+      setPurchaseMessage(`Bought! Remaining balance: ${Math.floor(data.purchase.userCoins)} coins.`);
+      await reload?.();
+    } catch (err) {
+      setPurchaseMessage(err.message);
+    }
+  }
 
   useEffect(() => {
     function handleEscape(event) {
@@ -228,7 +255,14 @@ export function ShopPage() {
               <strong>{totalCoins} coins</strong>
             </div>
 
-            <button className="shop-page__modal-buy" type="button" disabled={!rulesAccepted}>
+            {!hasEnoughCoins ? (
+              <p className="shop-page__modal-warning">
+                Not enough coins. You have {Math.floor(userCoins)} coins, but this costs {totalCoins}.
+              </p>
+            ) : null}
+            {purchaseMessage ? <p className="shop-page__modal-warning">{purchaseMessage}</p> : null}
+
+            <button className="shop-page__modal-buy" type="button" disabled={!rulesAccepted || !hasEnoughCoins} onClick={buySelectedItem}>
               Buy
             </button>
           </section>

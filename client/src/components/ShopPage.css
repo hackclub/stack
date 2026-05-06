@@ -345,6 +345,16 @@
   font-weight: 800;
 }
 
+.shop-page__modal-warning {
+  margin: 0.7rem 0 0;
+  border: 2px dashed #9cb7ff;
+  border-radius: 12px;
+  padding: 0.55rem 0.65rem;
+  background: rgba(255, 255, 255, 0.58);
+  color: #304389;
+  font-weight: 700;
+}
+
 .shop-page__modal-buy {
   margin-top: 0.9rem;
   width: 100%;

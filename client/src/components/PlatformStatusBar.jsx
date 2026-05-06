@@ -14,7 +14,8 @@ export function PlatformStatusBar({ user, className = "" }) {
 
   const avatarSrc = user?.profileImageUrl || defaultAvatar;
   const username = user?.name || user?.slug || user?.email?.split("@")[0] || "User";
-  const isAdmin = user?.role === "admin";
+  const isFullAdmin = user?.role === "admin" || user?.role === "superadmin";
+  const isReviewerOnly = user?.role === "reviewer";
   const coins = Math.floor(Number(user?.coins ?? 0));
 
   useEffect(() => {
@@ -55,9 +56,14 @@ export function PlatformStatusBar({ user, className = "" }) {
       </button>
       {menuOpen && (
         <div className="platform-status__menu" role="menu">
-          {isAdmin ? (
+          {isFullAdmin ? (
             <a className="platform-status__menu-item" role="menuitem" href="/admin">
               Admin Panel
+            </a>
+          ) : null}
+          {isReviewerOnly ? (
+            <a className="platform-status__menu-item" role="menuitem" href="/admin/review">
+              Project Review
             </a>
           ) : null}
           <button type="button" className="platform-status__menu-item" role="menuitem" onClick={handleLogout}>
