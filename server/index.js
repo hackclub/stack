@@ -7,7 +7,15 @@ import { fileURLToPath } from "url";
 import { createAuthRouter } from "./authRoutes.js";
 import { getAirtableSyncStatus, startAirtableAutoSync, syncDatabaseToAirtable } from "./airtable.js";
 import { checkDatabaseConnection, getTestRows } from "./db.js";
-import { ensureUsersTable } from "./users.js";
+import {
+  createShopItem,
+  deleteShopItem,
+  ensureShopItemsTable,
+  listShopItems,
+  setAllShopItemsActive,
+  updateShopItem,
+} from "./shopItems.js";
+import { ensureUsersTable, getUserById } from "./users.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -44,6 +52,26 @@ app.use(
   })
 );
 app.use("/api/auth", createAuthRouter());
+
+async function requireAdmin(req, res, next) {
+  const userId = req.session?.userId;
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required." });
+    return;
+  }
+
+  try {
+    const user = await getUserById(userId);
+    if (user?.role !== "admin") {
+      res.status(403).json({ error: "Admin only." });
+      return;
+    }
+    next();
+  } catch (error) {
+    console.error("[admin] auth check failed:", error);
+    res.status(500).json({ error: "Failed to verify admin access." });
+  }
+}
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, service: "stack-api" });
@@ -116,6 +144,74 @@ app.get("/api/test", async (req, res) => {
   }
 });
 
+app.get("/api/shop/items", async (req, res) => {
+  try {
+    const items = await listShopItems();
+    res.json({ items });
+  } catch (error) {
+    console.error("Failed to load shop items:", error);
+    res.status(500).json({ error: "Failed to load shop items." });
+  }
+});
+
+app.get("/api/admin/shop/items", requireAdmin, async (req, res) => {
+  try {
+    const items = await listShopItems({ includeInactive: true });
+    res.json({ items });
+  } catch (error) {
+    console.error("Failed to load admin shop items:", error);
+    res.status(500).json({ error: "Failed to load admin shop items." });
+  }
+});
+
+app.post("/api/admin/shop/items", requireAdmin, async (req, res) => {
+  try {
+    const item = await createShopItem(req.body);
+    res.status(201).json({ item });
+  } catch (error) {
+    console.error("Failed to create shop item:", error);
+    res.status(500).json({ error: "Failed to create shop item." });
+  }
+});
+
+app.patch("/api/admin/shop/items/:id", requireAdmin, async (req, res) => {
+  try {
+    const item = await updateShopItem(req.params.id, req.body);
+    if (!item) {
+      res.status(404).json({ error: "Shop item not found." });
+      return;
+    }
+    res.json({ item });
+  } catch (error) {
+    console.error("Failed to update shop item:", error);
+    res.status(500).json({ error: "Failed to update shop item." });
+  }
+});
+
+app.delete("/api/admin/shop/items/:id", requireAdmin, async (req, res) => {
+  try {
+    const deleted = await deleteShopItem(req.params.id);
+    if (!deleted) {
+      res.status(404).json({ error: "Shop item not found." });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Failed to delete shop item:", error);
+    res.status(500).json({ error: "Failed to delete shop item." });
+  }
+});
+
+app.post("/api/admin/shop/items/bulk_active", requireAdmin, async (req, res) => {
+  try {
+    await setAllShopItemsActive(req.body?.active);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Failed to bulk update shop items:", error);
+    res.status(500).json({ error: "Failed to update shop items." });
+  }
+});
+
 app.get("/api/airtable/status", (req, res) => {
   res.json(getAirtableSyncStatus());
 });
@@ -150,8 +246,13 @@ if (isProd) {
 async function startServer() {
   try {
     await ensureUsersTable();
+    await ensureShopItemsTable();
+    console.log("[db] Database schema is up to date.");
   } catch (error) {
-    console.error("[users] Failed to ensure users table:", error);
+    console.error("[db] Failed to ensure database tables:", error);
+    if (isProd) {
+      throw error;
+    }
   }
 
   app.listen(PORT, () => {

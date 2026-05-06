@@ -133,7 +133,7 @@ export function Hero() {
           </a>
         </div>
 
-        <a className="section-two__join" href="/api/auth/hackclub/login" aria-label="Sign in with Hack Club to join Stack">
+        <a className="section-two__join" href="/login" aria-label="Sign up or log in with email to join Stack">
           <img src={joinButton} width={580} height={300} alt="Join!" />
         </a>
 

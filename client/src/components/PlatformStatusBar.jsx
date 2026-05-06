@@ -13,6 +13,8 @@ export function PlatformStatusBar({ user, className = "" }) {
   const rootRef = useRef(null);
 
   const avatarSrc = user?.profileImageUrl || defaultAvatar;
+  const username = user?.name || user?.slug || user?.email?.split("@")[0] || "User";
+  const isAdmin = user?.role === "admin";
 
   useEffect(() => {
     function onDocClick(event) {
@@ -52,6 +54,11 @@ export function PlatformStatusBar({ user, className = "" }) {
       </button>
       {menuOpen && (
         <div className="platform-status__menu" role="menu">
+          {isAdmin ? (
+            <a className="platform-status__menu-item" role="menuitem" href="/admin">
+              Admin Panel
+            </a>
+          ) : null}
           <button type="button" className="platform-status__menu-item" role="menuitem" onClick={handleLogout}>
             Log out
           </button>
@@ -64,6 +71,7 @@ export function PlatformStatusBar({ user, className = "" }) {
         </div>
         <div className="platform-status__row">
           <img className="platform-status__icon platform-status__icon--hearts" src={heartsIcon} alt="" aria-hidden="true" />
+          <span className="platform-status__username">{username}</span>
         </div>
       </div>
     </section>

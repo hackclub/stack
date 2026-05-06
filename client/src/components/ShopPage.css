@@ -72,6 +72,34 @@
   border-radius: 8px;
 }
 
+.shop-page__item-image {
+  position: absolute;
+  left: 20%;
+  top: 18%;
+  width: 60%;
+  height: 46%;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 8px rgba(21, 32, 58, 0.24));
+}
+
+.shop-page__status {
+  grid-column: 1 / -1;
+  align-self: center;
+  justify-self: center;
+  margin: 2rem 0;
+  padding: 1rem 1.2rem;
+  border: 3px solid #162456;
+  border-radius: 16px;
+  background: #fff8d8;
+  color: #162456;
+  box-shadow: 5px 5px 0 #162456;
+  font-size: 1.2rem;
+}
+
+.shop-page__status--error {
+  color: #b3261e;
+}
+
 .shop-page__buy {
   position: absolute;
   left: 50%;
@@ -217,6 +245,16 @@
   background-repeat: no-repeat;
   background-color: #e9efff;
   border: 2px solid #c7d6ff;
+}
+
+.shop-page__modal-image-img {
+  width: 100%;
+  height: 11rem;
+  margin-top: 0.6rem;
+  object-fit: contain;
+  border: 2px solid #c7d6ff;
+  border-radius: 12px;
+  background: #e9efff;
 }
 
 .shop-page__modal-title {
