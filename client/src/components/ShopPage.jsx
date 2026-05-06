@@ -12,60 +12,38 @@ import stackTitle from "@assets/platform/common/Stack_title.png";
 import legoCharacter from "@assets/mainPage/section_2/legoChar_1.png";
 import "./ShopPage.css";
 
-const shopItems = [
-  {
-    name: "Plant Kit",
-    cost: "12",
-    spriteX: 327,
-    spriteY: 180,
-    description: "A cozy desk bundle to brighten your build station.",
-    shippingCost: "3",
-  },
-  {
-    name: "Retro Set",
-    cost: "8",
-    spriteX: 501,
-    spriteY: 188,
-    description: "Classic throwback pieces with instant nostalgia.",
-    shippingCost: "4",
-  },
-  {
-    name: "Mug + Key",
-    cost: "6",
-    spriteX: 697,
-    spriteY: 186,
-    description: "A fun daily combo for coffee breaks and keys.",
-    shippingCost: "2",
-  },
-  {
-    name: "Robot Box",
-    cost: "7",
-    spriteX: 321,
-    spriteY: 356,
-    description: "A compact build set packed with motion and fun.",
-    shippingCost: "5",
-  },
-  {
-    name: "Game Pack",
-    cost: "10",
-    spriteX: 517,
-    spriteY: 356,
-    description: "A gamer-ready bundle for quick co-op energy.",
-    shippingCost: "4",
-  },
-  {
-    name: "Rocket Kit",
-    cost: "14",
-    spriteX: 706,
-    spriteY: 345,
-    description: "A launch-themed collector set for big dreamers.",
-    shippingCost: "6",
-  },
-];
-
 export function ShopPage() {
   const { user } = useAuth();
+  const [shopItems, setShopItems] = useState([]);
+  const [status, setStatus] = useState("Loading shop items...");
+  const [error, setError] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadShopItems() {
+      try {
+        const response = await fetch("/api/shop/items");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Failed to load shop items.");
+        if (isMounted) {
+          setShopItems(data.items || []);
+          setStatus("");
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err.message);
+          setStatus("");
+        }
+      }
+    }
+
+    loadShopItems();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     function handleEscape(event) {
@@ -90,18 +68,25 @@ export function ShopPage() {
       </section>
 
       <section className="shop-page__grid" aria-label="Shop items">
+        {status ? <p className="shop-page__status">{status}</p> : null}
+        {error ? <p className="shop-page__status shop-page__status--error">{error}</p> : null}
+        {!status && !error && shopItems.length === 0 ? <p className="shop-page__status">No shop items yet.</p> : null}
         {shopItems.map((item, index) => (
-          <article className="shop-page__card" key={`${item.name}-${index}`}>
+          <article className="shop-page__card" key={item.id ?? `${item.name}-${index}`}>
             <img className="shop-page__shelf" src={shelfBox} alt="" aria-hidden="true" />
-            <div
-              className="shop-page__item-art"
-              role="img"
-              aria-label={item.name}
-              style={{
-                backgroundImage: `url(${shopReference})`,
-                backgroundPosition: `-${item.spriteX}px -${item.spriteY}px`,
-              }}
-            />
+            {item.imageUrl ? (
+              <img className="shop-page__item-image" src={item.imageUrl} alt={item.name || "Shop item"} />
+            ) : (
+              <div
+                className="shop-page__item-art"
+                role="img"
+                aria-label={item.name}
+                style={{
+                  backgroundImage: `url(${shopReference})`,
+                  backgroundPosition: `-${327 + (index % 3) * 185}px -${180 + Math.floor(index / 3) * 170}px`,
+                }}
+              />
+            )}
             <button
               className="shop-page__buy"
               type="button"
@@ -112,7 +97,7 @@ export function ShopPage() {
             </button>
             <span className="shop-page__cost">
               <img src={shopCoin} alt="" aria-hidden="true" />
-              <strong>{item.cost}</strong>
+              <strong>{item.price ?? "0"}</strong>
             </span>
           </article>
         ))}
@@ -154,26 +139,18 @@ export function ShopPage() {
               x
             </button>
 
-            <div
-              className="shop-page__modal-image"
-              role="img"
-              aria-label={selectedItem.name}
-              style={{
-                backgroundImage: `url(${shopReference})`,
-                backgroundPosition: `-${selectedItem.spriteX}px -${selectedItem.spriteY}px`,
-              }}
-            />
+            {selectedItem.imageUrl ? (
+              <img className="shop-page__modal-image-img" src={selectedItem.imageUrl} alt={selectedItem.name || "Shop item"} />
+            ) : (
+              <div className="shop-page__modal-image" role="img" aria-label={selectedItem.name} />
+            )}
 
             <h2 className="shop-page__modal-title">{selectedItem.name}</h2>
             <p className="shop-page__modal-description">{selectedItem.description}</p>
 
             <div className="shop-page__modal-price-row">
               <span>Price</span>
-              <strong>{selectedItem.cost} coins</strong>
-            </div>
-            <div className="shop-page__modal-price-row">
-              <span>Shipping</span>
-              <strong>{selectedItem.shippingCost} coins</strong>
+              <strong>{selectedItem.price ?? "0"} coins</strong>
             </div>
 
             <button className="shop-page__modal-buy" type="button">

@@ -7,6 +7,8 @@ import { ProjectsPage } from "./components/ProjectsPage.jsx";
 import { ShopPage } from "./components/ShopPage.jsx";
 import { TestPage } from "./components/TestPage.jsx";
 import { AdminPage } from "./components/AdminPage.jsx";
+import { AdminShopPage } from "./components/AdminShopPage.jsx";
+import { AdminShopOrdersPage } from "./components/AdminShopOrdersPage.jsx";
 import { UserAreaPage } from "./components/UserAreaPage.jsx";
 
 const PROTECTED = new Set(["/main", "/shop", "/projects", "/faq", "/user", "/test", "/admin"]);
@@ -14,7 +16,9 @@ const ADMIN_ONLY = new Set(["/admin"]);
 
 export default function App() {
   const [auth, setAuth] = useState({ status: "loading", user: null });
+  const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
   const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
 
   const loadMe = useCallback(async () => {
     try {
@@ -30,8 +34,6 @@ export default function App() {
     loadMe();
   }, [loadMe]);
 
-  const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
-
   if (auth.status === "loading") {
     return (
       <div className="app-auth-loading" aria-busy="true">
@@ -40,13 +42,13 @@ export default function App() {
     );
   }
 
-  if (PROTECTED.has(pathname) && !auth.user) {
+  if ((PROTECTED.has(pathname) || isAdminPath) && !auth.user) {
     const returnTo = `${pathname}${window.location.search}${window.location.hash}`;
     window.location.replace(`/api/auth/hackclub/login?returnTo=${encodeURIComponent(returnTo)}`);
     return null;
   }
 
-  if (ADMIN_ONLY.has(pathname) && auth.user?.role !== "admin") {
+  if ((ADMIN_ONLY.has(pathname) || isAdminPath) && auth.user?.role !== "admin") {
     window.location.replace("/main");
     return null;
   }
@@ -84,6 +86,12 @@ export default function App() {
       break;
     case "/admin":
       page = <AdminPage />;
+      break;
+    case "/admin/shop":
+      page = <AdminShopPage />;
+      break;
+    case "/admin/shop/orders":
+      page = <AdminShopOrdersPage />;
       break;
     default:
       page = <Hero />;
