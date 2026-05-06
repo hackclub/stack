@@ -17,6 +17,7 @@ const passwordLoginLimiter = rateLimit({
   legacyHeaders: false,
   message: "Too many login attempts. Please try again in a few minutes.",
 });
+const LOCAL_DEV_AUTH_COOKIE = "stack.local_user";
 
 function normalizeReturnTo(value) {
   if (typeof value !== "string") return "/main";
@@ -29,6 +30,23 @@ function normalizeReturnTo(value) {
 
 function getAppOrigin() {
   return process.env.APP_ORIGIN || "http://localhost:5173";
+}
+
+function isLocalhostRequest(req) {
+  const hostHeader = (req.get("X-Forwarded-Host") || req.get("Host") || "")
+    .split(",")[0]
+    .trim()
+    .toLowerCase();
+  const hostname = hostHeader.split(":")[0];
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+function shouldUseLocalDevCookie(req) {
+  return process.env.NODE_ENV !== "production" && isLocalhostRequest(req);
+}
+
+function localDevCookieSecret() {
+  return process.env.DEV_AUTH_COOKIE_SECRET || process.env.SESSION_SECRET || "dev-local-auth-cookie-secret";
 }
 
 function normalizeEmail(email) {
@@ -52,6 +70,38 @@ function verifyPassword(password, storedHash) {
   const submittedHash = crypto.scryptSync(password, salt, 64);
   const storedBuffer = Buffer.from(hash, "hex");
   return storedBuffer.length === submittedHash.length && crypto.timingSafeEqual(storedBuffer, submittedHash);
+}
+
+function signLocalUserId(userId) {
+  const payload = String(userId);
+  const signature = crypto.createHmac("sha256", localDevCookieSecret()).update(payload).digest("hex");
+  return `${payload}.${signature}`;
+}
+
+function verifyLocalUserCookie(value) {
+  const [payload, signature] = String(value || "").split(".");
+  if (!payload || !signature) return null;
+
+  const expectedSignature = crypto.createHmac("sha256", localDevCookieSecret()).update(payload).digest("hex");
+  const actualBuffer = Buffer.from(signature, "hex");
+  const expectedBuffer = Buffer.from(expectedSignature, "hex");
+  if (actualBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(actualBuffer, expectedBuffer)) {
+    return null;
+  }
+
+  return payload;
+}
+
+function setLocalDevAuthCookie(req, res, userId) {
+  if (!shouldUseLocalDevCookie(req)) return;
+
+  res.cookie(LOCAL_DEV_AUTH_COOKIE, signLocalUserId(userId), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: false,
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    path: "/",
+  });
 }
 
 export function createAuthRouter() {
@@ -98,6 +148,7 @@ export function createAuthRouter() {
 
       req.session.userId = user.id;
       delete req.session.hackclubSub;
+      setLocalDevAuthCookie(req, res, user.id);
 
       res.json({ user: toPublicUser(user) });
     } catch (error) {
@@ -108,7 +159,15 @@ export function createAuthRouter() {
 
   router.get("/me", async (req, res) => {
     try {
-      const userId = req.session?.userId;
+      let userId = req.session?.userId;
+      if (!userId && shouldUseLocalDevCookie(req)) {
+        const restoredUserId = verifyLocalUserCookie(req.cookies?.[LOCAL_DEV_AUTH_COOKIE]);
+        if (restoredUserId) {
+          userId = restoredUserId;
+          req.session.userId = restoredUserId;
+        }
+      }
+
       if (!userId) {
         res.json({ user: null });
         return;
@@ -130,6 +189,7 @@ export function createAuthRouter() {
         return;
       }
       res.clearCookie("stack.sid", { path: "/" });
+      res.clearCookie(LOCAL_DEV_AUTH_COOKIE, { path: "/" });
       res.json({ ok: true });
     });
   });
