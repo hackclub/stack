@@ -100,6 +100,9 @@ export function AdminPage() {
   return (
     <main className="admin-page" aria-label="Admin page">
       <section className="admin-content">
+        <a className="admin-back-link" href="/main">
+          ← Back to platform
+        </a>
         <h1>Admin Panel</h1>
 
         <div className="admin-links">

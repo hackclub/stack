@@ -42,6 +42,8 @@ export async function ensureUsersTable() {
       scope TEXT,
       raw_profile JSONB,
       raw_token JSONB,
+      password_hash TEXT,
+      password_set_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -65,6 +67,8 @@ export async function ensureUsersTable() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS scope TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS raw_profile JSONB`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS raw_token JSONB`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_set_at TIMESTAMPTZ`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 
@@ -113,13 +117,17 @@ export async function ensureUsersTable() {
   `);
 }
 
-function resolveRole(email) {
+export function resolveRole(email) {
   const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
   const admins = parseEmailList(process.env.ADMIN_EMAILS);
   if (normalizedEmail && admins.includes(normalizedEmail)) {
     return "admin";
   }
   return DEFAULT_ROLE;
+}
+
+function normalizeEmail(email) {
+  return typeof email === "string" ? email.trim().toLowerCase() : "";
 }
 
 function hackclubSubFromProfile(profile) {
@@ -248,6 +256,110 @@ export async function getUserById(id) {
 
   const result = await pool.query(`SELECT * FROM users WHERE id = $1`, [id]);
   return result.rows[0] ?? null;
+}
+
+export async function getUserByEmail(email) {
+  if (!pool) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM users
+      WHERE lower(email) = $1
+      ORDER BY id ASC
+      LIMIT 1
+    `,
+    [normalizedEmail]
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function updateUserRoleFromEmail(id, email) {
+  if (!pool) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const result = await pool.query(
+    `
+      UPDATE users
+      SET
+        email = $1,
+        role = $2,
+        updated_at = NOW()
+      WHERE id = $3
+      RETURNING *
+    `,
+    [normalizeEmail(email), resolveRole(email), id]
+  );
+
+  return result.rows[0];
+}
+
+export async function setPasswordForExistingUser(id, email, passwordHash) {
+  if (!pool) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const result = await pool.query(
+    `
+      UPDATE users
+      SET
+        email = $1,
+        role = $2,
+        password_hash = $3,
+        password_set_at = NOW(),
+        updated_at = NOW()
+      WHERE id = $4
+      RETURNING *
+    `,
+    [normalizeEmail(email), resolveRole(email), passwordHash, id]
+  );
+
+  return result.rows[0];
+}
+
+export async function createUserFromEmailPassword(email, passwordHash) {
+  if (!pool) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) {
+    throw new Error("Email is required.");
+  }
+
+  const result = await pool.query(
+    `
+      INSERT INTO users (
+        hackclub_sub,
+        email,
+        name,
+        slug,
+        verification_status,
+        role,
+        password_hash,
+        password_set_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, NOW()
+      )
+      RETURNING *
+    `,
+    [
+      `email:${normalizedEmail}`,
+      normalizedEmail,
+      normalizedEmail.split("@")[0],
+      normalizedEmail.split("@")[0],
+      "password",
+      resolveRole(normalizedEmail),
+      passwordHash,
+    ]
+  );
+
+  return result.rows[0];
 }
 
 export function toPublicUser(row) {

@@ -17,6 +17,14 @@ const SHOP_ITEM_COLUMNS = [
   "synced_at",
 ];
 
+const REMOVED_SHOP_ITEM_COLUMNS = [
+  "category",
+  "grant_type",
+  "shop_grant_type_id",
+  "item_quantity",
+  "shipping_tax_cents",
+];
+
 export async function ensureShopItemsTable() {
   if (!pool) {
     console.warn("[shop] DATABASE_URL not set; skipping shop_items table setup.");
@@ -45,6 +53,17 @@ export async function ensureShopItemsTable() {
 
   for (const column of SHOP_ITEM_COLUMNS) {
     await ensureShopItemColumn(column);
+  }
+
+  await pool.query(`
+    UPDATE shop_items
+    SET price = price_usd * 10
+    WHERE price_usd IS NOT NULL
+      AND (price IS NULL OR price != price_usd * 10)
+  `);
+
+  for (const column of REMOVED_SHOP_ITEM_COLUMNS) {
+    await pool.query(`ALTER TABLE shop_items DROP COLUMN IF EXISTS ${column}`);
   }
 }
 

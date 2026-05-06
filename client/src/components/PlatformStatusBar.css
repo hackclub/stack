@@ -66,6 +66,18 @@
   margin-left: 25px;
 }
 
+.platform-status__username {
+  margin-left: 0.55rem;
+  max-width: 10rem;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: clamp(1rem, 1.35vw, 1.45rem);
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 0 #1b3a7a;
+  white-space: nowrap;
+}
+
 .platform-status__text {
   margin-left: 0.45rem;
   color: #4bb3ff;
@@ -87,12 +99,15 @@
 }
 
 .platform-status__menu-item {
+  display: block;
+  box-sizing: border-box;
   width: 100%;
   padding: 0.5rem 1rem;
   border: none;
   background: transparent;
   color: #e8f4ff;
   font: inherit;
+  text-decoration: none;
   text-align: left;
   cursor: pointer;
 }

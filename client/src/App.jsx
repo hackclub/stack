@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AuthContext } from "./auth/AuthContext.jsx";
 import { FaqPage } from "./components/FaqPage.jsx";
 import { Hero } from "./components/Hero.jsx";
+import { LoginPage } from "./components/LoginPage.jsx";
 import { MainPage } from "./components/MainPage.jsx";
 import { ProjectsPage } from "./components/ProjectsPage.jsx";
 import { ShopPage } from "./components/ShopPage.jsx";
@@ -44,7 +45,7 @@ export default function App() {
 
   if ((PROTECTED.has(pathname) || isAdminPath) && !auth.user) {
     const returnTo = `${pathname}${window.location.search}${window.location.hash}`;
-    window.location.replace(`/api/auth/hackclub/login?returnTo=${encodeURIComponent(returnTo)}`);
+    window.location.replace(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     return null;
   }
 
@@ -54,6 +55,11 @@ export default function App() {
   }
 
   if (pathname === "/" && auth.user) {
+    window.location.replace("/main");
+    return null;
+  }
+
+  if (pathname === "/login" && auth.user) {
     window.location.replace("/main");
     return null;
   }
@@ -68,6 +74,9 @@ export default function App() {
   switch (pathname) {
     case "/main":
       page = <MainPage />;
+      break;
+    case "/login":
+      page = <LoginPage />;
       break;
     case "/test":
       page = isLocalhost ? <TestPage /> : <AdminPage />;

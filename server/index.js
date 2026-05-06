@@ -53,21 +53,7 @@ app.use(
 );
 app.use("/api/auth", createAuthRouter());
 
-function isLocalhostRequest(req) {
-  const hostHeader = (req.get("X-Forwarded-Host") || req.get("Host") || "")
-    .split(",")[0]
-    .trim()
-    .toLowerCase();
-  const hostname = hostHeader.split(":")[0];
-  return hostname === "localhost" || hostname === "127.0.0.1";
-}
-
 async function requireAdmin(req, res, next) {
-  if (!isProd && isLocalhostRequest(req)) {
-    next();
-    return;
-  }
-
   const userId = req.session?.userId;
   if (!userId) {
     res.status(401).json({ error: "Authentication required." });
@@ -261,8 +247,12 @@ async function startServer() {
   try {
     await ensureUsersTable();
     await ensureShopItemsTable();
+    console.log("[db] Database schema is up to date.");
   } catch (error) {
     console.error("[db] Failed to ensure database tables:", error);
+    if (isProd) {
+      throw error;
+    }
   }
 
   app.listen(PORT, () => {
