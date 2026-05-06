@@ -4,7 +4,7 @@ import "./AdminPage.css";
 const adminLinks = [
   { href: "/admin/stats", icon: "📊", title: "Platform Statistics", desc: "Overview of projects, hours, users, and shop activity" },
   { href: "/admin/users", icon: "👥", title: "Users", desc: "Bolts, projects, hours, journals, and shop activity per participant" },
-  { href: "/admin/journals", icon: "🧾", title: "Journal entries (CSV)", desc: "All journal rows in one spreadsheet, sorted by project then time" },
+  { href: "/api/admin/journals.csv", icon: "🧾", title: "Journal entries (CSV)", desc: "All journal rows in one spreadsheet, sorted by project then time" },
   { href: "/admin/review", icon: "📋", title: "Project Review", desc: "Review shipped projects and approve hours" },
   { href: "/admin/shop", icon: "🛒", title: "Shop Admin", desc: "Manage catalog, categories, and pricing" },
   { href: "/admin/shop/orders", icon: "📦", title: "Shop orders", desc: "Fulfillment queue, group by user or item, refunds" },

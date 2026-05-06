@@ -10,7 +10,6 @@ const emptyForm = {
   itemLink: "",
   imageUrl: "",
   description: "",
-  position: "",
   active: true,
 };
 
@@ -251,7 +250,7 @@ export function AdminShopPage() {
 }
 
 function ShopItemForm({ value, submitLabel, onChange, onSubmit }) {
-  const coinValue = value.priceUsd ? Number(value.priceUsd) * 10 : 0;
+  const coinValue = value.priceUsd ? Math.ceil(Number(value.priceUsd) * 10) : 0;
 
   return (
     <form className="admin-shop-form" onSubmit={onSubmit}>
@@ -279,7 +278,7 @@ function ShopItemForm({ value, submitLabel, onChange, onSubmit }) {
       </label>
       <label>
         Coins
-        <input type="number" step="0.01" value={coinValue || ""} readOnly />
+        <input type="number" value={coinValue || ""} readOnly />
       </label>
       <label>
         Max purchases per person
@@ -292,10 +291,6 @@ function ShopItemForm({ value, submitLabel, onChange, onSubmit }) {
       <label>
         Image URL
         <input value={value.imageUrl || ""} onChange={(event) => onChange("imageUrl", event.target.value)} />
-      </label>
-      <label>
-        Position
-        <input type="number" value={value.position || ""} onChange={(event) => onChange("position", event.target.value)} />
       </label>
       <label>
         Active

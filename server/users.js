@@ -34,6 +34,7 @@ export async function ensureUsersTable() {
       slack_id TEXT,
       verification_status TEXT,
       role TEXT NOT NULL DEFAULT '${DEFAULT_ROLE}',
+      coins NUMERIC(10, 2) NOT NULL DEFAULT 0,
       access_token TEXT,
       refresh_token TEXT,
       token_type TEXT,
@@ -59,6 +60,7 @@ export async function ensureUsersTable() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS slack_id TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_status TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS coins NUMERIC(10, 2) NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS access_token TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS refresh_token TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS token_type TEXT`);
@@ -81,6 +83,17 @@ export async function ensureUsersTable() {
   await pool.query(`
     ALTER TABLE users
     ALTER COLUMN role SET DEFAULT '${DEFAULT_ROLE}'
+  `);
+
+  await pool.query(`
+    UPDATE users
+    SET coins = 0
+    WHERE coins IS NULL
+  `);
+
+  await pool.query(`
+    ALTER TABLE users
+    ALTER COLUMN coins SET DEFAULT 0
   `);
 
   await pool.query(`
@@ -270,6 +283,7 @@ export async function listAdminUsers() {
       name,
       slug,
       role,
+      coins,
       hackclub_sub,
       profile_image_url,
       verification_status,
@@ -296,6 +310,7 @@ export async function getAdminUserById(id) {
         name,
         slug,
         role,
+        coins,
         hackclub_sub,
         profile_image_url,
         verification_status,
@@ -427,6 +442,7 @@ export function toPublicUser(row) {
     slackId: row.slack_id,
     verificationStatus: row.verification_status,
     role: row.role,
+    coins: Number(row.coins ?? 0),
   };
 }
 
@@ -437,6 +453,7 @@ function toAdminUser(row) {
     name: row.name,
     slug: row.slug,
     role: row.role,
+    coins: Number(row.coins ?? 0),
     hackclubSub: row.hackclub_sub,
     profileImageUrl: row.profile_image_url,
     verificationStatus: row.verification_status,

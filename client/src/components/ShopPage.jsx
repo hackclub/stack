@@ -18,6 +18,9 @@ export function ShopPage() {
   const [status, setStatus] = useState("Loading shop items...");
   const [error, setError] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
+  const [purchaseQuantity, setPurchaseQuantity] = useState(1);
+  const [shippingTaxUsd, setShippingTaxUsd] = useState("");
+  const [rulesAccepted, setRulesAccepted] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -44,6 +47,18 @@ export function ShopPage() {
       isMounted = false;
     };
   }, []);
+
+  function openItem(item) {
+    setSelectedItem(item);
+    setPurchaseQuantity(1);
+    setShippingTaxUsd("");
+    setRulesAccepted(false);
+  }
+
+  const baseCoins = selectedItem?.price ? Number(selectedItem.price) : 0;
+  const quantity = Math.max(1, Number(purchaseQuantity) || 1);
+  const shippingCoins = shippingTaxUsd ? Math.ceil(Number(shippingTaxUsd) * 10) : 0;
+  const totalCoins = baseCoins * quantity + (Number.isFinite(shippingCoins) ? shippingCoins : 0);
 
   useEffect(() => {
     function handleEscape(event) {
@@ -91,7 +106,7 @@ export function ShopPage() {
               className="shop-page__buy"
               type="button"
               aria-label={`Buy ${item.name}`}
-              onClick={() => setSelectedItem(item)}
+              onClick={() => openItem(item)}
             >
               <img src={buyBtn} alt="" aria-hidden="true" />
             </button>
@@ -149,11 +164,71 @@ export function ShopPage() {
             <p className="shop-page__modal-description">{selectedItem.description}</p>
 
             <div className="shop-page__modal-price-row">
-              <span>Price</span>
+              <span>Item price</span>
               <strong>{selectedItem.price ?? "0"} coins</strong>
             </div>
+            <div className="shop-page__modal-price-row">
+              <span>USD value</span>
+              <strong>${selectedItem.priceUsd ?? "—"}</strong>
+            </div>
+            {selectedItem.maxPerPerson ? (
+              <div className="shop-page__modal-price-row">
+                <span>Limit</span>
+                <strong>{selectedItem.maxPerPerson} per person</strong>
+              </div>
+            ) : null}
 
-            <button className="shop-page__modal-buy" type="button">
+            {selectedItem.itemLink ? (
+              <a className="shop-page__modal-link" href={selectedItem.itemLink} target="_blank" rel="noreferrer">
+                View item link
+              </a>
+            ) : null}
+
+            <label className="shop-page__modal-field">
+              <span>Quantity</span>
+              <input
+                type="number"
+                min="1"
+                max={selectedItem.maxPerPerson || undefined}
+                value={purchaseQuantity}
+                onChange={(event) => setPurchaseQuantity(event.target.value)}
+              />
+            </label>
+
+            <label className="shop-page__modal-field">
+              <span>Shipping/Tax $ <small>(optional, USD)</small></span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0"
+                value={shippingTaxUsd}
+                onChange={(event) => setShippingTaxUsd(event.target.value)}
+              />
+            </label>
+
+            <div className="shop-page__modal-rules">
+              <strong>Shop Rules</strong>
+              <p>
+                Fulfillment will be provided as a grant/card to buy this prize. If shipping, customs, or taxes cost extra,
+                add the extra USD amount above before purchase.
+              </p>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={rulesAccepted}
+                  onChange={(event) => setRulesAccepted(event.target.checked)}
+                />
+                I have read the shop rules and understand the conditions.
+              </label>
+            </div>
+
+            <div className="shop-page__modal-total">
+              <span>Total</span>
+              <strong>{totalCoins} coins</strong>
+            </div>
+
+            <button className="shop-page__modal-buy" type="button" disabled={!rulesAccepted}>
               Buy
             </button>
           </section>

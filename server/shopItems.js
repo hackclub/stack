@@ -12,7 +12,6 @@ const SHOP_ITEM_COLUMNS = [
   "max_per_person",
   "price_usd",
   "dollar_per_hour",
-  "position",
   "airtable_id",
   "synced_at",
 ];
@@ -23,6 +22,7 @@ const REMOVED_SHOP_ITEM_COLUMNS = [
   "shop_grant_type_id",
   "item_quantity",
   "shipping_tax_cents",
+  "position",
 ];
 
 export async function ensureShopItemsTable() {
@@ -45,7 +45,6 @@ export async function ensureShopItemsTable() {
       max_per_person INTEGER,
       price_usd NUMERIC(10, 2),
       dollar_per_hour NUMERIC(10, 2),
-      position INTEGER,
       airtable_id VARCHAR,
       synced_at DATE
     )
@@ -57,9 +56,9 @@ export async function ensureShopItemsTable() {
 
   await pool.query(`
     UPDATE shop_items
-    SET price = price_usd * 10
+    SET price = CEIL(price_usd * 10)
     WHERE price_usd IS NOT NULL
-      AND (price IS NULL OR price != price_usd * 10)
+      AND (price IS NULL OR price != CEIL(price_usd * 10))
   `);
 
   for (const column of REMOVED_SHOP_ITEM_COLUMNS) {
@@ -80,7 +79,6 @@ async function ensureShopItemColumn(column) {
     max_per_person: "INTEGER",
     price_usd: "NUMERIC(10, 2)",
     dollar_per_hour: "NUMERIC(10, 2)",
-    position: "INTEGER",
     airtable_id: "VARCHAR",
     synced_at: "DATE",
   };
@@ -96,7 +94,7 @@ export async function listShopItems({ includeInactive = false } = {}) {
     SELECT *
     FROM shop_items
     ${where}
-    ORDER BY position ASC NULLS LAST, created_at DESC, id DESC
+    ORDER BY created_at DESC, id DESC
   `);
   return result.rows.map(toPublicShopItem);
 }
@@ -109,10 +107,10 @@ export async function createShopItem(input) {
     `
       INSERT INTO shop_items (
         name, price, item_link, image_url, description, active, max_per_person,
-        price_usd, dollar_per_hour, position, airtable_id, synced_at
+        price_usd, dollar_per_hour, airtable_id, synced_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7,
-        $8, $9, $10, $11, $12
+        $8, $9, $10, $11
       )
       RETURNING *
     `,
@@ -138,11 +136,10 @@ export async function updateShopItem(id, input) {
         max_per_person = $7,
         price_usd = $8,
         dollar_per_hour = $9,
-        position = $10,
-        airtable_id = $11,
-        synced_at = $12,
+        airtable_id = $10,
+        synced_at = $11,
         updated_at = NOW()
-      WHERE id = $13
+      WHERE id = $12
       RETURNING *
     `,
     [...shopItemValues(values), id]
@@ -166,7 +163,7 @@ function normalizeShopItemInput(input = {}) {
   const priceUsd = numberOrNull(input.priceUsd ?? input.price_usd);
   return {
     name: textOrNull(input.name),
-    price: priceUsd === null ? numberOrNull(input.price) : priceUsd * 10,
+    price: priceUsd === null ? integerOrNull(input.price) : Math.ceil(priceUsd * 10),
     itemLink: textOrNull(input.itemLink ?? input.item_link),
     imageUrl: textOrNull(input.imageUrl ?? input.image_url),
     description: textOrNull(input.description),
@@ -174,7 +171,6 @@ function normalizeShopItemInput(input = {}) {
     maxPerPerson: integerOrNull(input.maxPerPerson ?? input.max_per_person),
     priceUsd,
     dollarPerHour: numberOrNull(input.dollarPerHour ?? input.dollar_per_hour),
-    position: integerOrNull(input.position),
     airtableId: textOrNull(input.airtableId ?? input.airtable_id),
     syncedAt: dateOrNull(input.syncedAt ?? input.synced_at),
   };
@@ -191,7 +187,6 @@ function shopItemValues(item) {
     item.maxPerPerson,
     item.priceUsd,
     item.dollarPerHour,
-    item.position,
     item.airtableId,
     item.syncedAt,
   ];
@@ -233,7 +228,6 @@ function toPublicShopItem(row) {
     maxPerPerson: row.max_per_person,
     priceUsd: row.price_usd,
     dollarPerHour: row.dollar_per_hour,
-    position: row.position,
     airtableId: row.airtable_id,
     syncedAt: row.synced_at,
   };

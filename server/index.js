@@ -15,6 +15,17 @@ import {
   setAllShopItemsActive,
   updateShopItem,
 } from "./shopItems.js";
+import {
+  createProjectForUser,
+  createJournalEntryForUser,
+  deleteProjectForUser,
+  ensureProjectsTable,
+  getJournalEntriesCsv,
+  listJournalEntriesForUserProject,
+  listProjectsForUser,
+  shipProjectForUser,
+  updateProjectForUser,
+} from "./projects.js";
 import { ensureUsersTable, getAdminUserById, getUserById, listAdminUsers } from "./users.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -71,6 +82,15 @@ async function requireAdmin(req, res, next) {
     console.error("[admin] auth check failed:", error);
     res.status(500).json({ error: "Failed to verify admin access." });
   }
+}
+
+function requireUser(req, res, next) {
+  const userId = req.session?.userId;
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required." });
+    return;
+  }
+  next();
 }
 
 app.get("/api/health", (req, res) => {
@@ -151,6 +171,100 @@ app.get("/api/shop/items", async (req, res) => {
   } catch (error) {
     console.error("Failed to load shop items:", error);
     res.status(500).json({ error: "Failed to load shop items." });
+  }
+});
+
+app.get("/api/projects", requireUser, async (req, res) => {
+  try {
+    const projects = await listProjectsForUser(req.session.userId);
+    res.json({ projects, hackatimeAvailable: false });
+  } catch (error) {
+    console.error("Failed to load projects:", error);
+    res.status(500).json({ error: "Failed to load projects." });
+  }
+});
+
+app.post("/api/projects", requireUser, async (req, res) => {
+  try {
+    const project = await createProjectForUser(req.session.userId, req.body);
+    res.status(201).json({ project });
+  } catch (error) {
+    console.error("Failed to create project:", error);
+    res.status(500).json({ error: error.message || "Failed to create project." });
+  }
+});
+
+app.patch("/api/projects/:id", requireUser, async (req, res) => {
+  try {
+    const project = await updateProjectForUser(req.session.userId, req.params.id, req.body);
+    if (!project) {
+      res.status(404).json({ error: "Project not found." });
+      return;
+    }
+    res.json({ project });
+  } catch (error) {
+    console.error("Failed to update project:", error);
+    res.status(500).json({ error: error.message || "Failed to update project." });
+  }
+});
+
+app.post("/api/projects/:id/ship", requireUser, async (req, res) => {
+  try {
+    const project = await shipProjectForUser(req.session.userId, req.params.id);
+    res.json({ project });
+  } catch (error) {
+    console.error("Failed to ship project:", error);
+    res.status(400).json({ error: error.message || "Failed to ship project." });
+  }
+});
+
+app.delete("/api/projects/:id", requireUser, async (req, res) => {
+  try {
+    const deleted = await deleteProjectForUser(req.session.userId, req.params.id);
+    if (!deleted) {
+      res.status(404).json({ error: "Project not found." });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Failed to delete project:", error);
+    res.status(500).json({ error: "Failed to delete project." });
+  }
+});
+
+app.get("/api/projects/:id/journal_entries", requireUser, async (req, res) => {
+  try {
+    const entries = await listJournalEntriesForUserProject(req.session.userId, req.params.id);
+    res.json({ entries });
+  } catch (error) {
+    console.error("Failed to load journal entries:", error);
+    res.status(500).json({ error: "Failed to load journal entries." });
+  }
+});
+
+app.post("/api/projects/:id/journal_entries", requireUser, async (req, res) => {
+  try {
+    const result = await createJournalEntryForUser(req.session.userId, {
+      ...req.body,
+      projectId: req.params.id,
+    });
+    res.status(201).json(result);
+  } catch (error) {
+    console.error("Failed to create journal entry:", error);
+    res.status(500).json({ error: error.message || "Failed to create journal entry." });
+  }
+});
+
+app.get("/api/admin/journals.csv", requireAdmin, async (req, res) => {
+  try {
+    const csv = await getJournalEntriesCsv();
+    const today = new Date().toISOString().slice(0, 10);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="stack-journal-entries-${today}.csv"`);
+    res.send(`\uFEFF${csv}`);
+  } catch (error) {
+    console.error("Failed to export journal entries:", error);
+    res.status(500).json({ error: "Failed to export journal entries." });
   }
 });
 
@@ -270,6 +384,7 @@ if (isProd) {
 async function startServer() {
   try {
     await ensureUsersTable();
+    await ensureProjectsTable();
     await ensureShopItemsTable();
     console.log("[db] Database schema is up to date.");
   } catch (error) {
