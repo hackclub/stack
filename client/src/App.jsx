@@ -5,6 +5,7 @@ import { Hero } from "./components/Hero.jsx";
 import { MainPage } from "./components/MainPage.jsx";
 import { ProjectsPage } from "./components/ProjectsPage.jsx";
 import { ShopPage } from "./components/ShopPage.jsx";
+import { TestPage } from "./components/TestPage.jsx";
 import { AdminPage } from "./components/AdminPage.jsx";
 import { UserAreaPage } from "./components/UserAreaPage.jsx";
 
@@ -13,6 +14,7 @@ const ADMIN_ONLY = new Set(["/admin"]);
 
 export default function App() {
   const [auth, setAuth] = useState({ status: "loading", user: null });
+  const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
   const loadMe = useCallback(async () => {
     try {
@@ -66,8 +68,8 @@ export default function App() {
       page = <MainPage />;
       break;
     case "/test":
-      window.location.replace("/admin#admin-airtable-sync");
-      return null;
+      page = isLocalhost ? <TestPage /> : <AdminPage />;
+      break;
     case "/projects":
       page = <ProjectsPage />;
       break;
