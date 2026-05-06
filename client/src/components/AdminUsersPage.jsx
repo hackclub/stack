@@ -145,7 +145,8 @@ export function AdminUsersPage({ userId = null }) {
             <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
               <option value="any">Any role</option>
               <option value="member">Members</option>
-              <option value="admin">Admins</option>
+              <option value="reviewer">Reviewers</option>
+              <option value="superadmin">Superadmins</option>
             </select>
           </label>
           <label>

@@ -132,11 +132,40 @@ export async function ensureUsersTable() {
 
 export function resolveRole(email) {
   const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+  const superadmins = parseEmailList(process.env.SUPERADMIN_EMAILS);
   const admins = parseEmailList(process.env.ADMIN_EMAILS);
+  const reviewers = parseEmailList(process.env.REVIEWERS_EMAILS);
+
+  if (normalizedEmail && superadmins.includes(normalizedEmail)) {
+    return "superadmin";
+  }
   if (normalizedEmail && admins.includes(normalizedEmail)) {
     return "admin";
   }
+  if (normalizedEmail && reviewers.includes(normalizedEmail)) {
+    return "reviewer";
+  }
   return DEFAULT_ROLE;
+}
+
+export function effectiveRole(row) {
+  if (!row) return null;
+  if (typeof row.email === "string" && row.email.trim()) {
+    return resolveRole(row.email);
+  }
+  return row.role || DEFAULT_ROLE;
+}
+
+export function canAccessStaffReview(role) {
+  return role === "reviewer" || role === "admin" || role === "superadmin";
+}
+
+export function canAccessFullAdmin(role) {
+  return role === "admin" || role === "superadmin";
+}
+
+export function canPerformDestructiveAdmin(role) {
+  return role === "superadmin";
 }
 
 function normalizeEmail(email) {
@@ -223,11 +252,7 @@ export async function upsertUserFromHackClub({ profile, token }) {
       profile_image_url = COALESCE(EXCLUDED.profile_image_url, users.profile_image_url),
       slack_id = COALESCE(EXCLUDED.slack_id, users.slack_id),
       verification_status = COALESCE(EXCLUDED.verification_status, users.verification_status),
-      role = CASE
-        WHEN users.role = 'admin' THEN users.role
-        WHEN EXCLUDED.role = 'admin' THEN 'admin'
-        ELSE users.role
-      END,
+      role = EXCLUDED.role,
       access_token = EXCLUDED.access_token,
       refresh_token = EXCLUDED.refresh_token,
       token_type = EXCLUDED.token_type,
@@ -441,7 +466,7 @@ export function toPublicUser(row) {
     profileImageUrl: row.profile_image_url,
     slackId: row.slack_id,
     verificationStatus: row.verification_status,
-    role: row.role,
+    role: effectiveRole(row),
     coins: Number(row.coins ?? 0),
   };
 }
@@ -452,7 +477,7 @@ function toAdminUser(row) {
     email: row.email,
     name: row.name,
     slug: row.slug,
-    role: row.role,
+    role: effectiveRole(row),
     coins: Number(row.coins ?? 0),
     hackclubSub: row.hackclub_sub,
     profileImageUrl: row.profile_image_url,

@@ -159,6 +159,72 @@ export async function setAllShopItemsActive(active) {
   await pool.query("UPDATE shop_items SET active = $1, updated_at = NOW()", [Boolean(active)]);
 }
 
+export async function purchaseShopItemForUser(userId, itemId, input = {}) {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const quantity = Math.max(1, integerOrNull(input.quantity) || 1);
+  const shippingTaxUsd = Math.max(0, numberOrNull(input.shippingTaxUsd ?? input.shipping_tax_usd) || 0);
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const itemResult = await client.query(
+      `
+        SELECT *
+        FROM shop_items
+        WHERE id = $1
+          AND active IS TRUE
+        FOR UPDATE
+      `,
+      [itemId]
+    );
+    const item = itemResult.rows[0];
+    if (!item) throw new Error("Shop item not found.");
+
+    if (item.max_per_person && quantity > item.max_per_person) {
+      throw new Error(`Limit is ${item.max_per_person} per person.`);
+    }
+
+    const itemCoins = Number(item.price ?? 0);
+    const shippingCoins = Math.ceil(shippingTaxUsd * 10);
+    const totalCoins = itemCoins * quantity + shippingCoins;
+
+    const userResult = await client.query(
+      `
+        UPDATE users
+        SET coins = coins - $1,
+            updated_at = NOW()
+        WHERE id = $2
+          AND coins >= $1
+        RETURNING id, coins
+      `,
+      [totalCoins, userId]
+    );
+
+    if (!userResult.rows[0]) {
+      const currentUser = await client.query("SELECT coins FROM users WHERE id = $1", [userId]);
+      const availableCoins = Number(currentUser.rows[0]?.coins ?? 0);
+      throw new Error(`Not enough coins. You have ${Math.floor(availableCoins)} coins, but this costs ${totalCoins}.`);
+    }
+
+    await client.query("COMMIT");
+
+    return {
+      item: toPublicShopItem(item),
+      quantity,
+      shippingTaxUsd,
+      totalCoins,
+      userCoins: Number(userResult.rows[0].coins ?? 0),
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 function normalizeShopItemInput(input = {}) {
   const priceUsd = numberOrNull(input.priceUsd ?? input.price_usd);
   return {

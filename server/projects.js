@@ -19,9 +19,17 @@ export async function ensureProjectsTable() {
       hackatime_names JSONB NOT NULL DEFAULT '[]'::jsonb,
       status TEXT NOT NULL DEFAULT 'draft',
       shipped BOOLEAN NOT NULL DEFAULT FALSE,
+      reviewed BOOLEAN NOT NULL DEFAULT FALSE,
       total_hours NUMERIC(10, 2) NOT NULL DEFAULT 0,
       approved_hours NUMERIC(10, 2) NOT NULL DEFAULT 0,
+      past_approved_hours NUMERIC(10, 2) NOT NULL DEFAULT 0,
+      coins_earned NUMERIC(10, 2) NOT NULL DEFAULT 0,
+      admin_feedback TEXT,
+      hour_justification TEXT,
+      reviewed_at TIMESTAMPTZ,
+      reviewed_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       shipped_at TIMESTAMPTZ,
+      fraud_flag BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -38,9 +46,17 @@ export async function ensureProjectsTable() {
     hackatime_names: "JSONB NOT NULL DEFAULT '[]'::jsonb",
     status: "TEXT NOT NULL DEFAULT 'draft'",
     shipped: "BOOLEAN NOT NULL DEFAULT FALSE",
+    reviewed: "BOOLEAN NOT NULL DEFAULT FALSE",
     total_hours: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
     approved_hours: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
+    past_approved_hours: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
+    coins_earned: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
+    admin_feedback: "TEXT",
+    hour_justification: "TEXT",
+    reviewed_at: "TIMESTAMPTZ",
+    reviewed_by_user_id: "INTEGER REFERENCES users(id) ON DELETE SET NULL",
     shipped_at: "TIMESTAMPTZ",
+    fraud_flag: "BOOLEAN NOT NULL DEFAULT FALSE",
     created_at: "TIMESTAMPTZ NOT NULL DEFAULT NOW()",
     updated_at: "TIMESTAMPTZ NOT NULL DEFAULT NOW()",
   };
@@ -50,8 +66,13 @@ export async function ensureProjectsTable() {
   }
 
   await pool.query("ALTER TABLE projects DROP COLUMN IF EXISTS github_username");
+  await pool.query(`UPDATE projects SET reviewed = FALSE WHERE reviewed IS NULL`);
+  await pool.query(`UPDATE projects SET past_approved_hours = COALESCE(approved_hours, 0) WHERE past_approved_hours IS NULL`);
+  await pool.query(`UPDATE projects SET coins_earned = 0 WHERE coins_earned IS NULL`);
+  await pool.query(`UPDATE projects SET fraud_flag = FALSE WHERE fraud_flag IS NULL`);
 
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_projects_user_name_lower ON projects(user_id, LOWER(name))`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS journal_entries (
@@ -114,6 +135,7 @@ export async function createProjectForUser(userId, input) {
 
   const project = normalizeProjectInput(input);
   validateProjectBasics(project);
+  await assertProjectNameAvailable(userId, project.name);
 
   const result = await pool.query(
     `
@@ -151,6 +173,7 @@ export async function updateProjectForUser(userId, projectId, input) {
 
   const project = normalizeProjectInput(input);
   validateProjectBasics(project);
+  await assertProjectNameAvailable(userId, project.name, projectId);
 
   const result = await pool.query(
     `
@@ -202,6 +225,7 @@ export async function shipProjectForUser(userId, projectId) {
       SET
         shipped = TRUE,
         status = 'in-review',
+        reviewed = FALSE,
         shipped_at = NOW(),
         updated_at = NOW()
       WHERE user_id = $1
@@ -212,6 +236,202 @@ export async function shipProjectForUser(userId, projectId) {
   );
 
   return toPublicProject(result.rows[0]);
+}
+
+export async function listAdminReviewProjects({ shipSort = "oldest" } = {}) {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const direction = shipSort === "newest" ? "DESC" : "ASC";
+  const result = await pool.query(`
+    SELECT
+      projects.*,
+      COALESCE(SUM(journal_entries.hours_worked), 0) AS journal_hours,
+      users.email AS user_email,
+      users.name AS user_name,
+      users.slug AS user_slug,
+      users.profile_image_url AS user_profile_image_url,
+      users.slack_id AS user_slack_id
+    FROM projects
+    JOIN users ON users.id = projects.user_id
+    LEFT JOIN journal_entries
+      ON journal_entries.project_id = projects.id
+      AND journal_entries.user_id = projects.user_id
+    GROUP BY projects.id, users.id
+    ORDER BY projects.shipped_at ${direction} NULLS LAST, projects.updated_at ${direction}, projects.id ${direction}
+  `);
+
+  const projects = result.rows.map(toAdminReviewProject);
+  return {
+    projects,
+    pendingProjects: projects.filter((project) => project.shipped && project.status === "in-review" && !project.reviewed),
+  };
+}
+
+export async function getAdminReviewProject(projectId) {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const result = await pool.query(
+    `
+      SELECT
+        projects.*,
+        COALESCE(SUM(journal_entries.hours_worked), 0) AS journal_hours,
+        users.email AS user_email,
+        users.name AS user_name,
+        users.slug AS user_slug,
+        users.profile_image_url AS user_profile_image_url,
+        users.slack_id AS user_slack_id
+      FROM projects
+      JOIN users ON users.id = projects.user_id
+      LEFT JOIN journal_entries
+        ON journal_entries.project_id = projects.id
+        AND journal_entries.user_id = projects.user_id
+      WHERE projects.id = $1
+      GROUP BY projects.id, users.id
+    `,
+    [projectId]
+  );
+
+  const project = result.rows[0] ? toAdminReviewProject(result.rows[0]) : null;
+  if (!project) return null;
+
+  const journalEntries = await listJournalEntriesForUserProject(project.userId, project.id);
+  return { project, journalEntries };
+}
+
+export async function approveAdminReviewProject(adminId, projectId, input = {}) {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const approvedHours = Number.parseFloat(input.approvedHours ?? input.approved_hours ?? 0);
+  const feedback = textOrNull(input.feedback);
+  const hourJustification = textOrNull(input.hourJustification ?? input.hour_justification);
+
+  if (!Number.isFinite(approvedHours) || approvedHours <= 0) {
+    throw new Error("Enter a positive number of new hours to approve for this submission.");
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await refreshProjectJournalHoursWithClient(client, projectId);
+
+    const projectResult = await client.query("SELECT * FROM projects WHERE id = $1 FOR UPDATE", [projectId]);
+    const project = projectResult.rows[0];
+    if (!project) throw new Error("Project not found.");
+    if (!project.shipped) throw new Error("Project is not in the review queue.");
+    if (project.reviewed && project.status === "approved") throw new Error("Project is already approved.");
+
+    const bankedHours = Number(project.past_approved_hours ?? 0);
+    const pendingCap = Math.max(0, Number(project.total_hours ?? 0) - bankedHours);
+    if (approvedHours > pendingCap + 0.02) {
+      throw new Error(`Cannot approve more new hours than the participant has logged beyond prior approvals (${pendingCap.toFixed(2)} h max).`);
+    }
+
+    const newTotalApprovedHours = Number((bankedHours + approvedHours).toFixed(2));
+    const coinsDelta = Math.ceil(approvedHours * 10);
+    const newCumulativeCoins = Number(project.coins_earned ?? 0) + coinsDelta;
+
+    const updatedProjectResult = await client.query(
+      `
+        UPDATE projects
+        SET
+          reviewed = TRUE,
+          reviewed_at = NOW(),
+          reviewed_by_user_id = $1,
+          status = 'approved',
+          approved_hours = $2,
+          past_approved_hours = $2,
+          hour_justification = COALESCE($3, hour_justification),
+          admin_feedback = $4,
+          coins_earned = $5,
+          updated_at = NOW()
+        WHERE id = $6
+        RETURNING *, total_hours AS journal_hours
+      `,
+      [adminId, newTotalApprovedHours, hourJustification, feedback, newCumulativeCoins, projectId]
+    );
+
+    await client.query("UPDATE users SET coins = coins + $1, updated_at = NOW() WHERE id = $2", [coinsDelta, project.user_id]);
+    await client.query("COMMIT");
+
+    return {
+      project: toPublicProject(updatedProjectResult.rows[0]),
+      coinsEarned: coinsDelta,
+      approvedHours: newTotalApprovedHours,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function rejectAdminReviewProject(adminId, projectId, input = {}) {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const feedback = textOrNull(input.feedback);
+  if (!feedback) {
+    throw new Error("Rejection requires a written comment (what to fix before resubmitting).");
+  }
+
+  const result = await pool.query(
+    `
+      UPDATE projects
+      SET
+        shipped = FALSE,
+        shipped_at = NULL,
+        reviewed = FALSE,
+        reviewed_at = NOW(),
+        reviewed_by_user_id = $1,
+        status = 'rejected',
+        admin_feedback = $2,
+        updated_at = NOW()
+      WHERE id = $3
+        AND shipped IS TRUE
+      RETURNING *, total_hours AS journal_hours
+    `,
+    [adminId, feedback, projectId]
+  );
+
+  if (!result.rows[0]) {
+    throw new Error("Project is not in the review queue.");
+  }
+
+  return toPublicProject(result.rows[0]);
+}
+
+export async function patchAdminReviewProjectFlags(projectId, input = {}) {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const hasFraud =
+    input.fraudFlag !== undefined || input.fraud_flag !== undefined || input.fraud !== undefined;
+  if (!hasFraud) {
+    throw new Error("Nothing to update.");
+  }
+
+  const fraudFlag = Boolean(input.fraudFlag ?? input.fraud_flag ?? input.fraud);
+  const result = await pool.query(
+    `
+      UPDATE projects
+      SET fraud_flag = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING id
+    `,
+    [fraudFlag, projectId]
+  );
+
+  if (!result.rows[0]) {
+    throw new Error("Project not found.");
+  }
+
+  return getAdminReviewProject(projectId);
+}
+
+export async function deleteProjectBySuperadmin(projectId) {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const result = await pool.query(`DELETE FROM projects WHERE id = $1`, [projectId]);
+  return result.rowCount > 0;
 }
 
 export async function deleteProjectForUser(userId, projectId) {
@@ -356,6 +576,24 @@ function validateProjectBasics(project) {
   if (!project.projectType) throw new Error("Project type is required.");
 }
 
+async function assertProjectNameAvailable(userId, projectName, exceptProjectId = null) {
+  const result = await pool.query(
+    `
+      SELECT id
+      FROM projects
+      WHERE user_id = $1
+        AND LOWER(name) = LOWER($2)
+        AND ($3::bigint IS NULL OR id != $3::bigint)
+      LIMIT 1
+    `,
+    [userId, projectName, exceptProjectId]
+  );
+
+  if (result.rows.length > 0) {
+    throw new Error("You already have a project with that name.");
+  }
+}
+
 function normalizeJournalEntryInput(input = {}) {
   const hoursWorked = Number.parseFloat(input.hoursWorked ?? input.hours_worked ?? 0);
   const toolsValue = input.toolsUsed ?? input.tools_used ?? [];
@@ -415,6 +653,24 @@ async function refreshProjectJournalHours(userId, projectId) {
   return result.rows[0] ? toPublicProject(result.rows[0]) : null;
 }
 
+async function refreshProjectJournalHoursWithClient(client, projectId) {
+  await client.query(
+    `
+      UPDATE projects
+      SET
+        total_hours = COALESCE((
+          SELECT SUM(hours_worked)
+          FROM journal_entries
+          WHERE journal_entries.user_id = projects.user_id
+            AND journal_entries.project_id = projects.id
+        ), 0),
+        updated_at = NOW()
+      WHERE id = $1
+    `,
+    [projectId]
+  );
+}
+
 function textOrNull(value) {
   if (value === undefined || value === null) return null;
   const text = String(value).trim();
@@ -435,12 +691,36 @@ function toPublicProject(row) {
     hackatimeNames: row.hackatime_names || [],
     status: row.status,
     shipped: row.shipped,
+    reviewed: row.reviewed,
     totalHours: Number(row.total_hours ?? 0),
     journalHours,
     approvedHours: Number(row.approved_hours ?? 0),
+    pastApprovedHours: Number(row.past_approved_hours ?? 0),
+    coinsEarned: Number(row.coins_earned ?? 0),
+    adminFeedback: row.admin_feedback,
+    hourJustification: row.hour_justification,
+    reviewedAt: row.reviewed_at,
+    reviewedByUserId: row.reviewed_by_user_id,
     shippedAt: row.shipped_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    fraudFlag: Boolean(row.fraud_flag),
+  };
+}
+
+function toAdminReviewProject(row) {
+  const project = toPublicProject(row);
+  return {
+    ...project,
+    user: {
+      id: row.user_id,
+      email: row.user_email,
+      name: row.user_name,
+      slug: row.user_slug,
+      profileImageUrl: row.user_profile_image_url,
+      slackId: row.user_slack_id,
+    },
+    pendingReviewHours: Math.max(0, Number(row.total_hours ?? 0) - Number(row.past_approved_hours ?? 0)),
   };
 }
 
