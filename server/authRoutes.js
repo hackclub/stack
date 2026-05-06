@@ -7,8 +7,10 @@ import {
   getUserById,
   setPasswordForExistingUser,
   toPublicUser,
+  updateUserPasswordHash,
   updateUserRoleFromEmail,
 } from "./users.js";
+import { hashPasswordForStorage, verifyPasswordForLogin } from "./passwordHash.js";
 
 const passwordLoginLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
@@ -55,21 +57,6 @@ function normalizeEmail(email) {
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
-  return `scrypt:${salt}:${hash}`;
-}
-
-function verifyPassword(password, storedHash) {
-  const [algorithm, salt, hash] = String(storedHash || "").split(":");
-  if (algorithm !== "scrypt" || !salt || !hash) return false;
-
-  const submittedHash = crypto.scryptSync(password, salt, 64);
-  const storedBuffer = Buffer.from(hash, "hex");
-  return storedBuffer.length === submittedHash.length && crypto.timingSafeEqual(storedBuffer, submittedHash);
 }
 
 function signLocalUserId(userId) {
@@ -135,15 +122,19 @@ export function createAuthRouter() {
       let user;
 
       if (existingUser?.password_hash) {
-        if (!verifyPassword(password, existingUser.password_hash)) {
+        const outcome = verifyPasswordForLogin(password, existingUser.password_hash);
+        if (!outcome.valid) {
           res.status(401).json({ error: "Wrong email or password." });
           return;
         }
+        if (outcome.migrateToHash) {
+          await updateUserPasswordHash(existingUser.id, outcome.migrateToHash);
+        }
         user = await updateUserRoleFromEmail(existingUser.id, email);
       } else if (existingUser) {
-        user = await setPasswordForExistingUser(existingUser.id, email, hashPassword(password));
+        user = await setPasswordForExistingUser(existingUser.id, email, hashPasswordForStorage(password));
       } else {
-        user = await createUserFromEmailPassword(email, hashPassword(password));
+        user = await createUserFromEmailPassword(email, hashPasswordForStorage(password));
       }
 
       req.session.userId = user.id;

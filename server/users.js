@@ -415,6 +415,27 @@ export async function setPasswordForExistingUser(id, email, passwordHash) {
   return result.rows[0];
 }
 
+export async function updateUserPasswordHash(id, passwordHash) {
+  if (!pool) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const result = await pool.query(
+    `
+      UPDATE users
+      SET
+        password_hash = $1,
+        password_set_at = NOW(),
+        updated_at = NOW()
+      WHERE id = $2
+      RETURNING *
+    `,
+    [passwordHash, id]
+  );
+
+  return result.rows[0] ?? null;
+}
+
 export async function createUserFromEmailPassword(email, passwordHash) {
   if (!pool) {
     throw new Error("DATABASE_URL is not set.");
