@@ -15,7 +15,7 @@ import {
   setAllShopItemsActive,
   updateShopItem,
 } from "./shopItems.js";
-import { ensureUsersTable, getUserById } from "./users.js";
+import { ensureUsersTable, getAdminUserById, getUserById, listAdminUsers } from "./users.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -209,6 +209,30 @@ app.post("/api/admin/shop/items/bulk_active", requireAdmin, async (req, res) => 
   } catch (error) {
     console.error("Failed to bulk update shop items:", error);
     res.status(500).json({ error: "Failed to update shop items." });
+  }
+});
+
+app.get("/api/admin/users", requireAdmin, async (req, res) => {
+  try {
+    const users = await listAdminUsers();
+    res.json({ users });
+  } catch (error) {
+    console.error("Failed to load admin users:", error);
+    res.status(500).json({ error: "Failed to load users." });
+  }
+});
+
+app.get("/api/admin/users/:id", requireAdmin, async (req, res) => {
+  try {
+    const user = await getAdminUserById(req.params.id);
+    if (!user) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+    res.json({ user });
+  } catch (error) {
+    console.error("Failed to load admin user:", error);
+    res.status(500).json({ error: "Failed to load user." });
   }
 });
 

@@ -258,6 +258,59 @@ export async function getUserById(id) {
   return result.rows[0] ?? null;
 }
 
+export async function listAdminUsers() {
+  if (!pool) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const result = await pool.query(`
+    SELECT
+      id,
+      email,
+      name,
+      slug,
+      role,
+      hackclub_sub,
+      profile_image_url,
+      verification_status,
+      password_set_at,
+      created_at,
+      updated_at
+    FROM users
+    ORDER BY created_at DESC, id DESC
+  `);
+
+  return result.rows.map(toAdminUser);
+}
+
+export async function getAdminUserById(id) {
+  if (!pool) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const result = await pool.query(
+    `
+      SELECT
+        id,
+        email,
+        name,
+        slug,
+        role,
+        hackclub_sub,
+        profile_image_url,
+        verification_status,
+        password_set_at,
+        created_at,
+        updated_at
+      FROM users
+      WHERE id = $1
+    `,
+    [id]
+  );
+
+  return result.rows[0] ? toAdminUser(result.rows[0]) : null;
+}
+
 export async function getUserByEmail(email) {
   if (!pool) {
     throw new Error("DATABASE_URL is not set.");
@@ -374,5 +427,21 @@ export function toPublicUser(row) {
     slackId: row.slack_id,
     verificationStatus: row.verification_status,
     role: row.role,
+  };
+}
+
+function toAdminUser(row) {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    slug: row.slug,
+    role: row.role,
+    hackclubSub: row.hackclub_sub,
+    profileImageUrl: row.profile_image_url,
+    verificationStatus: row.verification_status,
+    passwordSetAt: row.password_set_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }

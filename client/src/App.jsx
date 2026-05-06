@@ -7,9 +7,11 @@ import { MainPage } from "./components/MainPage.jsx";
 import { ProjectsPage } from "./components/ProjectsPage.jsx";
 import { ShopPage } from "./components/ShopPage.jsx";
 import { TestPage } from "./components/TestPage.jsx";
+import { AdminAirtableSyncPage } from "./components/AdminAirtableSyncPage.jsx";
 import { AdminPage } from "./components/AdminPage.jsx";
 import { AdminShopPage } from "./components/AdminShopPage.jsx";
 import { AdminShopOrdersPage } from "./components/AdminShopOrdersPage.jsx";
+import { AdminUsersPage } from "./components/AdminUsersPage.jsx";
 import { UserAreaPage } from "./components/UserAreaPage.jsx";
 
 const PROTECTED = new Set(["/main", "/shop", "/projects", "/faq", "/user", "/test", "/admin"]);
@@ -96,6 +98,12 @@ export default function App() {
     case "/admin":
       page = <AdminPage />;
       break;
+    case "/admin/users":
+      page = <AdminUsersPage />;
+      break;
+    case "/admin/airtable_sync":
+      page = <AdminAirtableSyncPage />;
+      break;
     case "/admin/shop":
       page = <AdminShopPage />;
       break;
@@ -103,7 +111,11 @@ export default function App() {
       page = <AdminShopOrdersPage />;
       break;
     default:
-      page = <Hero />;
+      if (pathname.startsWith("/admin/users/")) {
+        page = <AdminUsersPage userId={pathname.split("/").pop()} />;
+      } else {
+        page = <Hero />;
+      }
   }
 
   return <AuthContext.Provider value={contextValue}>{page}</AuthContext.Provider>;
