@@ -2,6 +2,13 @@ import { pool } from "./db.js";
 
 const DEFAULT_ROLE = "member";
 
+function parseEmailList(value) {
+  return (value || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 /**
  * Creates the users table if missing. Safe to run on every server start.
  */
@@ -107,11 +114,9 @@ export async function ensureUsersTable() {
 }
 
 function resolveRole(email) {
-  const admins = (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  if (email && admins.includes(email.toLowerCase())) {
+  const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+  const admins = parseEmailList(process.env.ADMIN_EMAILS);
+  if (normalizedEmail && admins.includes(normalizedEmail)) {
     return "admin";
   }
   return DEFAULT_ROLE;

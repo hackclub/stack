@@ -5,10 +5,11 @@ import { Hero } from "./components/Hero.jsx";
 import { MainPage } from "./components/MainPage.jsx";
 import { ProjectsPage } from "./components/ProjectsPage.jsx";
 import { ShopPage } from "./components/ShopPage.jsx";
-import { TestPage } from "./components/TestPage.jsx";
+import { AdminPage } from "./components/AdminPage.jsx";
 import { UserAreaPage } from "./components/UserAreaPage.jsx";
 
-const PROTECTED = new Set(["/main", "/shop", "/projects", "/faq", "/user", "/test"]);
+const PROTECTED = new Set(["/main", "/shop", "/projects", "/faq", "/user", "/test", "/admin"]);
+const ADMIN_ONLY = new Set(["/admin"]);
 
 export default function App() {
   const [auth, setAuth] = useState({ status: "loading", user: null });
@@ -43,6 +44,11 @@ export default function App() {
     return null;
   }
 
+  if (ADMIN_ONLY.has(pathname) && auth.user?.role !== "admin") {
+    window.location.replace("/main");
+    return null;
+  }
+
   if (pathname === "/" && auth.user) {
     window.location.replace("/main");
     return null;
@@ -60,8 +66,8 @@ export default function App() {
       page = <MainPage />;
       break;
     case "/test":
-      page = <TestPage />;
-      break;
+      window.location.replace("/admin#admin-airtable-sync");
+      return null;
     case "/projects":
       page = <ProjectsPage />;
       break;
@@ -73,6 +79,9 @@ export default function App() {
       break;
     case "/user":
       page = <UserAreaPage />;
+      break;
+    case "/admin":
+      page = <AdminPage />;
       break;
     default:
       page = <Hero />;
