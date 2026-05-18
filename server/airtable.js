@@ -86,6 +86,13 @@ function normalizeAirtableValue(value) {
   return value;
 }
 
+function asIso(value, fallback = null) {
+  if (!value) return fallback;
+  if (value instanceof Date) return value.toISOString();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
+}
+
 function buildAirtableRecord(row, sharedFields) {
   const fields = {};
 
@@ -108,6 +115,43 @@ function chooseMergeFields(primaryKeyColumns, sharedFields) {
 
 function getErrorMessage(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+export async function upsertAuthUserToAirtable(user, profile = {}) {
+  if (!hasAirtableConfig) {
+    return { ok: false, configured: false };
+  }
+
+  const fields = {
+    user_id: Number(user?.id),
+    Name: user?.name ?? profile?.name ?? "",
+    bricks: Number(user?.coins ?? 0),
+    slack_id: user?.slack_id ?? profile?.slack_id ?? profile?.slack_user_id ?? null,
+    "slack username": user?.slack_username ?? profile?.slack_username ?? profile?.slack?.username ?? null,
+    role: user?.role || "user",
+    "last sign in": asIso(user?.last_sign_in_at, new Date().toISOString()),
+    "created at": asIso(user?.created_at, new Date().toISOString()),
+    email: user?.email ?? profile?.email ?? profile?.email_address ?? null,
+    "hackatime hours": Number(user?.hackatime_hours ?? 0),
+  };
+
+  const response = await fetch(getAirtableUrl("_users"), {
+    method: "PATCH",
+    headers: getAirtableHeaders(),
+    body: JSON.stringify({
+      performUpsert: {
+        fieldsToMergeOn: ["user_id"],
+      },
+      records: [{ fields }],
+    }),
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Airtable _users sync failed (${response.status}): ${details}`);
+  }
+
+  return response.json();
 }
 
 export async function syncDatabaseToAirtable() {

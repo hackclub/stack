@@ -1,7 +1,6 @@
 const AUTH_BASE = "https://auth.hackclub.com";
 const OAUTH_CALLBACK_PATH = "/api/auth/hackclub/callback";
-const DEFAULT_SCOPES = [
-  "openid",
+const REQUIRED_SCOPES = [
   "email",
   "name",
   "profile",
@@ -138,10 +137,8 @@ export function appOriginFromRedirectUri(redirectUri) {
 export function getAuthorizeUrl({ state, redirectUri }) {
   const clientId = requiredEnv("HC_CLIENT_ID");
   const configuredScopes = (process.env.HC_SCOPES || "").trim();
-  const scopeList = configuredScopes
-    ? configuredScopes.split(/\s+/).filter(Boolean)
-    : DEFAULT_SCOPES;
-  const scope = [...new Set(scopeList)].join(" ");
+  const scopeList = configuredScopes ? configuredScopes.split(/\s+/).filter(Boolean) : [];
+  const scope = [...new Set([...scopeList, ...REQUIRED_SCOPES])].join(" ");
 
   const params = new URLSearchParams({
     client_id: clientId,

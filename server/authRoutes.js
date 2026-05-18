@@ -2,24 +2,29 @@ import crypto from "crypto";
 import express from "express";
 import rateLimit from "express-rate-limit";
 import {
-  createUserFromEmailPassword,
-  getUserByEmail,
   getUserById,
-  setPasswordForExistingUser,
   toPublicUser,
-  updateUserPasswordHash,
-  updateUserRoleFromEmail,
+  upsertUserFromHackClub,
 } from "./users.js";
-import { hashPasswordForStorage, verifyPasswordForLogin } from "./passwordHash.js";
+import { upsertAuthUserToAirtable } from "./airtable.js";
+import {
+  appOriginFromRedirectUri,
+  exchangeAuthorizationCode,
+  fetchHackClubMe,
+  getAppOrigin,
+  getAuthorizeUrl,
+  resolveOAuthRedirectUri,
+} from "./hackclubAuth.js";
 
-const passwordLoginLimiter = rateLimit({
+const LOCAL_DEV_AUTH_COOKIE = "stack.local_user";
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
+const oauthLoginLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  max: 40,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: "Too many login attempts. Please try again in a few minutes.",
 });
-const LOCAL_DEV_AUTH_COOKIE = "stack.local_user";
 
 function normalizeReturnTo(value) {
   if (typeof value !== "string") return "/main";
@@ -28,10 +33,6 @@ function normalizeReturnTo(value) {
     return "/main";
   }
   return trimmed;
-}
-
-function getAppOrigin() {
-  return process.env.APP_ORIGIN || "http://localhost:5173";
 }
 
 function isLocalhostRequest(req) {
@@ -49,14 +50,6 @@ function shouldUseLocalDevCookie(req) {
 
 function localDevCookieSecret() {
   return process.env.DEV_AUTH_COOKIE_SECRET || process.env.SESSION_SECRET || "dev-local-auth-cookie-secret";
-}
-
-function normalizeEmail(email) {
-  return typeof email === "string" ? email.trim().toLowerCase() : "";
-}
-
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function signLocalUserId(userId) {
@@ -94,57 +87,90 @@ function setLocalDevAuthCookie(req, res, userId) {
 export function createAuthRouter() {
   const router = express.Router();
 
-  router.get("/hackclub/login", (req, res) => {
+  router.get("/hackclub/login", oauthLoginLimiter, (req, res) => {
     const returnTo = normalizeReturnTo(req.query?.returnTo);
-    res.redirect(302, `${getAppOrigin()}/login?returnTo=${encodeURIComponent(returnTo)}&auth=password`);
-  });
-
-  router.get("/hackclub/callback", (req, res) => {
-    res.redirect(302, `${getAppOrigin()}/login?auth=password`);
-  });
-
-  router.post("/password/login", passwordLoginLimiter, async (req, res) => {
     try {
-      const email = normalizeEmail(req.body?.email);
-      const password = String(req.body?.password || "");
+      const redirectUri = resolveOAuthRedirectUri(req);
+      const state = crypto.randomBytes(24).toString("hex");
+      req.session.oauth = {
+        state,
+        returnTo,
+        redirectUri,
+        createdAt: Date.now(),
+      };
+      res.redirect(302, getAuthorizeUrl({ state, redirectUri }));
+    } catch (error) {
+      console.error("[auth] failed to start Hack Club auth:", error);
+      res.redirect(302, `${getAppOrigin()}/login?error=${encodeURIComponent("Failed to start login.")}`);
+    }
+  });
 
-      if (!isValidEmail(email)) {
-        res.status(422).json({ error: "Enter a valid email address." });
-        return;
+  router.get("/hackclub/callback", oauthLoginLimiter, async (req, res) => {
+    const stateFromQuery = String(req.query?.state || "");
+    const code = String(req.query?.code || "");
+    const authError = req.query?.error ? String(req.query.error) : "";
+    const oauthState = req.session?.oauth;
+    delete req.session.oauth;
+    let redirectUri = oauthState?.redirectUri || "";
+    if (!redirectUri) {
+      try {
+        redirectUri = resolveOAuthRedirectUri(req);
+      } catch {
+        redirectUri = "";
       }
+    }
+    const appOrigin = appOriginFromRedirectUri(redirectUri);
+    const returnTo = normalizeReturnTo(oauthState?.returnTo);
 
-      if (password.length < 6) {
-        res.status(422).json({ error: "Password must be at least 6 characters." });
-        return;
+    if (authError) {
+      res.redirect(
+        302,
+        `${appOrigin}/login?returnTo=${encodeURIComponent(returnTo)}&error=${encodeURIComponent(authError)}`
+      );
+      return;
+    }
+
+    if (!oauthState?.state || oauthState.state !== stateFromQuery || !code) {
+      res.redirect(
+        302,
+        `${appOrigin}/login?returnTo=${encodeURIComponent(returnTo)}&error=${encodeURIComponent("Invalid login state.")}`
+      );
+      return;
+    }
+
+    if (!oauthState.createdAt || Date.now() - oauthState.createdAt > OAUTH_STATE_TTL_MS) {
+      res.redirect(
+        302,
+        `${appOrigin}/login?returnTo=${encodeURIComponent(returnTo)}&error=${encodeURIComponent("Login attempt expired.")}`
+      );
+      return;
+    }
+
+    try {
+      if (!redirectUri) {
+        throw new Error("OAuth redirect URI is not configured.");
       }
-
-      const existingUser = await getUserByEmail(email);
-      let user;
-
-      if (existingUser?.password_hash) {
-        const outcome = verifyPasswordForLogin(password, existingUser.password_hash);
-        if (!outcome.valid) {
-          res.status(401).json({ error: "Wrong email or password." });
-          return;
-        }
-        if (outcome.migrateToHash) {
-          await updateUserPasswordHash(existingUser.id, outcome.migrateToHash);
-        }
-        user = await updateUserRoleFromEmail(existingUser.id, email);
-      } else if (existingUser) {
-        user = await setPasswordForExistingUser(existingUser.id, email, hashPasswordForStorage(password));
-      } else {
-        user = await createUserFromEmailPassword(email, hashPasswordForStorage(password));
-      }
+      const token = await exchangeAuthorizationCode(code, redirectUri);
+      const profile = await fetchHackClubMe(token.access_token);
+      const user = await upsertUserFromHackClub({ profile, token });
 
       req.session.userId = user.id;
-      delete req.session.hackclubSub;
+      req.session.hackclubSub = user.hackclub_sub;
       setLocalDevAuthCookie(req, res, user.id);
 
-      res.json({ user: toPublicUser(user) });
+      try {
+        await upsertAuthUserToAirtable(user, profile);
+      } catch (airtableError) {
+        console.error("[auth] failed to sync _users Airtable record:", airtableError);
+      }
+
+      res.redirect(302, `${appOrigin}${returnTo}`);
     } catch (error) {
-      console.error("[auth] password login failed:", error);
-      res.status(500).json({ error: "Failed to log in." });
+      console.error("[auth] Hack Club callback failed:", error);
+      res.redirect(
+        302,
+        `${appOrigin}/login?returnTo=${encodeURIComponent(returnTo)}&error=${encodeURIComponent("Failed to log in.")}`
+      );
     }
   });
 
