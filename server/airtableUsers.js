@@ -212,6 +212,76 @@ function buildFieldsFromProfile(profile, { isCreate, userId, existingFields }) {
   return fields;
 }
 
+function buildFieldsFromPostgresRow(row, { isCreate, userId, existingFields }) {
+  const now = airtableDateNow();
+  const email = typeof row.email === "string" ? row.email.trim().toLowerCase() : "";
+  const hackatimeHours = Number(row.hackatime_total_hours);
+  const fields = {
+    [F.name]: row.name || row.slug || email?.split("@")[0] || undefined,
+    [F.email]: email || undefined,
+    [F.slackId]: row.slack_id || undefined,
+    [F.lastSignIn]: now,
+    [F.hackatimeHours]: Number.isFinite(hackatimeHours) ? hackatimeHours : undefined,
+  };
+
+  if (isCreate) {
+    fields[F.userId] = userId;
+    fields[F.currency] = existingFields?.[F.currency] ?? 0;
+    fields[F.role] = existingFields?.[F.role] ?? row.role ?? "user";
+    fields[F.createdAt] = existingFields?.[F.createdAt] ?? airtableDateNow();
+    if (fields[F.currency] === undefined) fields[F.currency] = 0;
+  }
+
+  for (const key of Object.keys(fields)) {
+    if (fields[key] === undefined) delete fields[key];
+  }
+
+  return fields;
+}
+
+export async function syncPostgresUserToAirtable(row) {
+  if (!hasAirtableUsersConfig) {
+    return { ok: false, skipped: true, reason: "Airtable not configured." };
+  }
+
+  const email = typeof row.email === "string" ? row.email.trim().toLowerCase() : "";
+  const slackId = row.slack_id ? String(row.slack_id) : "";
+
+  if (!email && !slackId) {
+    return { ok: false, skipped: true, reason: "User missing email and slack_id." };
+  }
+
+  const existing = await findUserRecord({ email, slackId });
+
+  if (existing?.id) {
+    const fields = buildFieldsFromPostgresRow(row, {
+      isCreate: false,
+      existingFields: existing.fields,
+    });
+
+    const data = await airtableRequest(`/${existing.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ fields }),
+    });
+
+    return { ok: true, created: false, recordId: data.id, userId: existing.fields?.[F.userId] ?? null };
+  }
+
+  const nextUserId = (await getMaxUserId()) + 1;
+  const fields = buildFieldsFromPostgresRow(row, {
+    isCreate: true,
+    userId: nextUserId,
+    existingFields: { [F.currency]: 0, [F.role]: "user" },
+  });
+
+  const data = await airtableRequest("", {
+    method: "POST",
+    body: JSON.stringify({ fields }),
+  });
+
+  return { ok: true, created: true, recordId: data.id, userId: nextUserId };
+}
+
 export async function syncUserToAirtableUsers(profile) {
   if (!hasAirtableUsersConfig) {
     return { ok: false, skipped: true, reason: "Airtable not configured." };

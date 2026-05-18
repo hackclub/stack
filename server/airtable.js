@@ -11,6 +11,8 @@ let lastSync = null;
 
 export const hasAirtableConfig = Boolean(airtableToken && airtableBaseId);
 
+const GENERIC_SYNC_SKIP_TABLES = new Set(["users", "projects", "journal_entries"]);
+
 function getAirtableUrl(tableName) {
   const tablePath = encodeURIComponent(tableName);
   return `https://api.airtable.com/v0/${airtableBaseId}/${tablePath}`;
@@ -135,6 +137,16 @@ export async function syncDatabaseToAirtable() {
     const results = [];
 
     for (const tableName of postgresTables) {
+      if (GENERIC_SYNC_SKIP_TABLES.has(tableName)) {
+        results.push({
+          table: tableName,
+          synced: 0,
+          skipped: true,
+          reason: "Uses dedicated Airtable sync module.",
+        });
+        continue;
+      }
+
       const airtableTable = airtableTablesByName.get(tableName);
 
       if (!airtableTable) {

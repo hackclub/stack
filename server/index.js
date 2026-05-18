@@ -5,7 +5,10 @@ import session from "express-session";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createAuthRouter } from "./authRoutes.js";
-import { getAirtableSyncStatus, startAirtableAutoSync, syncDatabaseToAirtable } from "./airtable.js";
+import { getAirtableSyncStatus, syncDatabaseToAirtable } from "./airtable.js";
+import { getPeriodicAirtableSyncStatus, startPeriodicAirtableSync, syncAllUsersAndProjectsToAirtable } from "./airtablePeriodic.js";
+import { isHackatimeOAuthConfigured } from "./hackatimeAuth.js";
+import { getHackatimeStatusForUser, listHackatimeProjectsForUser } from "./hackatimeService.js";
 import { checkDatabaseConnection, getTestRows } from "./db.js";
 import {
   createShopItem,
@@ -19,6 +22,7 @@ import {
 import {
   approveAdminReviewProject,
   createProjectForUser,
+  getProjectForUser,
   createJournalEntryForUser,
   deleteProjectForUser,
   deleteProjectBySuperadmin,
@@ -78,7 +82,9 @@ app.use(
     },
   })
 );
-app.use("/api/auth", createAuthRouter());
+const authRouter = createAuthRouter();
+app.use("/api/auth", authRouter);
+app.use("/auth", authRouter);
 
 async function requireFullAdmin(req, res, next) {
   const userId = req.session?.userId;
@@ -243,7 +249,7 @@ app.post("/api/shop/items/:id/buy", requireUser, async (req, res) => {
 app.get("/api/projects", requireUser, async (req, res) => {
   try {
     const projects = await listProjectsForUser(req.session.userId);
-    res.json({ projects, hackatimeAvailable: false });
+    res.json({ projects, hackatimeAvailable: isHackatimeOAuthConfigured() });
   } catch (error) {
     console.error("Failed to load projects:", error);
     res.status(500).json({ error: "Failed to load projects." });
@@ -257,6 +263,40 @@ app.post("/api/projects", requireUser, async (req, res) => {
   } catch (error) {
     console.error("Failed to create project:", error);
     res.status(500).json({ error: error.message || "Failed to create project." });
+  }
+});
+
+app.get("/api/projects/:id", requireUser, async (req, res) => {
+  try {
+    const project = await getProjectForUser(req.session.userId, req.params.id);
+    if (!project) {
+      res.status(404).json({ error: "Project not found." });
+      return;
+    }
+    res.json({ project, hackatimeAvailable: isHackatimeOAuthConfigured() });
+  } catch (error) {
+    console.error("Failed to load project:", error);
+    res.status(500).json({ error: "Failed to load project." });
+  }
+});
+
+app.get("/api/hackatime/status", requireUser, async (req, res) => {
+  try {
+    const status = await getHackatimeStatusForUser(req.session.userId);
+    res.json(status);
+  } catch (error) {
+    console.error("Failed to load Hackatime status:", error);
+    res.status(500).json({ error: "Failed to load Hackatime status." });
+  }
+});
+
+app.get("/api/hackatime/projects", requireUser, async (req, res) => {
+  try {
+    const projects = await listHackatimeProjectsForUser(req.session.userId);
+    res.json({ projects });
+  } catch (error) {
+    console.error("Failed to load Hackatime projects:", error);
+    res.status(500).json({ error: error.message || "Failed to load Hackatime projects." });
   }
 });
 
@@ -485,7 +525,10 @@ app.get("/api/admin/users/:id", requireFullAdmin, async (req, res) => {
 });
 
 app.get("/api/airtable/status", (req, res) => {
-  res.json(getAirtableSyncStatus());
+  res.json({
+    ...getAirtableSyncStatus(),
+    periodic: getPeriodicAirtableSyncStatus(),
+  });
 });
 
 app.post("/api/airtable/sync", async (req, res) => {
@@ -495,7 +538,7 @@ app.post("/api/airtable/sync", async (req, res) => {
   }
 
   try {
-    const result = await syncDatabaseToAirtable();
+    const result = await syncAllUsersAndProjectsToAirtable();
     res.status(result.ok ? 200 : 503).json(result);
   } catch (error) {
     console.error("Manual Airtable sync failed:", error);
@@ -534,9 +577,7 @@ async function startServer() {
     );
   });
 
-  if (isProd) {
-    startAirtableAutoSync();
-  }
+  startPeriodicAirtableSync();
 }
 
 startServer();

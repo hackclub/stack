@@ -378,6 +378,24 @@
   color: #304389;
 }
 
+.projects-page__hackatime-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.projects-page__hackatime-option {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+}
+
+.projects-page__hackatime-summary {
+  margin-top: 10px;
+  font-weight: 700;
+}
+
 .projects-page__hackatime-disabled p {
   margin: 0.35rem 0 0;
 }

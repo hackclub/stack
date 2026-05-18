@@ -9,7 +9,17 @@ import {
   getAuthorizeUrl,
   resolveOAuthRedirectUri,
 } from "./hackclubAuth.js";
-import { syncUserToAirtableUsers } from "./airtableUsers.js";
+import { syncPostgresUserToAirtable, syncUserToAirtableUsers } from "./airtableUsers.js";
+import {
+  connectHackatimeForUser,
+  isHackatimeConnected,
+} from "./hackatimeService.js";
+import {
+  exchangeHackatimeAuthorizationCode,
+  getHackatimeAuthorizeUrl,
+  isHackatimeOAuthConfigured,
+  resolveHackatimeRedirectUri,
+} from "./hackatimeAuth.js";
 import {
   buildSessionProfileSnapshot,
   describeProfileIdentifier,
@@ -176,8 +186,14 @@ export function createAuthRouter() {
       }
 
       try {
-        const airtableResult = await syncUserToAirtableUsers(profile);
-        console.log("[auth] Airtable _users sync:", airtableResult);
+        if (user?.id) {
+          const userRow = await getUserById(user.id);
+          const airtableResult = await syncPostgresUserToAirtable(userRow);
+          console.log("[auth] Airtable _users sync:", airtableResult);
+        } else {
+          const airtableResult = await syncUserToAirtableUsers(profile);
+          console.log("[auth] Airtable _users sync:", airtableResult);
+        }
       } catch (syncError) {
         console.error("[auth] Airtable _users sync failed:", {
           message: syncError instanceof Error ? syncError.message : String(syncError),
@@ -192,6 +208,17 @@ export function createAuthRouter() {
       if (user?.id) {
         req.session.userId = user.id;
         setLocalDevAuthCookie(req, res, user.id);
+
+        const userRow = await getUserById(user.id);
+        if (isHackatimeOAuthConfigured() && userRow && !isHackatimeConnected(userRow)) {
+          const htState = crypto.randomBytes(24).toString("hex");
+          const htRedirectUri = resolveHackatimeRedirectUri(req);
+          res.cookie("ht_oauth_state", htState, oauthCookieOptions());
+          res.cookie("ht_oauth_redirect_uri", htRedirectUri, oauthCookieOptions());
+          res.cookie("ht_oauth_return_to", returnTo, oauthCookieOptions());
+          res.redirect(302, getHackatimeAuthorizeUrl({ state: htState, redirectUri: htRedirectUri }));
+          return;
+        }
       } else {
         delete req.session.userId;
       }
@@ -205,6 +232,85 @@ export function createAuthRouter() {
         queryErrorDescription: req.query?.error_description,
       });
       res.redirect(302, `${appOrigin}/login?error=oauth_callback`);
+    }
+  });
+
+  router.get("/hackatime/login", (req, res) => {
+    const userId = req.session?.userId;
+    if (!userId) {
+      res.redirect(302, `${getAppOrigin()}/login?error=auth_required`);
+      return;
+    }
+
+    if (!isHackatimeOAuthConfigured()) {
+      const returnTo = normalizeReturnTo(req.query?.returnTo);
+      res.redirect(302, `${getAppOrigin()}${returnTo}`);
+      return;
+    }
+
+    try {
+      const returnTo = normalizeReturnTo(req.query?.returnTo);
+      const htRedirectUri = resolveHackatimeRedirectUri(req);
+      const htState = crypto.randomBytes(24).toString("hex");
+      res.cookie("ht_oauth_state", htState, oauthCookieOptions());
+      res.cookie("ht_oauth_redirect_uri", htRedirectUri, oauthCookieOptions());
+      res.cookie("ht_oauth_return_to", returnTo, oauthCookieOptions());
+      res.redirect(302, getHackatimeAuthorizeUrl({ state: htState, redirectUri: htRedirectUri }));
+    } catch (error) {
+      console.error("[auth] Hackatime login setup failed:", error);
+      res.redirect(302, `${getAppOrigin()}/main?error=hackatime_config`);
+    }
+  });
+
+  router.get("/hackatime/callback", async (req, res) => {
+    const cookieState = req.cookies?.ht_oauth_state;
+    const returnTo = normalizeReturnTo(req.cookies?.ht_oauth_return_to);
+    const storedRedirectUri = req.cookies?.ht_oauth_redirect_uri;
+    const redirectUri =
+      typeof storedRedirectUri === "string" && storedRedirectUri
+        ? storedRedirectUri
+        : resolveHackatimeRedirectUri(req);
+
+    res.clearCookie("ht_oauth_state", { path: "/" });
+    res.clearCookie("ht_oauth_return_to", { path: "/" });
+    res.clearCookie("ht_oauth_redirect_uri", { path: "/" });
+
+    const appOrigin = process.env.APP_ORIGIN?.trim() || getAppOrigin();
+
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        res.redirect(302, `${appOrigin}/login?error=auth_required`);
+        return;
+      }
+
+      if (req.query.error) {
+        console.warn("[auth] Hackatime OAuth denied:", req.query.error);
+        res.redirect(302, `${appOrigin}${returnTo}?hackatime=denied`);
+        return;
+      }
+
+      const code = req.query.code;
+      const state = req.query.state;
+      if (typeof code !== "string" || !code) {
+        res.redirect(302, `${appOrigin}${returnTo}?error=hackatime_missing_code`);
+        return;
+      }
+
+      if (typeof state !== "string" || !cookieState || state !== cookieState) {
+        res.redirect(302, `${appOrigin}${returnTo}?error=hackatime_state`);
+        return;
+      }
+
+      const token = await exchangeHackatimeAuthorizationCode(code, redirectUri);
+      await connectHackatimeForUser(userId, token);
+
+      res.redirect(302, `${appOrigin}${returnTo}?hackatime=connected`);
+    } catch (error) {
+      console.error("[auth] Hackatime callback failed:", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+      res.redirect(302, `${appOrigin}${returnTo}?error=hackatime_callback`);
     }
   });
 

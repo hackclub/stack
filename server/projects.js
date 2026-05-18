@@ -1,4 +1,6 @@
 import { pool } from "./db.js";
+import { persistProjectAirtableRecordId, syncProjectToAirtable } from "./airtableProjects.js";
+import { fetchHackatimeProjects, sumHackatimeHoursForNames } from "./hackatimeAuth.js";
 
 export async function ensureProjectsTable() {
   if (!pool) {
@@ -30,6 +32,9 @@ export async function ensureProjectsTable() {
       reviewed_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       shipped_at TIMESTAMPTZ,
       fraud_flag BOOLEAN NOT NULL DEFAULT FALSE,
+      baseline_hours NUMERIC(10, 2),
+      hackatime_hours NUMERIC(10, 2) NOT NULL DEFAULT 0,
+      airtable_record_id TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -57,6 +62,9 @@ export async function ensureProjectsTable() {
     reviewed_by_user_id: "INTEGER REFERENCES users(id) ON DELETE SET NULL",
     shipped_at: "TIMESTAMPTZ",
     fraud_flag: "BOOLEAN NOT NULL DEFAULT FALSE",
+    baseline_hours: "NUMERIC(10, 2)",
+    hackatime_hours: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
+    airtable_record_id: "TEXT",
     created_at: "TIMESTAMPTZ NOT NULL DEFAULT NOW()",
     updated_at: "TIMESTAMPTZ NOT NULL DEFAULT NOW()",
   };
@@ -161,11 +169,14 @@ export async function createProjectForUser(userId, input) {
       project.playableUrl,
       project.codeUrl,
       project.imageUrl,
-      JSON.stringify([]),
+      JSON.stringify(project.hackatimeNames || []),
     ]
   );
 
-  return toPublicProject(result.rows[0]);
+  const row = result.rows[0];
+  await applyHackatimeHoursToProject(userId, row.id);
+  await trySyncProjectToAirtable(row.id);
+  return toPublicProject((await getProjectRowForAirtableSync(row.id)) || row);
 }
 
 export async function updateProjectForUser(userId, projectId, input) {
@@ -185,9 +196,10 @@ export async function updateProjectForUser(userId, projectId, input) {
         playable_url = $4,
         code_url = $5,
         image_url = $6,
+        hackatime_names = $7,
         updated_at = NOW()
-      WHERE id = $7
-        AND user_id = $8
+      WHERE id = $8
+        AND user_id = $9
       RETURNING *
     `,
     [
@@ -197,12 +209,16 @@ export async function updateProjectForUser(userId, projectId, input) {
       project.playableUrl,
       project.codeUrl,
       project.imageUrl,
+      JSON.stringify(project.hackatimeNames || []),
       projectId,
       userId,
     ]
   );
 
-  return result.rows[0] ? toPublicProject(result.rows[0]) : null;
+  if (!result.rows[0]) return null;
+  await applyHackatimeHoursToProject(userId, result.rows[0].id);
+  await trySyncProjectToAirtable(result.rows[0].id);
+  return toPublicProject((await getProjectRowForAirtableSync(result.rows[0].id)) || result.rows[0]);
 }
 
 export async function shipProjectForUser(userId, projectId) {
@@ -235,7 +251,9 @@ export async function shipProjectForUser(userId, projectId) {
     [userId, projectId]
   );
 
-  return toPublicProject(result.rows[0]);
+  const row = result.rows[0];
+  await trySyncProjectToAirtable(row.id);
+  return toPublicProject(row);
 }
 
 export async function listAdminReviewProjects({ shipSort = "oldest" } = {}) {
@@ -340,6 +358,7 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
           status = 'approved',
           approved_hours = $2,
           past_approved_hours = $2,
+          baseline_hours = COALESCE(baseline_hours, total_hours),
           hour_justification = COALESCE($3, hour_justification),
           admin_feedback = $4,
           coins_earned = $5,
@@ -353,8 +372,11 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
     await client.query("UPDATE users SET coins = coins + $1, updated_at = NOW() WHERE id = $2", [coinsDelta, project.user_id]);
     await client.query("COMMIT");
 
+    const approvedRow = updatedProjectResult.rows[0];
+    await trySyncProjectToAirtable(approvedRow.id);
+
     return {
-      project: toPublicProject(updatedProjectResult.rows[0]),
+      project: toPublicProject(approvedRow),
       coinsEarned: coinsDelta,
       approvedHours: newTotalApprovedHours,
     };
@@ -397,7 +419,9 @@ export async function rejectAdminReviewProject(adminId, projectId, input = {}) {
     throw new Error("Project is not in the review queue.");
   }
 
-  return toPublicProject(result.rows[0]);
+  const row = result.rows[0];
+  await trySyncProjectToAirtable(row.id);
+  return toPublicProject(row);
 }
 
 export async function patchAdminReviewProjectFlags(projectId, input = {}) {
@@ -559,6 +583,12 @@ export async function getJournalEntriesCsv() {
   );
 }
 
+function normalizeHackatimeNames(input = {}) {
+  const raw = input.hackatimeNames ?? input.hackatime_names ?? [];
+  if (!Array.isArray(raw)) return [];
+  return raw.map((name) => String(name).trim()).filter(Boolean);
+}
+
 function normalizeProjectInput(input = {}) {
   return {
     name: textOrNull(input.name),
@@ -567,7 +597,65 @@ function normalizeProjectInput(input = {}) {
     playableUrl: textOrNull(input.playableUrl ?? input.playable_url),
     codeUrl: textOrNull(input.codeUrl ?? input.code_url),
     imageUrl: textOrNull(input.imageUrl ?? input.image_url),
+    hackatimeNames: normalizeHackatimeNames(input),
   };
+}
+
+export async function refreshProjectHackatimeHoursForUser(userId, hackatimeProjects = null) {
+  if (!pool) return;
+
+  const tokenResult = await pool.query(
+    `SELECT hackatime_access_token FROM users WHERE id = $1`,
+    [userId]
+  );
+  const token = tokenResult.rows[0]?.hackatime_access_token;
+  if (!token && !hackatimeProjects) return;
+
+  const list = hackatimeProjects || (await fetchHackatimeProjects(token));
+  const projectsResult = await pool.query(
+    `SELECT id, hackatime_names FROM projects WHERE user_id = $1`,
+    [userId]
+  );
+
+  for (const project of projectsResult.rows) {
+    const names = Array.isArray(project.hackatime_names) ? project.hackatime_names : [];
+    const hours = sumHackatimeHoursForNames(list, names);
+    await pool.query(
+      `UPDATE projects SET hackatime_hours = $1, updated_at = NOW() WHERE id = $2`,
+      [hours, project.id]
+    );
+    await trySyncProjectToAirtable(project.id);
+  }
+}
+
+async function applyHackatimeHoursToProject(userId, projectId) {
+  const tokenResult = await pool.query(
+    `SELECT hackatime_access_token FROM users WHERE id = $1`,
+    [userId]
+  );
+  const token = tokenResult.rows[0]?.hackatime_access_token;
+  if (!token) return;
+
+  const projectResult = await pool.query(
+    `SELECT hackatime_names FROM projects WHERE id = $1 AND user_id = $2`,
+    [projectId, userId]
+  );
+  const names = projectResult.rows[0]?.hackatime_names || [];
+  const list = await fetchHackatimeProjects(token);
+  const hours = sumHackatimeHoursForNames(list, names);
+
+  await pool.query(
+    `UPDATE projects SET hackatime_hours = $1, updated_at = NOW() WHERE id = $2`,
+    [hours, projectId]
+  );
+}
+
+export async function getProjectForUser(userId, projectId) {
+  const row = await getProjectRowForAirtableSync(projectId);
+  if (!row || Number(row.user_id) !== Number(userId)) return null;
+  await applyHackatimeHoursToProject(userId, projectId);
+  const refreshed = await getProjectRowForAirtableSync(projectId);
+  return toPublicProject(refreshed || row);
 }
 
 function validateProjectBasics(project) {
@@ -650,7 +738,9 @@ async function refreshProjectJournalHours(userId, projectId) {
     [userId, projectId]
   );
 
-  return result.rows[0] ? toPublicProject(result.rows[0]) : null;
+  const row = result.rows[0];
+  if (row) await trySyncProjectToAirtable(row.id);
+  return row ? toPublicProject(row) : null;
 }
 
 async function refreshProjectJournalHoursWithClient(client, projectId) {
@@ -677,8 +767,57 @@ function textOrNull(value) {
   return text ? text : null;
 }
 
+async function getProjectRowForAirtableSync(projectId) {
+  if (!pool) return null;
+
+  const result = await pool.query(
+    `
+      SELECT
+        projects.*,
+        COALESCE(SUM(journal_entries.hours_worked), 0) AS journal_hours,
+        users.email AS user_email,
+        users.slack_id AS user_slack_id
+      FROM projects
+      JOIN users ON users.id = projects.user_id
+      LEFT JOIN journal_entries
+        ON journal_entries.project_id = projects.id
+        AND journal_entries.user_id = projects.user_id
+      WHERE projects.id = $1
+      GROUP BY projects.id, users.id
+    `,
+    [projectId]
+  );
+
+  return result.rows[0] ?? null;
+}
+
+async function trySyncProjectToAirtable(projectId) {
+  try {
+    const row = await getProjectRowForAirtableSync(projectId);
+    if (!row) return;
+
+    const result = await syncProjectToAirtable(row);
+    if (result.ok && result.recordId) {
+      await persistProjectAirtableRecordId(projectId, result.recordId);
+    }
+    if (!result.skipped) {
+      console.log("[projects] Airtable _projects sync:", {
+        projectId,
+        created: result.created,
+        recordId: result.recordId,
+      });
+    }
+  } catch (error) {
+    console.error("[projects] Airtable _projects sync failed:", {
+      projectId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 function toPublicProject(row) {
   const journalHours = Number(row.journal_hours ?? row.total_hours ?? 0);
+  const hackatimeHours = Number(row.hackatime_hours ?? 0);
   return {
     id: row.id,
     userId: row.user_id,
@@ -694,6 +833,9 @@ function toPublicProject(row) {
     reviewed: row.reviewed,
     totalHours: Number(row.total_hours ?? 0),
     journalHours,
+    hackatimeHours,
+    combinedHours: Number((journalHours + hackatimeHours).toFixed(2)),
+    baselineHours: row.baseline_hours != null ? Number(row.baseline_hours) : null,
     approvedHours: Number(row.approved_hours ?? 0),
     pastApprovedHours: Number(row.past_approved_hours ?? 0),
     coinsEarned: Number(row.coins_earned ?? 0),
@@ -730,7 +872,9 @@ function getShipMissingRequirements(project) {
   if (!textOrNull(project.playable_url)) missing.push("playable URL missing");
   if (!textOrNull(project.code_url)) missing.push("code URL missing");
   if (!textOrNull(project.image_url)) missing.push("project image missing");
-  if (Number(project.total_hours ?? 0) <= 0) missing.push("hours logged missing");
+  const combinedHours =
+    Number(project.total_hours ?? 0) + Number(project.hackatime_hours ?? 0);
+  if (combinedHours <= 0) missing.push("hours logged missing");
   return missing;
 }
 

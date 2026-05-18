@@ -67,6 +67,11 @@ export async function ensureUsersTable() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS scope TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS raw_profile JSONB`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS raw_token JSONB`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hackatime_access_token TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hackatime_refresh_token TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hackatime_token_expires_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hackatime_connected_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hackatime_total_hours NUMERIC(10, 2) NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 
@@ -462,6 +467,8 @@ export function toPublicUser(row) {
     verificationStatus: row.verification_status,
     role: effectiveRole(row),
     coins: Number(row.coins ?? 0),
+    hackatimeConnected: Boolean(row.hackatime_access_token),
+    hackatimeTotalHours: Number(row.hackatime_total_hours ?? 0),
   };
 }
 

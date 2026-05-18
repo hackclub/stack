@@ -19,6 +19,7 @@ const emptyProject = {
   playableUrl: "",
   codeUrl: "",
   imageUrl: "",
+  hackatimeNames: [],
 };
 
 const emptyJournalEntry = {
@@ -40,7 +41,8 @@ function getShipLockReason(project) {
   if (!project.playableUrl) missing.push("playable URL missing");
   if (!project.codeUrl) missing.push("code URL missing");
   if (!project.imageUrl) missing.push("project image missing");
-  if (Number(project.totalHours || 0) <= 0) missing.push("hours logged missing");
+  const hours = Number(project.combinedHours ?? project.totalHours ?? project.journalHours ?? 0);
+  if (hours <= 0) missing.push("hours logged missing");
   return missing.length ? `Locked: ${missing.join(", ")}.` : "";
 }
 
@@ -55,10 +57,43 @@ export function ProjectsPage() {
   const [projectBlockPage, setProjectBlockPage] = useState(0);
   const [status, setStatus] = useState("Loading projects...");
   const [error, setError] = useState("");
+  const [hackatimeAvailable, setHackatimeAvailable] = useState(false);
+  const [hackatimeConnected, setHackatimeConnected] = useState(false);
+  const [hackatimeProjects, setHackatimeProjects] = useState([]);
 
   useEffect(() => {
     loadProjects();
+    loadHackatimeStatus();
   }, []);
+
+  async function openEditProject(project) {
+    if (project.id && hackatimeConnected) {
+      try {
+        const response = await fetch(`/api/projects/${project.id}`, { credentials: "include" });
+        const data = response.ok ? await response.json() : null;
+        if (data?.project) {
+          setEditingProject({ ...data.project, hackatimeNames: data.project.hackatimeNames || [] });
+          return;
+        }
+      } catch {
+        // use cached project row
+      }
+    }
+    setEditingProject({ ...project, hackatimeNames: project.hackatimeNames || [] });
+  }
+
+  async function loadHackatimeStatus() {
+    try {
+      const response = await fetch("/api/hackatime/status", { credentials: "include" });
+      if (!response.ok) return;
+      const data = await response.json();
+      setHackatimeAvailable(Boolean(data.configured));
+      setHackatimeConnected(Boolean(data.connected));
+      setHackatimeProjects(data.projects || []);
+    } catch {
+      setHackatimeAvailable(false);
+    }
+  }
 
   useEffect(() => {
     const maxProjectBlockPage = Math.max(0, Math.ceil(projects.length / PROJECTS_PER_BLOCK) - 1);
@@ -88,6 +123,7 @@ export function ProjectsPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to load projects.");
       setProjects(data.projects || []);
+      setHackatimeAvailable(Boolean(data.hackatimeAvailable));
       setStatus("");
     } catch (err) {
       setError(err.message);
@@ -307,7 +343,7 @@ export function ProjectsPage() {
         <ProjectDetailsModal
           project={selectedProject}
           onClose={() => setSelectedProject(null)}
-          onEdit={() => setEditingProject(selectedProject)}
+          onEdit={() => openEditProject(selectedProject)}
           onJournal={() => openJournal(selectedProject)}
           onShip={() => shipProject(selectedProject)}
           onDelete={() => deleteProject(selectedProject)}
@@ -317,6 +353,9 @@ export function ProjectsPage() {
       {editingProject && (
         <ProjectFormModal
           project={editingProject}
+          hackatimeAvailable={hackatimeAvailable}
+          hackatimeConnected={hackatimeConnected}
+          hackatimeProjects={hackatimeProjects}
           onChange={(field, value) => setEditingProject((current) => ({ ...current, [field]: value }))}
           onClose={() => setEditingProject(null)}
           onSubmit={saveProject}
@@ -366,24 +405,24 @@ function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDe
           <strong>{displayStatus(project)}</strong>
         </div>
         <div className="projects-page__modal-row">
-          <span>Hours logged</span>
-          <strong>{project.totalHours || 0}</strong>
+          <span>Hours logged (combined)</span>
+          <strong>{project.combinedHours ?? project.totalHours ?? 0}</strong>
         </div>
         <div className="projects-page__modal-row">
           <span>Hours approved</span>
           <strong>{project.approvedHours || 0}</strong>
         </div>
         <div className="projects-page__modal-row">
-          <span>Journaling logged time</span>
+          <span>Journal hours</span>
           <strong>{project.journalHours || 0}</strong>
         </div>
         <div className="projects-page__modal-row">
-          <span>Hackatime logged time</span>
-          <strong>Blocked for now</strong>
+          <span>Hackatime hours</span>
+          <strong>{project.hackatimeHours || 0}</strong>
         </div>
         <div className="projects-page__modal-row">
-          <span>Hackatime name</span>
-          <strong>Unavailable</strong>
+          <span>Hackatime projects</span>
+          <strong>{(project.hackatimeNames || []).join(", ") || "—"}</strong>
         </div>
         {project.playableUrl ? (
           <a className="projects-page__modal-link" href={project.playableUrl} target="_blank" rel="noreferrer">
@@ -473,7 +512,22 @@ function JournalModal({ project, entries, form, onChange, onClose, onSubmit }) {
   );
 }
 
-function ProjectFormModal({ project, onChange, onClose, onSubmit }) {
+function toggleHackatimeName(currentNames, name) {
+  const set = new Set(currentNames || []);
+  if (set.has(name)) set.delete(name);
+  else set.add(name);
+  return [...set];
+}
+
+function ProjectFormModal({
+  project,
+  hackatimeAvailable,
+  hackatimeConnected,
+  hackatimeProjects,
+  onChange,
+  onClose,
+  onSubmit,
+}) {
   return (
     <div className="projects-page__modal-overlay" role="presentation" onClick={onClose}>
       <section className="projects-page__modal projects-page__modal--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
@@ -512,9 +566,44 @@ function ProjectFormModal({ project, onChange, onClose, onSubmit }) {
             Project image URL (required before shipping)
             <input value={project.imageUrl || ""} onChange={(event) => onChange("imageUrl", event.target.value)} />
           </label>
-          <fieldset disabled className="projects-page__hackatime-disabled">
+          <fieldset
+            disabled={!hackatimeConnected}
+            className={hackatimeConnected ? "projects-page__hackatime" : "projects-page__hackatime-disabled"}
+          >
             <legend>Hackatime projects</legend>
-            <p>Blocked for now: Stack does not connect Hack Club accounts yet.</p>
+            {!hackatimeAvailable ? (
+              <p>Hackatime OAuth is not configured on this server.</p>
+            ) : !hackatimeConnected ? (
+              <p>
+                Connect Hackatime on your next login, or{" "}
+                <a href="/api/auth/hackatime/login?returnTo=/projects">connect now</a>.
+              </p>
+            ) : hackatimeProjects.length === 0 ? (
+              <p>No Hackatime projects found on your account yet.</p>
+            ) : (
+              <div className="projects-page__hackatime-list">
+                {hackatimeProjects.map((ht) => {
+                  const checked = (project.hackatimeNames || []).includes(ht.name);
+                  return (
+                    <label key={ht.name} className="projects-page__hackatime-option">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() =>
+                          onChange("hackatimeNames", toggleHackatimeName(project.hackatimeNames, ht.name))
+                        }
+                      />
+                      <span>
+                        {ht.name} ({ht.totalHours} h)
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {Number(project.hackatimeHours) > 0 ? (
+              <p className="projects-page__hackatime-summary">Linked Hackatime: {project.hackatimeHours} h</p>
+            ) : null}
           </fieldset>
           <button type="submit">Save Project</button>
         </form>
