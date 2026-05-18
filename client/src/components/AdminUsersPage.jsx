@@ -101,10 +101,6 @@ export function AdminUsersPage({ userId = null }) {
                   <dd>{selectedUser.role || "member"}</dd>
                 </div>
                 <div>
-                  <dt>Password set</dt>
-                  <dd>{selectedUser.passwordSetAt ? "Yes" : "No"}</dd>
-                </div>
-                <div>
                   <dt>Joined</dt>
                   <dd>{formatDate(selectedUser.createdAt)}</dd>
                 </div>
@@ -132,7 +128,7 @@ export function AdminUsersPage({ userId = null }) {
         </a>
         <h1>Users</h1>
         <p className="admin-users-intro">
-          Participant, role, login status, join date, and profile details from the Stack users table.
+          Participant, role, join date, and profile details from the Stack users table.
         </p>
 
         <div className="admin-users-filters">
@@ -171,7 +167,6 @@ export function AdminUsersPage({ userId = null }) {
               <tr>
                 <th>Participant</th>
                 <th>Role</th>
-                <th>Password</th>
                 <th>Joined</th>
                 <th>Updated</th>
                 <th>Profile</th>
@@ -180,7 +175,7 @@ export function AdminUsersPage({ userId = null }) {
             <tbody>
               {visibleUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="6">No users found.</td>
+                  <td colSpan="5">No users found.</td>
                 </tr>
               ) : (
                 visibleUsers.map((user) => (
@@ -192,7 +187,6 @@ export function AdminUsersPage({ userId = null }) {
                       <span>{user.email || "—"}</span>
                     </td>
                     <td>{user.role || "member"}</td>
-                    <td>{user.passwordSetAt ? "Set" : "Not set"}</td>
                     <td>{formatDate(user.createdAt)}</td>
                     <td>{formatDate(user.updatedAt)}</td>
                     <td>

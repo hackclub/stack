@@ -1,24 +1,26 @@
 import crypto from "crypto";
 import express from "express";
-import rateLimit from "express-rate-limit";
 import {
-  createUserFromEmailPassword,
-  getUserByEmail,
+  appOriginFromRedirectUri,
+  describeHackClubProfile,
+  exchangeAuthorizationCode,
+  fetchHackClubMe,
+  getAppOrigin,
+  getAuthorizeUrl,
+  resolveOAuthRedirectUri,
+} from "./hackclubAuth.js";
+import { syncUserToAirtableUsers } from "./airtableUsers.js";
+import {
+  buildSessionProfileSnapshot,
+  describeProfileIdentifier,
   getUserById,
-  setPasswordForExistingUser,
+  hackclubSubFromProfile,
+  isDatabaseConnectionError,
   toPublicUser,
-  updateUserPasswordHash,
-  updateUserRoleFromEmail,
+  toPublicUserFromSessionSnapshot,
+  upsertUserFromHackClub,
 } from "./users.js";
-import { hashPasswordForStorage, verifyPasswordForLogin } from "./passwordHash.js";
 
-const passwordLoginLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 40,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: "Too many login attempts. Please try again in a few minutes.",
-});
 const LOCAL_DEV_AUTH_COOKIE = "stack.local_user";
 
 function normalizeReturnTo(value) {
@@ -30,8 +32,14 @@ function normalizeReturnTo(value) {
   return trimmed;
 }
 
-function getAppOrigin() {
-  return process.env.APP_ORIGIN || "http://localhost:5173";
+function oauthCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 10 * 60 * 1000,
+    path: "/",
+  };
 }
 
 function isLocalhostRequest(req) {
@@ -49,14 +57,6 @@ function shouldUseLocalDevCookie(req) {
 
 function localDevCookieSecret() {
   return process.env.DEV_AUTH_COOKIE_SECRET || process.env.SESSION_SECRET || "dev-local-auth-cookie-secret";
-}
-
-function normalizeEmail(email) {
-  return typeof email === "string" ? email.trim().toLowerCase() : "";
-}
-
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function signLocalUserId(userId) {
@@ -80,7 +80,7 @@ function verifyLocalUserCookie(value) {
 }
 
 function setLocalDevAuthCookie(req, res, userId) {
-  if (!shouldUseLocalDevCookie(req)) return;
+  if (!shouldUseLocalDevCookie(req) || !userId) return;
 
   res.cookie(LOCAL_DEV_AUTH_COOKIE, signLocalUserId(userId), {
     httpOnly: true,
@@ -95,56 +95,116 @@ export function createAuthRouter() {
   const router = express.Router();
 
   router.get("/hackclub/login", (req, res) => {
-    const returnTo = normalizeReturnTo(req.query?.returnTo);
-    res.redirect(302, `${getAppOrigin()}/login?returnTo=${encodeURIComponent(returnTo)}&auth=password`);
-  });
-
-  router.get("/hackclub/callback", (req, res) => {
-    res.redirect(302, `${getAppOrigin()}/login?auth=password`);
-  });
-
-  router.post("/password/login", passwordLoginLimiter, async (req, res) => {
+    let redirectUri;
     try {
-      const email = normalizeEmail(req.body?.email);
-      const password = String(req.body?.password || "");
-
-      if (!isValidEmail(email)) {
-        res.status(422).json({ error: "Enter a valid email address." });
-        return;
-      }
-
-      if (password.length < 6) {
-        res.status(422).json({ error: "Password must be at least 6 characters." });
-        return;
-      }
-
-      const existingUser = await getUserByEmail(email);
-      let user;
-
-      if (existingUser?.password_hash) {
-        const outcome = verifyPasswordForLogin(password, existingUser.password_hash);
-        if (!outcome.valid) {
-          res.status(401).json({ error: "Wrong email or password." });
-          return;
-        }
-        if (outcome.migrateToHash) {
-          await updateUserPasswordHash(existingUser.id, outcome.migrateToHash);
-        }
-        user = await updateUserRoleFromEmail(existingUser.id, email);
-      } else if (existingUser) {
-        user = await setPasswordForExistingUser(existingUser.id, email, hashPasswordForStorage(password));
-      } else {
-        user = await createUserFromEmailPassword(email, hashPasswordForStorage(password));
-      }
-
-      req.session.userId = user.id;
-      delete req.session.hackclubSub;
-      setLocalDevAuthCookie(req, res, user.id);
-
-      res.json({ user: toPublicUser(user) });
+      redirectUri = resolveOAuthRedirectUri(req);
     } catch (error) {
-      console.error("[auth] password login failed:", error);
-      res.status(500).json({ error: "Failed to log in." });
+      console.error("[auth] Login redirect_uri setup failed:", error);
+      res.redirect(302, `${getAppOrigin()}/login?error=oauth_config`);
+      return;
+    }
+
+    const returnTo = normalizeReturnTo(req.query?.returnTo);
+    const state = crypto.randomBytes(24).toString("hex");
+
+    res.cookie("hc_oauth_state", state, oauthCookieOptions());
+    res.cookie("hc_oauth_redirect_uri", redirectUri, oauthCookieOptions());
+    res.cookie("hc_oauth_return_to", returnTo, oauthCookieOptions());
+
+    const url = getAuthorizeUrl({ state, redirectUri });
+    res.redirect(302, url);
+  });
+
+  router.get("/hackclub/callback", async (req, res) => {
+    const storedRedirectUri = req.cookies?.hc_oauth_redirect_uri;
+    const cookieState = req.cookies?.hc_oauth_state;
+    const returnTo = normalizeReturnTo(req.cookies?.hc_oauth_return_to);
+    const redirectUri =
+      typeof storedRedirectUri === "string" && storedRedirectUri
+        ? storedRedirectUri
+        : process.env.HC_REDIRECT_URI?.trim() || null;
+
+    res.clearCookie("hc_oauth_state", { path: "/" });
+    res.clearCookie("hc_oauth_redirect_uri", { path: "/" });
+    res.clearCookie("hc_oauth_return_to", { path: "/" });
+
+    const appOrigin = redirectUri ? appOriginFromRedirectUri(redirectUri) : getAppOrigin();
+
+    try {
+      const code = req.query.code;
+      const state = req.query.state;
+
+      if (typeof code !== "string" || !code) {
+        res.redirect(302, `${appOrigin}/login?error=oauth_missing_code`);
+        return;
+      }
+
+      if (typeof state !== "string" || !cookieState || state !== cookieState) {
+        res.redirect(302, `${appOrigin}/login?error=oauth_state`);
+        return;
+      }
+
+      if (!redirectUri) {
+        res.redirect(302, `${appOrigin}/login?error=oauth_missing_redirect`);
+        return;
+      }
+
+      const token = await exchangeAuthorizationCode(code, redirectUri);
+      const accessToken = token.access_token;
+      if (!accessToken) {
+        res.redirect(302, `${appOrigin}/login?error=oauth_no_access_token`);
+        return;
+      }
+
+      const profile = await fetchHackClubMe(accessToken);
+      console.log("[auth] HCA /me profile shape:", describeHackClubProfile(profile));
+
+      let user = null;
+      try {
+        user = await upsertUserFromHackClub({ profile, token });
+      } catch (dbError) {
+        const dbUnavailable = isDatabaseConnectionError(dbError);
+        console.error("[auth] Postgres user upsert failed:", {
+          message: dbError instanceof Error ? dbError.message : String(dbError),
+          code: dbError?.code,
+          dbUnavailable,
+          profile: describeProfileIdentifier(profile),
+        });
+        if (!dbUnavailable) {
+          throw dbError;
+        }
+      }
+
+      try {
+        const airtableResult = await syncUserToAirtableUsers(profile);
+        console.log("[auth] Airtable _users sync:", airtableResult);
+      } catch (syncError) {
+        console.error("[auth] Airtable _users sync failed:", {
+          message: syncError instanceof Error ? syncError.message : String(syncError),
+          profile: describeProfileIdentifier(profile),
+        });
+      }
+
+      const hackclubSub = hackclubSubFromProfile(profile);
+      req.session.hackclubSub = hackclubSub;
+      req.session.profileSnapshot = buildSessionProfileSnapshot(profile, { userRow: user });
+
+      if (user?.id) {
+        req.session.userId = user.id;
+        setLocalDevAuthCookie(req, res, user.id);
+      } else {
+        delete req.session.userId;
+      }
+
+      res.redirect(302, `${appOrigin}${returnTo}`);
+    } catch (error) {
+      console.error("[auth] Hack Club callback failed:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        queryError: req.query?.error,
+        queryErrorDescription: req.query?.error_description,
+      });
+      res.redirect(302, `${appOrigin}/login?error=oauth_callback`);
     }
   });
 
@@ -159,13 +219,28 @@ export function createAuthRouter() {
         }
       }
 
-      if (!userId) {
-        res.json({ user: null });
+      if (userId) {
+        try {
+          const row = await getUserById(userId);
+          if (row) {
+            res.json({ user: toPublicUser(row) });
+            return;
+          }
+        } catch (dbError) {
+          if (!isDatabaseConnectionError(dbError)) {
+            throw dbError;
+          }
+          console.warn("[auth] /me Postgres unavailable, using session snapshot.");
+        }
+      }
+
+      const snapshotUser = toPublicUserFromSessionSnapshot(req.session?.profileSnapshot);
+      if (snapshotUser) {
+        res.json({ user: snapshotUser });
         return;
       }
 
-      const row = await getUserById(userId);
-      res.json({ user: toPublicUser(row) });
+      res.json({ user: null });
     } catch (error) {
       console.error("[auth] /me failed:", error);
       res.status(500).json({ error: "Failed to load session user." });

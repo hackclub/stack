@@ -43,8 +43,6 @@ export async function ensureUsersTable() {
       scope TEXT,
       raw_profile JSONB,
       raw_token JSONB,
-      password_hash TEXT,
-      password_set_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -69,8 +67,6 @@ export async function ensureUsersTable() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS scope TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS raw_profile JSONB`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS raw_token JSONB`);
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT`);
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_set_at TIMESTAMPTZ`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 
@@ -172,26 +168,75 @@ function normalizeEmail(email) {
   return typeof email === "string" ? email.trim().toLowerCase() : "";
 }
 
-function hackclubSubFromProfile(profile) {
+export function hackclubSubFromProfile(profile) {
+  const nestedIdentity =
+    profile?.identity && typeof profile.identity === "object" ? profile.identity : null;
+  const source = nestedIdentity ?? profile;
+
   const subCandidate =
-    profile?.sub ??
-    profile?.id ??
-    profile?.user_id ??
-    profile?.uid ??
-    profile?.hc_id ??
-    profile?.slack_id ??
+    source?.sub ??
+    source?.id ??
+    source?.public_id ??
+    source?.identity_id ??
+    source?.user_id ??
+    source?.uid ??
+    source?.hc_id ??
     null;
 
   if (subCandidate !== undefined && subCandidate !== null && String(subCandidate).trim()) {
-    return String(subCandidate);
+    return String(subCandidate).trim();
   }
 
-  const emailCandidate = profile?.email ?? profile?.email_address ?? null;
+  const slackId = source?.slack_id ?? source?.slackId;
+  if (slackId !== undefined && slackId !== null && String(slackId).trim()) {
+    return `slack:${String(slackId).trim()}`;
+  }
+
+  const emailCandidate =
+    source?.email ??
+    source?.primary_email ??
+    source?.email_address ??
+    source?.primaryEmail ??
+    null;
   if (typeof emailCandidate === "string" && emailCandidate.trim()) {
     return `email:${emailCandidate.trim().toLowerCase()}`;
   }
 
   throw new Error("Hack Club profile missing stable identifier.");
+}
+
+export function describeProfileIdentifier(profile) {
+  try {
+    return { stableId: hackclubSubFromProfile(profile), ...describeHackClubProfileFields(profile) };
+  } catch {
+    return describeHackClubProfileFields(profile);
+  }
+}
+
+function describeHackClubProfileFields(profile) {
+  const nested = profile?.identity && typeof profile.identity === "object" ? profile.identity : null;
+  const source = nested ?? profile ?? {};
+  return {
+    topLevelKeys: profile ? Object.keys(profile) : [],
+    identityKeys: nested ? Object.keys(nested) : [],
+    id: source.id ?? null,
+    public_id: source.public_id ?? null,
+    sub: source.sub ?? null,
+    hasPrimaryEmail: Boolean(source.primary_email),
+    hasEmail: Boolean(source.email),
+    hasSlackId: Boolean(source.slack_id),
+  };
+}
+
+function profileEmail(profile) {
+  const nested = profile?.identity && typeof profile.identity === "object" ? profile.identity : profile;
+  const email =
+    nested?.email ??
+    nested?.primary_email ??
+    nested?.email_address ??
+    nested?.primaryEmail ??
+    null;
+  return typeof email === "string" ? email.trim().toLowerCase() : "";
 }
 
 /**
@@ -203,11 +248,25 @@ export async function upsertUserFromHackClub({ profile, token }) {
   }
 
   const hackclubSub = hackclubSubFromProfile(profile);
-  const email = profile.email ?? profile.email_address ?? null;
-  const name = profile.name ?? profile.full_name ?? profile.username ?? null;
+  const emailRaw =
+    profile.email ??
+    profile.primary_email ??
+    profile.email_address ??
+    profile.primaryEmail ??
+    null;
+  const email = typeof emailRaw === "string" ? emailRaw.trim().toLowerCase() : null;
+  const nameParts = [profile.first_name, profile.last_name].filter(
+    (part) => typeof part === "string" && part.trim()
+  );
+  const name =
+    profile.name ??
+    profile.full_name ??
+    (nameParts.length > 0 ? nameParts.join(" ") : null) ??
+    profile.username ??
+    null;
   const slug = profile.slug ?? profile.username ?? null;
   const profileImageUrl = profile.profile_image_url ?? profile.picture ?? profile.avatar_url ?? null;
-  const slackId = profile.slack_id ?? profile.slack_user_id ?? null;
+  const slackId = profile.slack_id ?? profile.slack_user_id ?? profile.slackId ?? null;
   const verificationStatus = profile.verification_status ?? profile.verification ?? null;
 
   const accessToken = token.access_token ?? null;
@@ -312,7 +371,6 @@ export async function listAdminUsers() {
       hackclub_sub,
       profile_image_url,
       verification_status,
-      password_set_at,
       created_at,
       updated_at
     FROM users
@@ -339,7 +397,6 @@ export async function getAdminUserById(id) {
         hackclub_sub,
         profile_image_url,
         verification_status,
-        password_set_at,
         created_at,
         updated_at
       FROM users
@@ -392,90 +449,6 @@ export async function updateUserRoleFromEmail(id, email) {
   return result.rows[0];
 }
 
-export async function setPasswordForExistingUser(id, email, passwordHash) {
-  if (!pool) {
-    throw new Error("DATABASE_URL is not set.");
-  }
-
-  const result = await pool.query(
-    `
-      UPDATE users
-      SET
-        email = $1,
-        role = $2,
-        password_hash = $3,
-        password_set_at = NOW(),
-        updated_at = NOW()
-      WHERE id = $4
-      RETURNING *
-    `,
-    [normalizeEmail(email), resolveRole(email), passwordHash, id]
-  );
-
-  return result.rows[0];
-}
-
-export async function updateUserPasswordHash(id, passwordHash) {
-  if (!pool) {
-    throw new Error("DATABASE_URL is not set.");
-  }
-
-  const result = await pool.query(
-    `
-      UPDATE users
-      SET
-        password_hash = $1,
-        password_set_at = NOW(),
-        updated_at = NOW()
-      WHERE id = $2
-      RETURNING *
-    `,
-    [passwordHash, id]
-  );
-
-  return result.rows[0] ?? null;
-}
-
-export async function createUserFromEmailPassword(email, passwordHash) {
-  if (!pool) {
-    throw new Error("DATABASE_URL is not set.");
-  }
-
-  const normalizedEmail = normalizeEmail(email);
-  if (!normalizedEmail) {
-    throw new Error("Email is required.");
-  }
-
-  const result = await pool.query(
-    `
-      INSERT INTO users (
-        hackclub_sub,
-        email,
-        name,
-        slug,
-        verification_status,
-        role,
-        password_hash,
-        password_set_at
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, NOW()
-      )
-      RETURNING *
-    `,
-    [
-      `email:${normalizedEmail}`,
-      normalizedEmail,
-      normalizedEmail.split("@")[0],
-      normalizedEmail.split("@")[0],
-      "password",
-      resolveRole(normalizedEmail),
-      passwordHash,
-    ]
-  );
-
-  return result.rows[0];
-}
-
 export function toPublicUser(row) {
   if (!row) return null;
   return {
@@ -492,6 +465,63 @@ export function toPublicUser(row) {
   };
 }
 
+export function toPublicUserFromSessionSnapshot(snapshot) {
+  if (!snapshot?.hackclubSub) return null;
+  return {
+    id: snapshot.id ?? null,
+    hackclubSub: snapshot.hackclubSub,
+    email: snapshot.email ?? null,
+    name: snapshot.name ?? null,
+    slug: snapshot.slug ?? null,
+    profileImageUrl: snapshot.profileImageUrl ?? null,
+    slackId: snapshot.slackId ?? null,
+    verificationStatus: snapshot.verificationStatus ?? null,
+    role: snapshot.role ?? DEFAULT_ROLE,
+    coins: Number(snapshot.coins ?? 0),
+  };
+}
+
+export function buildSessionProfileSnapshot(profile, { userRow = null } = {}) {
+  const hackclubSub = hackclubSubFromProfile(profile);
+  const email = profileEmail(profile) || userRow?.email || null;
+  const nameParts = [profile.first_name, profile.last_name].filter(
+    (part) => typeof part === "string" && part.trim()
+  );
+  const name =
+    profile.name ??
+    profile.full_name ??
+    (nameParts.length > 0 ? nameParts.join(" ") : null) ??
+    userRow?.name ??
+    null;
+
+  return {
+    id: userRow?.id ?? null,
+    hackclubSub,
+    email,
+    name,
+    slug: profile.slug ?? profile.username ?? userRow?.slug ?? null,
+    profileImageUrl:
+      profile.profile_image_url ?? profile.picture ?? profile.avatar_url ?? userRow?.profile_image_url ?? null,
+    slackId: profile.slack_id ?? profile.slack_user_id ?? userRow?.slack_id ?? null,
+    verificationStatus:
+      profile.verification_status ?? profile.verification ?? userRow?.verification_status ?? null,
+    role: userRow ? effectiveRole(userRow) : resolveRole(email),
+    coins: userRow ? Number(userRow.coins ?? 0) : 0,
+  };
+}
+
+export function isDatabaseConnectionError(error) {
+  if (!error || typeof error !== "object") return false;
+  const code = error.code;
+  return (
+    code === "ENOTFOUND" ||
+    code === "ECONNREFUSED" ||
+    code === "ETIMEDOUT" ||
+    code === "ECONNRESET" ||
+    code === "57P01"
+  );
+}
+
 function toAdminUser(row) {
   return {
     id: row.id,
@@ -503,7 +533,6 @@ function toAdminUser(row) {
     hackclubSub: row.hackclub_sub,
     profileImageUrl: row.profile_image_url,
     verificationStatus: row.verification_status,
-    passwordSetAt: row.password_set_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

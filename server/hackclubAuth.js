@@ -188,6 +188,69 @@ export async function exchangeAuthorizationCode(code, redirectUri) {
   return data;
 }
 
+function buildNameFromIdentity(identity) {
+  if (typeof identity?.name === "string" && identity.name.trim()) {
+    return identity.name.trim();
+  }
+
+  const parts = [identity?.first_name, identity?.last_name].filter(
+    (part) => typeof part === "string" && part.trim()
+  );
+  if (parts.length > 0) {
+    return parts.join(" ");
+  }
+
+  return identity?.username ?? identity?.slug ?? null;
+}
+
+export function normalizeHackClubMeResponse(data) {
+  if (!data || typeof data !== "object") {
+    return data;
+  }
+
+  if (data.identity && typeof data.identity === "object") {
+    const identity = data.identity;
+    const email =
+      identity.email ??
+      identity.primary_email ??
+      identity.email_address ??
+      identity.primaryEmail ??
+      null;
+
+    return {
+      ...identity,
+      scopes: data.scopes,
+      sub: identity.sub ?? identity.id,
+      public_id: identity.public_id ?? identity.id,
+      identity_id: identity.identity_id ?? identity.id,
+      email,
+      name: buildNameFromIdentity(identity),
+      slack_id: identity.slack_id ?? identity.slackId ?? null,
+      verification_status: identity.verification_status ?? identity.verificationStatus ?? null,
+    };
+  }
+
+  return data;
+}
+
+export function describeHackClubProfile(profile) {
+  if (!profile || typeof profile !== "object") {
+    return { present: false };
+  }
+
+  return {
+    topLevelKeys: Object.keys(profile),
+    id: profile.id ?? null,
+    public_id: profile.public_id ?? null,
+    identity_id: profile.identity_id ?? null,
+    sub: profile.sub ?? null,
+    hasEmail: Boolean(profile.email ?? profile.primary_email ?? profile.email_address),
+    hasSlackId: Boolean(profile.slack_id),
+    hasName: Boolean(profile.name ?? profile.first_name ?? profile.last_name),
+    wrappedIdentity: Boolean(profile.identity),
+  };
+}
+
 export async function fetchHackClubMe(accessToken) {
   const response = await fetch(`${AUTH_BASE}/api/v1/me`, {
     headers: {
@@ -209,9 +272,9 @@ export async function fetchHackClubMe(accessToken) {
     throw new Error(`Hack Club /api/v1/me failed: ${msg}`);
   }
 
-  return data;
+  return normalizeHackClubMeResponse(data);
 }
 
 export function getAppOrigin() {
-  return process.env.APP_ORIGIN || "http://localhost:5173";
+  return process.env.APP_ORIGIN || "http://127.0.0.1:5173";
 }

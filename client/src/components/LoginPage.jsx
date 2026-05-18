@@ -1,6 +1,14 @@
-import { useMemo, useState } from "react";
-import { useAuth } from "../auth/AuthContext.jsx";
+import { useEffect, useMemo } from "react";
 import "./LoginPage.css";
+
+const ERROR_MESSAGES = {
+  oauth_config: "Login is not configured correctly. Please contact @Scooter.",
+  oauth_missing_code: "Hack Club did not return an authorization code.",
+  oauth_state: "Login session expired. Please try again.",
+  oauth_missing_redirect: "OAuth redirect URI was missing.",
+  oauth_no_access_token: "Hack Club did not return an access token.",
+  oauth_callback: "Hack Club login failed. Please try again.",
+};
 
 function normalizeReturnTo(value) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/main";
@@ -8,36 +16,17 @@ function normalizeReturnTo(value) {
 }
 
 export function LoginPage() {
-  const { reload } = useAuth();
   const params = new URLSearchParams(window.location.search);
   const returnTo = useMemo(() => normalizeReturnTo(params.get("returnTo")), [params]);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const errorCode = params.get("error");
+  const errorMessage = ERROR_MESSAGES[errorCode] || (errorCode ? "Login failed. Please try again." : "");
 
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setSubmitting(true);
-    setError("");
+  useEffect(() => {
+    if (errorCode) return;
 
-    try {
-      const response = await fetch("/api/auth/password/login", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to log in.");
-      await reload();
-      window.location.href = returnTo;
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
+    const loginUrl = `/api/auth/hackclub/login?returnTo=${encodeURIComponent(returnTo)}`;
+    window.location.replace(loginUrl);
+  }, [errorCode, returnTo]);
 
   return (
     <main className="login-page">
@@ -46,37 +35,16 @@ export function LoginPage() {
           ← Back
         </a>
         <h1>Join Stack</h1>
-        <p>Use your email and a password. If this email is new, we’ll create your account.</p>
-
-        <form onSubmit={handleSubmit}>
-          <label>
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-              required
-            />
-          </label>
-          <label>
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="At least 6 characters"
-              autoComplete="current-password"
-              required
-            />
-          </label>
-          <button type="submit" disabled={submitting}>
-            {submitting ? "Logging in..." : "Log in / Sign up"}
-          </button>
-        </form>
-
-        {error ? <p className="login-card__error">{error}</p> : null}
+        {errorMessage ? (
+          <>
+            <p className="login-card__error">{errorMessage}</p>
+            <p>
+              <a href={`/login?returnTo=${encodeURIComponent(returnTo)}`}>Try Hack Club login again</a>
+            </p>
+          </>
+        ) : (
+          <p>Redirecting to Hack Club Auth…</p>
+        )}
       </section>
     </main>
   );

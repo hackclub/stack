@@ -4,6 +4,26 @@ const { Pool } = pg;
 
 const connectionString = process.env.DATABASE_URL;
 
+function warnIfDatabaseUrlLooksMisconfigured(urlString) {
+  if (!urlString) return;
+
+  try {
+    const parsed = new URL(urlString.replace(/^postgresql:/i, "postgres:"));
+    const host = parsed.hostname;
+
+    if (host && !host.includes(".") && /^[a-z0-9]{20,36}$/i.test(host)) {
+      console.warn(
+        `[db] DATABASE_URL hostname "${host}" has no domain. ` +
+          "Pg will fail with ENOTFOUND until this is corrected."
+      );
+    }
+  } catch {
+    console.warn("[db] DATABASE_URL is set but is not a valid postgres URL.");
+  }
+}
+
+warnIfDatabaseUrlLooksMisconfigured(connectionString);
+
 const getSslConfig = () => {
   const sslMode = process.env.PGSSLMODE;
 

@@ -530,7 +530,7 @@ async function startServer() {
 
   app.listen(PORT, () => {
     console.log(
-      `Server http://localhost:${PORT} (${isProd ? "serving React build" : "API only — use Vite on :5173 for UI"})${siteLockEnabled ? " [site lock enabled]" : " [site lock disabled]"}`
+      `Server http://127.0.0.1:${PORT} (${isProd ? "serving React build" : "API only — use Vite on :5173 for UI"})${siteLockEnabled ? " [site lock enabled]" : " [site lock disabled]"}`
     );
   });
 
