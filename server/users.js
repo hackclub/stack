@@ -1,6 +1,6 @@
 import { pool } from "./db.js";
 
-const DEFAULT_ROLE = "member";
+const DEFAULT_ROLE = "user";
 
 function parseEmailList(value) {
   return (value || "")
@@ -32,6 +32,7 @@ export async function ensureUsersTable() {
       slug TEXT,
       profile_image_url TEXT,
       slack_id TEXT,
+      slack_username TEXT,
       verification_status TEXT,
       role TEXT NOT NULL DEFAULT '${DEFAULT_ROLE}',
       coins NUMERIC(10, 2) NOT NULL DEFAULT 0,
@@ -45,6 +46,7 @@ export async function ensureUsersTable() {
       raw_token JSONB,
       password_hash TEXT,
       password_set_at TIMESTAMPTZ,
+      last_sign_in_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -58,6 +60,7 @@ export async function ensureUsersTable() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS slug TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image_url TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS slack_id TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS slack_username TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_status TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS coins NUMERIC(10, 2) NOT NULL DEFAULT 0`);
@@ -71,6 +74,7 @@ export async function ensureUsersTable() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS raw_token JSONB`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_set_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_sign_in_at TIMESTAMPTZ`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 
@@ -208,7 +212,9 @@ export async function upsertUserFromHackClub({ profile, token }) {
   const slug = profile.slug ?? profile.username ?? null;
   const profileImageUrl = profile.profile_image_url ?? profile.picture ?? profile.avatar_url ?? null;
   const slackId = profile.slack_id ?? profile.slack_user_id ?? null;
+  const slackUsername = profile.slack_username ?? profile.slack?.username ?? profile.slack_name ?? null;
   const verificationStatus = profile.verification_status ?? profile.verification ?? null;
+  const lastSignInAt = new Date();
 
   const accessToken = token.access_token ?? null;
   const refreshToken = token.refresh_token ?? null;
@@ -232,6 +238,7 @@ export async function upsertUserFromHackClub({ profile, token }) {
       slug,
       profile_image_url,
       slack_id,
+      slack_username,
       verification_status,
       role,
       access_token,
@@ -241,9 +248,10 @@ export async function upsertUserFromHackClub({ profile, token }) {
       expires_in_seconds,
       scope,
       raw_profile,
-      raw_token
+      raw_token,
+      last_sign_in_at
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
     )
     ON CONFLICT (hackclub_sub) DO UPDATE SET
       email = COALESCE(EXCLUDED.email, users.email),
@@ -251,6 +259,7 @@ export async function upsertUserFromHackClub({ profile, token }) {
       slug = COALESCE(EXCLUDED.slug, users.slug),
       profile_image_url = COALESCE(EXCLUDED.profile_image_url, users.profile_image_url),
       slack_id = COALESCE(EXCLUDED.slack_id, users.slack_id),
+      slack_username = COALESCE(EXCLUDED.slack_username, users.slack_username),
       verification_status = COALESCE(EXCLUDED.verification_status, users.verification_status),
       role = EXCLUDED.role,
       access_token = EXCLUDED.access_token,
@@ -261,6 +270,7 @@ export async function upsertUserFromHackClub({ profile, token }) {
       scope = EXCLUDED.scope,
       raw_profile = EXCLUDED.raw_profile,
       raw_token = EXCLUDED.raw_token,
+      last_sign_in_at = EXCLUDED.last_sign_in_at,
       updated_at = NOW()
     RETURNING *
     `,
@@ -271,6 +281,7 @@ export async function upsertUserFromHackClub({ profile, token }) {
       slug,
       profileImageUrl,
       slackId,
+      slackUsername,
       verificationStatus,
       role,
       accessToken,
@@ -281,6 +292,7 @@ export async function upsertUserFromHackClub({ profile, token }) {
       scope,
       JSON.stringify(profile ?? {}),
       JSON.stringify(token ?? {}),
+      lastSignInAt,
     ]
   );
 
@@ -486,6 +498,7 @@ export function toPublicUser(row) {
     slug: row.slug,
     profileImageUrl: row.profile_image_url,
     slackId: row.slack_id,
+    slackUsername: row.slack_username,
     verificationStatus: row.verification_status,
     role: effectiveRole(row),
     coins: Number(row.coins ?? 0),
