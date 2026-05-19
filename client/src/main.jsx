@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
-import faviconUrl from "@assets/mainPage/favicon.png?url";
+const faviconUrl = "https://cdn.hackclub.com/019e3e5a-40da-7214-b948-4100b5fa74e9/favicon.png";
 import "./index.css";
 
 const favicon = document.querySelector("link[rel='icon']") ?? document.createElement("link");

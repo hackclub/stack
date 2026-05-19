@@ -1,6 +1,6 @@
-import platformBackground from "@assets/platform/main/bkg.png";
-import backBtn from "@assets/platform/common/Back_btn.png";
-import stackTitle from "@assets/platform/common/Stack_title.png";
+const platformBackground = "https://cdn.hackclub.com/019e3e5a-908f-707d-9790-91f9ec414045/bkg.png";
+const backBtn = "https://cdn.hackclub.com/019e3e5a-8541-7927-b209-5cca8c932fe6/Back_btn.png";
+const stackTitle = "https://cdn.hackclub.com/019e3e5a-8745-7bee-a1ab-07b5743f98c7/Stack_title.png";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { PlatformStatusBar } from "./PlatformStatusBar.jsx";
 import "./FaqPage.css";

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import profileFrame from "@assets/platform/main/pfp_bar_square.png";
-import defaultAvatar from "@assets/platform/main/pfp.png";
-import coinIcon from "@assets/platform/main/coin.png";
-import heartsIcon from "@assets/platform/main/hearts.png";
+const profileFrame = "https://cdn.hackclub.com/019e3e5a-994b-736e-9af4-8f33b629a229/pfp_bar_square.png";
+const defaultAvatar = "https://cdn.hackclub.com/019e3e5a-976c-79a3-8474-9087ea96a5a2/pfp.png";
+const coinIcon = "https://cdn.hackclub.com/019e3e5a-92de-76d8-89cf-0598cf9946db/coin.png";
+const heartsIcon = "https://cdn.hackclub.com/019e3e5a-951b-7b7e-ab83-9324d8fc3c10/hearts.png";
 import "./PlatformStatusBar.css";
 
 /**

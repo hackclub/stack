@@ -1,16 +1,16 @@
-import platformBackground from "@assets/platform/main/bkg.png";
+const platformBackground = "https://cdn.hackclub.com/019e3e5a-908f-707d-9790-91f9ec414045/bkg.png";
 import { useEffect, useState } from "react";
 import confetti from "canvas-confetti";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { PlatformStatusBar } from "./PlatformStatusBar.jsx";
-import shelfBox from "@assets/platform/shop/shelfBox.png";
-import shopCoin from "@assets/platform/shop/shop_coin.png";
-import buyBtn from "@assets/platform/shop/buy_btn.png";
-import shopReference from "@assets/platform/shop/shop_reference.png";
-import backBtn from "@assets/platform/common/Back_btn.png";
-import nextBtn from "@assets/platform/common/nextPg_btn.png";
-import stackTitle from "@assets/platform/common/Stack_title.png";
-import legoCharacter from "@assets/mainPage/section_2/legoChar_1.png";
+const shelfBox = "https://cdn.hackclub.com/019e3e5a-a3a2-7a84-90e5-43d56ce44873/shelfBox.png";
+const shopCoin = "https://cdn.hackclub.com/019e3e5a-a63b-7b9d-84e1-1d78a8320ab7/shop_coin.png";
+const buyBtn = "https://cdn.hackclub.com/019e3e5a-a103-7306-8df6-e6cd08b537ef/buy_btn.png";
+const shopReference = "https://cdn.hackclub.com/019e3e5a-a8f3-7ba8-99e4-a1753d28f633/shop_reference.png";
+const backBtn = "https://cdn.hackclub.com/019e3e5a-8541-7927-b209-5cca8c932fe6/Back_btn.png";
+const nextBtn = "https://cdn.hackclub.com/019e3e5a-8982-762d-a87b-ab579f292394/nextPg_btn.png";
+const stackTitle = "https://cdn.hackclub.com/019e3e5a-8745-7bee-a1ab-07b5743f98c7/Stack_title.png";
+const legoCharacter = "https://cdn.hackclub.com/019e3e5a-6d71-79f0-9633-8668b69f464d/legoChar_1.png";
 import "./ShopPage.css";
 
 export function ShopPage() {

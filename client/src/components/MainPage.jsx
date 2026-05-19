@@ -1,4 +1,4 @@
-import platformBackground from "@assets/platform/main/bkg.png";
+const platformBackground = "https://cdn.hackclub.com/019e3e5a-908f-707d-9790-91f9ec414045/bkg.png";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { PlatformStatusBar } from "./PlatformStatusBar.jsx";
 import "./MainPage.css";

@@ -4,7 +4,6 @@ import { MTLLoader } from "three/examples/jsm/loaders/MTLLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import brickMtlUrl from "@assets/mainPage/section_1/3D_brick_fusion/brick_main.mtl?url";
 import brickObjUrl from "@assets/mainPage/section_1/3D_brick_fusion/brick_main.obj?url";
-
 export function BrickModel() {
   const containerRef = useRef(null);
 

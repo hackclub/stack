@@ -1,13 +1,13 @@
-import platformBackground from "@assets/platform/main/bkg.png";
+const platformBackground = "https://cdn.hackclub.com/019e3e5a-908f-707d-9790-91f9ec414045/bkg.png";
 import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { PlatformStatusBar } from "./PlatformStatusBar.jsx";
-import sideBrick from "@assets/platform/projects/side_brick.png";
-import statusBtn from "@assets/platform/projects/status_btn.png";
-import hoursBtn from "@assets/platform/projects/hours_btn.png";
-import backBtn from "@assets/platform/common/Back_btn.png";
-import nextBtn from "@assets/platform/common/nextPg_btn.png";
-import stackTitle from "@assets/platform/common/Stack_title.png";
+const sideBrick = "https://cdn.hackclub.com/019e3e5a-9d8a-7fcb-ad80-d6166cfd97f8/side_brick.png";
+const statusBtn = "https://cdn.hackclub.com/019e3e5a-9f39-7875-aec6-cf24a58b87d4/status_btn.png";
+const hoursBtn = "https://cdn.hackclub.com/019e3e5a-9b72-709a-8224-a87f14fd5e78/hours_btn.png";
+const backBtn = "https://cdn.hackclub.com/019e3e5a-8541-7927-b209-5cca8c932fe6/Back_btn.png";
+const nextBtn = "https://cdn.hackclub.com/019e3e5a-8982-762d-a87b-ab579f292394/nextPg_btn.png";
+const stackTitle = "https://cdn.hackclub.com/019e3e5a-8745-7bee-a1ab-07b5743f98c7/Stack_title.png";
 import "./ProjectsPage.css";
 
 const PROJECTS_PER_BLOCK = 5;
