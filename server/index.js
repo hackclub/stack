@@ -55,6 +55,7 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || "0.0.0.0";
 const isProd = process.env.NODE_ENV === "production";
 
 if (isProd) {
@@ -650,9 +651,9 @@ async function startServer() {
     }
   }
 
-  app.listen(PORT, "127.0.0.1", () => {
+  app.listen(PORT, HOST, () => {
     console.log(
-      `Server http://127.0.0.1:${PORT} (${isProd ? "serving React build" : "API only — use Vite on :5173 for UI"})${siteLockEnabled ? " [site lock enabled]" : " [site lock disabled]"}`
+      `Server http://${HOST}:${PORT} (${isProd ? "serving React build" : "API only — use Vite on :5173 for UI"})${siteLockEnabled ? " [site lock enabled]" : " [site lock disabled]"}`
     );
   });
 
