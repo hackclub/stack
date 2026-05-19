@@ -236,6 +236,15 @@ export async function shipProjectForUser(userId, projectId) {
     throw new Error(`Cannot ship yet: ${missing.join(", ")}.`);
   }
 
+  if (project.status === "approved") {
+    const totalLoggedHours = Number(project.total_hours ?? 0) + Number(project.hackatime_hours ?? 0);
+    const bankedHours = Number(project.past_approved_hours ?? 0);
+    const newHours = totalLoggedHours - bankedHours;
+    if (newHours <= 0) {
+      throw new Error("No new hours to ship. Add more hours before re-shipping.");
+    }
+  }
+
   const result = await pool.query(
     `
       UPDATE projects
@@ -605,14 +614,28 @@ function normalizeHackatimeNames(input = {}) {
   return raw.map((name) => String(name).trim()).filter(Boolean);
 }
 
+function safeHttpUrl(value) {
+  const text = textOrNull(value);
+  if (!text) return null;
+  try {
+    const parsed = new URL(text);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error(`URL must use http or https (got ${parsed.protocol})`);
+    }
+    return text;
+  } catch (e) {
+    throw new Error(e.message || "Invalid URL.");
+  }
+}
+
 function normalizeProjectInput(input = {}) {
   return {
     name: textOrNull(input.name),
     description: textOrNull(input.description),
     projectType: textOrNull(input.projectType ?? input.project_type),
-    playableUrl: textOrNull(input.playableUrl ?? input.playable_url),
-    codeUrl: textOrNull(input.codeUrl ?? input.code_url),
-    imageUrl: textOrNull(input.imageUrl ?? input.image_url),
+    playableUrl: safeHttpUrl(input.playableUrl ?? input.playable_url),
+    codeUrl: safeHttpUrl(input.codeUrl ?? input.code_url),
+    imageUrl: safeHttpUrl(input.imageUrl ?? input.image_url),
     hackatimeNames: normalizeHackatimeNames(input),
   };
 }
@@ -884,7 +907,10 @@ function toAdminReviewProject(row) {
 
 function getShipMissingRequirements(project) {
   const missing = [];
-  if (project.shipped && project.status !== "approved") missing.push("already shipped");
+  // Block shipping only if already shipped but not in a valid state for re-shipping
+  if (project.shipped && project.status !== "approved" && project.status !== "rejected") {
+    missing.push("already shipped");
+  }
   if (!textOrNull(project.playable_url)) missing.push("playable URL missing");
   if (!textOrNull(project.code_url)) missing.push("code URL missing");
   if (!textOrNull(project.image_url)) missing.push("project image missing");
@@ -917,7 +943,9 @@ function toCsv(headers, rows) {
 
 function csvCell(value) {
   if (value === undefined || value === null) return "";
-  const text = String(value);
+  let text = String(value);
+  // Neutralize spreadsheet formula injection (=, +, -, @, tab, carriage-return as first char)
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   if (!/[",\n\r]/.test(text)) return text;
   return `"${text.replaceAll('"', '""')}"`;
 }

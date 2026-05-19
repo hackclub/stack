@@ -10,7 +10,7 @@ import { getPeriodicAirtableSyncStatus, startPeriodicAirtableSync, syncAllUsersA
 import { isHackatimeOAuthConfigured } from "./hackatimeAuth.js";
 import { getHackatimeStatusForUser, listHackatimeProjectsForUser } from "./hackatimeService.js";
 import { checkDatabaseConnection, getTestRows } from "./db.js";
-import { adjustUserbricks, ensureAuditLogTable, getAdminStats, getAuditLogForTarget } from "./adminStats.js";
+import { adjustUserBricks, ensureAuditLogTable, getAdminStats, getAuditLogForTarget } from "./adminStats.js";
 import {
   createShopItem,
   deleteShopItem,
@@ -69,6 +69,14 @@ const SESSION_SECRET = process.env.SESSION_SECRET;
 if (isProd && !SESSION_SECRET) {
   throw new Error("[session] SESSION_SECRET must be set in production.");
 }
+
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-XSS-Protection", "0");
+  next();
+});
 
 app.use(express.json());
 app.use(cookieParser());
@@ -571,7 +579,7 @@ app.patch("/api/admin/users/:id/balance", requireFullAdmin, async (req, res) => 
       res.status(400).json({ error: "delta must be a non-zero number." });
       return;
     }
-    const updated = await adjustUserbricks(adminUserId, req.params.id, { delta: parsedDelta, reason });
+    const updated = await adjustUserBricks(adminUserId, req.params.id, { delta: parsedDelta, reason });
     console.log(`[admin] balance_adjustment user=${req.params.id} delta=${parsedDelta} by admin=${adminUserId}`);
     res.json({ user: updated });
   } catch (error) {
@@ -598,8 +606,12 @@ app.get("/api/airtable/status", (req, res) => {
 });
 
 app.post("/api/airtable/sync", async (req, res) => {
-  if (AIRTABLE_SYNC_SECRET && req.headers["x-sync-secret"] !== AIRTABLE_SYNC_SECRET) {
-    res.status(401).json({ error: "Invalid sync secret." });
+  const secretMatch = AIRTABLE_SYNC_SECRET && req.headers["x-sync-secret"] === AIRTABLE_SYNC_SECRET;
+  const isAdmin = req.session?.userId
+    ? await getUserById(req.session.userId).then((row) => canAccessFullAdmin(effectiveRole(row))).catch(() => false)
+    : false;
+  if (!secretMatch && !isAdmin) {
+    res.status(401).json({ error: "Authentication required." });
     return;
   }
 

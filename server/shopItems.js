@@ -256,13 +256,27 @@ export async function purchaseShopItemForUser(userId, itemId, input = {}) {
   }
 }
 
+function safeHttpUrl(value) {
+  const text = textOrNull(value);
+  if (!text) return null;
+  try {
+    const parsed = new URL(text);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error(`URL must use http or https (got ${parsed.protocol})`);
+    }
+    return text;
+  } catch (e) {
+    throw new Error(e.message || "Invalid URL.");
+  }
+}
+
 function normalizeShopItemInput(input = {}) {
   const priceUsd = numberOrNull(input.priceUsd ?? input.price_usd);
   return {
     name: textOrNull(input.name),
     price: priceUsd === null ? integerOrNull(input.price) : Math.ceil(priceUsd * 10),
-    itemLink: textOrNull(input.itemLink ?? input.item_link),
-    imageUrl: textOrNull(input.imageUrl ?? input.image_url),
+    itemLink: safeHttpUrl(input.itemLink ?? input.item_link),
+    imageUrl: safeHttpUrl(input.imageUrl ?? input.image_url),
     description: textOrNull(input.description),
     active: input.active === undefined ? true : Boolean(input.active),
     maxPerPerson: integerOrNull(input.maxPerPerson ?? input.max_per_person),
