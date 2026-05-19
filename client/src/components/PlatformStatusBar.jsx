@@ -16,7 +16,7 @@ export function PlatformStatusBar({ user, className = "" }) {
   const username = user?.name || user?.slug || user?.email?.split("@")[0] || "User";
   const isFullAdmin = user?.role === "admin" || user?.role === "superadmin";
   const isReviewerOnly = user?.role === "reviewer";
-  const coins = Math.floor(Number(user?.coins ?? 0));
+  const bricks = Math.floor(Number(user?.bricks ?? 0));
 
   useEffect(() => {
     function onDocClick(event) {
@@ -74,7 +74,7 @@ export function PlatformStatusBar({ user, className = "" }) {
       <div className="platform-status__content">
         <div className="platform-status__row">
           <img className="platform-status__icon platform-status__icon--coin" src={coinIcon} alt="" aria-hidden="true" />
-          <span className="platform-status__text">{coins}</span>
+          <span className="platform-status__text">{bricks}</span>
         </div>
         <div className="platform-status__row">
           <img className="platform-status__icon platform-status__icon--hearts" src={heartsIcon} alt="" aria-hidden="true" />

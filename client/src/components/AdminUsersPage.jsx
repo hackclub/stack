@@ -82,7 +82,7 @@ function UserDetailView({ userId }) {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Failed.");
-      setBalanceStatus(`Done — new balance: ${fmt(data.user.coins, 0)} Bricks`);
+      setBalanceStatus(`Done — new balance: ${fmt(data.user.bricks, 0)} Bricks`);
       setBalanceDelta("");
       setBalanceReason("");
       loadUser();
@@ -122,7 +122,7 @@ function UserDetailView({ userId }) {
 
   const projectTotalHours = (user.projects || []).reduce((s, p) => s + p.totalHours, 0);
   const projectApprovedHours = (user.projects || []).reduce((s, p) => s + p.approvedHours, 0);
-  const projectCoinsEarned = (user.projects || []).reduce((s, p) => s + p.coinsEarned, 0);
+  const projectbricksEarned = (user.projects || []).reduce((s, p) => s + p.bricksEarned, 0);
 
   return (
     <main className="admin-users-page">
@@ -182,7 +182,7 @@ function UserDetailView({ userId }) {
           </div>
           <div>
             <dt>Bricks balance</dt>
-            <dd className="auser-coins">{fmt(user.coins, 0)} Bricks</dd>
+            <dd className="auser-bricks">{fmt(user.bricks, 0)} Bricks</dd>
           </div>
         </dl>
 
@@ -201,7 +201,7 @@ function UserDetailView({ userId }) {
             <span>Approved hrs</span>
           </div>
           <div className="auser-summary-card">
-            <span>{fmt(projectCoinsEarned, 0)}</span>
+            <span>{fmt(projectbricksEarned, 0)}</span>
             <span>Bricks earned</span>
           </div>
         </div>
@@ -241,7 +241,7 @@ function UserDetailView({ userId }) {
                       <td>{fmt(p.journalHours)}</td>
                       <td>{fmt(p.totalHours)}</td>
                       <td>{fmt(p.approvedHours)}</td>
-                      <td>{fmt(p.coinsEarned, 0)}</td>
+                      <td>{fmt(p.bricksEarned, 0)}</td>
                       <td>{formatDate(p.createdAt)}</td>
                     </tr>
                   ))}
@@ -259,7 +259,7 @@ function UserDetailView({ userId }) {
         <section className="auser-balance-section">
           <h2 className="auser-section-title">Adjust Balance</h2>
           <p className="auser-muted">
-            Current balance: <strong className="auser-coins">{fmt(user.coins, 0)} Bricks</strong>.
+            Current balance: <strong className="auser-bricks">{fmt(user.bricks, 0)} Bricks</strong>.
             Enter a positive number to add, negative to deduct.
           </p>
           <form className="auser-balance-form" onSubmit={handleBalanceSubmit}>
@@ -465,7 +465,7 @@ export function AdminUsersPage({ userId = null }) {
                         {u.role || "member"}
                       </span>
                     </td>
-                    <td className="auser-coins-cell">{fmt(u.coins, 0)}</td>
+                    <td className="auser-bricks-cell">{fmt(u.bricks, 0)}</td>
                     <td>{formatDate(u.createdAt)}</td>
                     <td>{formatDate(u.updatedAt)}</td>
                     <td>

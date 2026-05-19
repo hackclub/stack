@@ -99,13 +99,15 @@ const emptyJournalEntry = {
 };
 
 function displayStatus(project) {
+  if (project.status === "approved") return "Approved";
+  if (project.status === "rejected") return "Rejected";
+  if (project.status === "in-review") return "In Review";
   if (project.shipped) return "Shipped";
   if (project.status === "draft") return "Draft";
   return project.status || "Draft";
 }
 
 function getShipLockReason(project) {
-  if (project.shipped) return "Shipped!";
   const missing = [];
   if (!project.playableUrl) missing.push("playable URL missing");
   if (!project.codeUrl) missing.push("code URL missing");
@@ -555,7 +557,7 @@ function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDe
           <button type="button" disabled={Boolean(shipLockReason)} title={shipLockReason || "Ready to ship"} onClick={onShip}>
             Ship It
           </button>
-          <button type="button" className="projects-page__danger-btn" onClick={onDelete}>
+          <button type="button" className="projects-page__danger-btn" disabled={project.shipped} title={project.shipped ? "Cannot delete shipped projects" : "Delete project"} onClick={onDelete}>
             Delete
           </button>
         </div>
@@ -638,6 +640,26 @@ function ProjectFormModal({
   onClose,
   onSubmit,
 }) {
+  const [allProjects, setAllProjects] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const response = await fetch("/api/projects", { credentials: "include" });
+        const data = await response.json();
+        setAllProjects(data.projects || []);
+      } catch {
+        setAllProjects([]);
+      }
+    })();
+  }, []);
+
+  const usedHackatimeNames = new Set(
+    allProjects
+      .filter((p) => p.shipped && p.id !== project.id)
+      .flatMap((p) => p.hackatimeNames || [])
+  );
+
   return (
     <div className="projects-page__modal-overlay" role="presentation" onClick={onClose}>
       <section className="projects-page__modal projects-page__modal--form" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
@@ -694,17 +716,19 @@ function ProjectFormModal({
               <div className="projects-page__hackatime-list">
                 {hackatimeProjects.map((ht) => {
                   const checked = (project.hackatimeNames || []).includes(ht.name);
+                  const isUsedElsewhere = usedHackatimeNames.has(ht.name) && !checked;
                   return (
-                    <label key={ht.name} className="projects-page__hackatime-option">
+                    <label key={ht.name} className="projects-page__hackatime-option" style={isUsedElsewhere ? { opacity: 0.5, pointerEvents: "none" } : {}}>
                       <input
                         type="checkbox"
                         checked={checked}
+                        disabled={isUsedElsewhere}
                         onChange={() =>
                           onChange("hackatimeNames", toggleHackatimeName(project.hackatimeNames, ht.name))
                         }
                       />
                       <span>
-                        {ht.name} ({ht.totalHours} h)
+                        {ht.name} ({ht.totalHours} h){isUsedElsewhere ? " — already used" : ""}
                       </span>
                     </label>
                   );

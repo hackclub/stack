@@ -58,15 +58,15 @@ export function ShopPage() {
     setPurchaseMessage("");
   }
 
-  const baseCoins = selectedItem?.price ? Number(selectedItem.price) : 0;
+  const baseBricks = selectedItem?.price ? Number(selectedItem.price) : 0;
   const quantity = Math.max(1, Number(purchaseQuantity) || 1);
-  const shippingCoins = shippingTaxUsd ? Math.ceil(Number(shippingTaxUsd) * 10) : 0;
-  const totalCoins = baseCoins * quantity + (Number.isFinite(shippingCoins) ? shippingCoins : 0);
-  const userCoins = Number(user?.coins ?? 0);
-  const hasEnoughCoins = userCoins >= totalCoins;
+  const shippingBricks = shippingTaxUsd ? Math.ceil(Number(shippingTaxUsd) * 10) : 0;
+  const totalBricks = baseBricks * quantity + (Number.isFinite(shippingBricks) ? shippingBricks : 0);
+  const userBricks = Number(user?.bricks ?? 0);
+  const hasEnoughBricks = userBricks >= totalBricks;
 
   async function buySelectedItem() {
-    if (!selectedItem || !rulesAccepted || !hasEnoughCoins) return;
+    if (!selectedItem || !rulesAccepted || !hasEnoughBricks) return;
 
     setPurchaseMessage("");
     try {
@@ -88,7 +88,7 @@ export function ShopPage() {
         origin: { y: 0.6 },
       });
 
-      setPurchaseMessage(`Bought ${selectedItem.name}! Remaining balance: ${Math.floor(data.purchase.userCoins)} coins.`);
+      setPurchaseMessage(`Bought ${selectedItem.name}! Remaining balance: ${Math.floor(data.purchase.userBricks)} bricks.`);
       await reload?.();
 
       setTimeout(() => {
@@ -204,7 +204,7 @@ export function ShopPage() {
 
             <div className="shop-page__modal-price-row">
               <span>Item price</span>
-              <strong>{selectedItem.price ?? "0"} coins</strong>
+              <strong>{selectedItem.price ?? "0"} bricks</strong>
             </div>
             <div className="shop-page__modal-price-row">
               <span>USD value</span>
@@ -264,17 +264,17 @@ export function ShopPage() {
 
             <div className="shop-page__modal-total">
               <span>Total</span>
-              <strong>{totalCoins} coins</strong>
+              <strong>{totalBricks} bricks</strong>
             </div>
 
-            {!hasEnoughCoins ? (
+            {!hasEnoughBricks ? (
               <p className="shop-page__modal-warning">
-                Not enough coins. You have {Math.floor(userCoins)} coins, but this costs {totalCoins}.
+                Not enough bricks. You have {Math.floor(userBricks)} bricks, but this costs {totalBricks}.
               </p>
             ) : null}
             {purchaseMessage ? <p className="shop-page__modal-warning">{purchaseMessage}</p> : null}
 
-            <button className="shop-page__modal-buy" type="button" disabled={!rulesAccepted || !hasEnoughCoins} onClick={buySelectedItem}>
+            <button className="shop-page__modal-buy" type="button" disabled={!rulesAccepted || !hasEnoughBricks} onClick={buySelectedItem}>
               Buy
             </button>
           </section>

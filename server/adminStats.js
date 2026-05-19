@@ -57,7 +57,7 @@ export async function getAuditLogForTarget(targetType, targetId, { limit = 50 } 
   }));
 }
 
-export async function adjustUserCoins(adminUserId, targetUserId, { delta, reason }) {
+export async function adjustUserBricks(adminUserId, targetUserId, { delta, reason }) {
   if (!pool) throw new Error("DATABASE_URL is not set.");
   if (typeof delta !== "number" || isNaN(delta)) throw new Error("Invalid delta.");
 
@@ -67,9 +67,9 @@ export async function adjustUserCoins(adminUserId, targetUserId, { delta, reason
 
     const result = await client.query(
       `UPDATE users
-       SET coins = coins + $1, updated_at = NOW()
+       SET bricks = bricks + $1, updated_at = NOW()
        WHERE id = $2
-       RETURNING id, coins`,
+       RETURNING id, bricks`,
       [delta, targetUserId]
     );
 
@@ -78,7 +78,7 @@ export async function adjustUserCoins(adminUserId, targetUserId, { delta, reason
       throw new Error("User not found.");
     }
 
-    const newBalance = Number(result.rows[0].coins);
+    const newBalance = Number(result.rows[0].bricks);
 
     await client.query(
       `INSERT INTO audit_log (admin_user_id, action, target_type, target_id, details)
@@ -87,7 +87,7 @@ export async function adjustUserCoins(adminUserId, targetUserId, { delta, reason
     );
 
     await client.query("COMMIT");
-    return { id: Number(result.rows[0].id), coins: newBalance };
+    return { id: Number(result.rows[0].id), bricks: newBalance };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
@@ -115,9 +115,9 @@ export async function getAdminStats() {
     pool.query(`
       SELECT COALESCE(SUM(hours_worked), 0) AS total_journal_hours FROM journal_entries
     `),
-    pool.query(`SELECT COALESCE(SUM(coins), 0) AS wallet_coins FROM users`),
+    pool.query(`SELECT COALESCE(SUM(bricks), 0) AS wallet_bricks FROM users`),
     pool.query(`
-      SELECT COALESCE(SUM(coins_earned), 0) AS total_earned FROM projects WHERE status = 'approved'
+      SELECT COALESCE(SUM(bricks_earned), 0) AS total_earned FROM projects WHERE status = 'approved'
     `),
     pool.query(`
       SELECT
@@ -138,7 +138,7 @@ export async function getAdminStats() {
   const ur = userResult.rows[0];
 
   const totalEarned = Number(er.total_earned);
-  const walletCoins = Number(wr.wallet_coins);
+  const walletBricks = Number(wr.wallet_bricks);
 
   return {
     projects: {
@@ -156,8 +156,8 @@ export async function getAdminStats() {
     },
     bricks: {
       totalEarned,
-      inWallets: walletCoins,
-      spent: Math.max(0, totalEarned - walletCoins),
+      inWallets: walletBricks,
+      spent: Math.max(0, totalEarned - walletBricks),
     },
     users: {
       total: ur.total_users,

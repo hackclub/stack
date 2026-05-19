@@ -34,7 +34,7 @@ export async function ensureUsersTable() {
       slack_id TEXT,
       verification_status TEXT,
       role TEXT NOT NULL DEFAULT '${DEFAULT_ROLE}',
-      coins NUMERIC(10, 2) NOT NULL DEFAULT 0,
+      bricks NUMERIC(10, 2) NOT NULL DEFAULT 0,
       access_token TEXT,
       refresh_token TEXT,
       token_type TEXT,
@@ -58,7 +58,7 @@ export async function ensureUsersTable() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS slack_id TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_status TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT`);
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS coins NUMERIC(10, 2) NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bricks NUMERIC(10, 2) NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS access_token TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS refresh_token TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS token_type TEXT`);
@@ -88,13 +88,13 @@ export async function ensureUsersTable() {
 
   await pool.query(`
     UPDATE users
-    SET coins = 0
-    WHERE coins IS NULL
+    SET bricks = 0
+    WHERE bricks IS NULL
   `);
 
   await pool.query(`
     ALTER TABLE users
-    ALTER COLUMN coins SET DEFAULT 0
+    ALTER COLUMN bricks SET DEFAULT 0
   `);
 
   await pool.query(`
@@ -372,7 +372,7 @@ export async function listAdminUsers() {
       name,
       slug,
       role,
-      coins,
+      bricks,
       hackclub_sub,
       profile_image_url,
       verification_status,
@@ -398,7 +398,7 @@ export async function getAdminUserById(id) {
         name,
         slug,
         role,
-        coins,
+        bricks,
         hackclub_sub,
         profile_image_url,
         verification_status,
@@ -418,7 +418,7 @@ export async function getAdminUserWithProjects(id) {
 
   const userResult = await pool.query(
     `SELECT
-       id, email, name, slug, role, coins, hackclub_sub, profile_image_url,
+       id, email, name, slug, role, bricks, hackclub_sub, profile_image_url,
        verification_status, hackatime_total_hours, hackatime_connected_at,
        created_at, updated_at
      FROM users WHERE id = $1`,
@@ -430,7 +430,7 @@ export async function getAdminUserWithProjects(id) {
 
   const projectResult = await pool.query(
     `SELECT
-       p.id, p.name, p.status, p.total_hours, p.approved_hours, p.coins_earned,
+       p.id, p.name, p.status, p.total_hours, p.approved_hours, p.bricks_earned,
        p.shipped, p.reviewed, p.fraud_flag, p.created_at, p.updated_at,
        COALESCE(SUM(je.hours_worked), 0) AS journal_hours
      FROM projects p
@@ -451,7 +451,7 @@ export async function getAdminUserWithProjects(id) {
       status: p.status,
       totalHours: Number(p.total_hours ?? 0),
       approvedHours: Number(p.approved_hours ?? 0),
-      coinsEarned: Number(p.coins_earned ?? 0),
+      bricksEarned: Number(p.bricks_earned ?? 0),
       journalHours: Number(p.journal_hours ?? 0),
       shipped: p.shipped,
       reviewed: p.reviewed,
@@ -515,7 +515,7 @@ export function toPublicUser(row) {
     slackId: row.slack_id,
     verificationStatus: row.verification_status,
     role: effectiveRole(row),
-    coins: Number(row.coins ?? 0),
+    bricks: Number(row.bricks ?? 0),
     hackatimeConnected: Boolean(row.hackatime_access_token),
     hackatimeTotalHours: Number(row.hackatime_total_hours ?? 0),
   };
@@ -533,7 +533,7 @@ export function toPublicUserFromSessionSnapshot(snapshot) {
     slackId: snapshot.slackId ?? null,
     verificationStatus: snapshot.verificationStatus ?? null,
     role: snapshot.role ?? DEFAULT_ROLE,
-    coins: Number(snapshot.coins ?? 0),
+    bricks: Number(snapshot.bricks ?? 0),
   };
 }
 
@@ -562,7 +562,7 @@ export function buildSessionProfileSnapshot(profile, { userRow = null } = {}) {
     verificationStatus:
       profile.verification_status ?? profile.verification ?? userRow?.verification_status ?? null,
     role: userRow ? effectiveRole(userRow) : resolveRole(email),
-    coins: userRow ? Number(userRow.coins ?? 0) : 0,
+    bricks: userRow ? Number(userRow.bricks ?? 0) : 0,
   };
 }
 
@@ -585,7 +585,7 @@ function toAdminUser(row) {
     name: row.name,
     slug: row.slug,
     role: effectiveRole(row),
-    coins: Number(row.coins ?? 0),
+    bricks: Number(row.bricks ?? 0),
     hackclubSub: row.hackclub_sub,
     profileImageUrl: row.profile_image_url,
     verificationStatus: row.verification_status,

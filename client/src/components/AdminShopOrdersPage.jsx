@@ -86,7 +86,7 @@ export function AdminShopOrdersPage() {
                         <td>{order.itemName}</td>
                         <td className="text-center">{order.quantity}</td>
                         <td className="text-right">
-                          {order.totalCoins} coins
+                          {order.totalbricks} bricks
                           {order.shippingTaxUsd ? ` (+$${order.shippingTaxUsd})` : ""}
                         </td>
                         <td>{new Date(order.createdAt).toLocaleDateString()}</td>

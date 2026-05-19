@@ -183,7 +183,7 @@ export function AdminShopPage() {
                   <th>ID</th>
                   <th>Name</th>
                   <th>Max / person</th>
-                  <th>Coins</th>
+                  <th>bricks</th>
                   <th>$ price</th>
                   <th>$/h</th>
                   <th>Link</th>
@@ -250,7 +250,7 @@ export function AdminShopPage() {
 }
 
 function ShopItemForm({ value, submitLabel, onChange, onSubmit }) {
-  const coinValue = value.priceUsd ? Math.ceil(Number(value.priceUsd) * 10) : 0;
+  const brickValue = value.priceUsd ? Math.ceil(Number(value.priceUsd) * 10) : 0;
 
   return (
     <form className="admin-shop-form" onSubmit={onSubmit}>
@@ -277,8 +277,8 @@ function ShopItemForm({ value, submitLabel, onChange, onSubmit }) {
         />
       </label>
       <label>
-        Coins
-        <input type="number" value={coinValue || ""} readOnly />
+        bricks
+        <input type="number" value={brickValue || ""} readOnly />
       </label>
       <label>
         Max purchases per person

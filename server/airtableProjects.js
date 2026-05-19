@@ -142,7 +142,7 @@ function buildFieldsFromProjectRow(row) {
     [F.shipped]: Boolean(row.shipped),
     [F.status]: mapProjectStatusToAirtable(row),
     [F.approvedHours]: approvedHours,
-    [F.bricksEarned]: numberOrZero(row.coins_earned),
+    [F.bricksEarned]: numberOrZero(row.bricks_earned),
     [F.reviewed]: Boolean(row.reviewed),
     [F.hackatimeProjects]: hackatimeProjectsLabel(row) || undefined,
     [F.shippedAt]: airtableDate(row.shipped_at),

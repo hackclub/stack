@@ -298,6 +298,21 @@
   color: #f7cf57;
 }
 
+.admin-review-rejection-feedback {
+  border-color: rgba(255, 143, 171, 0.6);
+  background: rgba(60, 10, 25, 0.3);
+}
+
+.admin-review-rejection-feedback h2 {
+  color: #ffccd4;
+}
+
+.admin-review-rejection-feedback p {
+  margin: 0;
+  color: #ffccd4;
+  line-height: 1.5;
+}
+
 .admin-review-links {
   display: flex;
   flex-wrap: wrap;

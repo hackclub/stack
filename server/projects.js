@@ -26,7 +26,7 @@ export async function ensureProjectsTable() {
       total_hours NUMERIC(10, 2) NOT NULL DEFAULT 0,
       approved_hours NUMERIC(10, 2) NOT NULL DEFAULT 0,
       past_approved_hours NUMERIC(10, 2) NOT NULL DEFAULT 0,
-      coins_earned NUMERIC(10, 2) NOT NULL DEFAULT 0,
+      bricks_earned NUMERIC(10, 2) NOT NULL DEFAULT 0,
       admin_feedback TEXT,
       hour_justification TEXT,
       reviewed_at TIMESTAMPTZ,
@@ -56,7 +56,7 @@ export async function ensureProjectsTable() {
     total_hours: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
     approved_hours: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
     past_approved_hours: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
-    coins_earned: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
+    bricks_earned: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
     admin_feedback: "TEXT",
     hour_justification: "TEXT",
     reviewed_at: "TIMESTAMPTZ",
@@ -77,7 +77,7 @@ export async function ensureProjectsTable() {
   await pool.query("ALTER TABLE projects DROP COLUMN IF EXISTS github_username");
   await pool.query(`UPDATE projects SET reviewed = FALSE WHERE reviewed IS NULL`);
   await pool.query(`UPDATE projects SET past_approved_hours = COALESCE(approved_hours, 0) WHERE past_approved_hours IS NULL`);
-  await pool.query(`UPDATE projects SET coins_earned = 0 WHERE coins_earned IS NULL`);
+  await pool.query(`UPDATE projects SET bricks_earned = 0 WHERE bricks_earned IS NULL`);
   await pool.query(`UPDATE projects SET fraud_flag = FALSE WHERE fraud_flag IS NULL`);
 
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)`);
@@ -243,6 +243,9 @@ export async function shipProjectForUser(userId, projectId) {
         shipped = TRUE,
         status = 'in-review',
         reviewed = FALSE,
+        reviewed_at = NULL,
+        reviewed_by_user_id = NULL,
+        admin_feedback = NULL,
         shipped_at = NOW(),
         updated_at = NOW()
       WHERE user_id = $1
@@ -340,14 +343,15 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
     if (project.reviewed && project.status === "approved") throw new Error("Project is already approved.");
 
     const bankedHours = Number(project.past_approved_hours ?? 0);
-    const pendingCap = Math.max(0, Number(project.total_hours ?? 0) - bankedHours);
+    const totalLoggedHours = Number(project.total_hours ?? 0) + Number(project.hackatime_hours ?? 0);
+    const pendingCap = Math.max(0, totalLoggedHours - bankedHours);
     if (approvedHours > pendingCap + 0.02) {
       throw new Error(`Cannot approve more new hours than the participant has logged beyond prior approvals (${pendingCap.toFixed(2)} h max).`);
     }
 
     const newTotalApprovedHours = Number((bankedHours + approvedHours).toFixed(2));
-    const coinsDelta = Math.ceil(approvedHours * 10);
-    const newCumulativeCoins = Number(project.coins_earned ?? 0) + coinsDelta;
+    const bricksDelta = Math.ceil(approvedHours * 10);
+    const newCumulativeBricks = Number(project.bricks_earned ?? 0) + bricksDelta;
 
     const updatedProjectResult = await client.query(
       `
@@ -362,15 +366,15 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
           baseline_hours = COALESCE(baseline_hours, total_hours),
           hour_justification = COALESCE($3, hour_justification),
           admin_feedback = $4,
-          coins_earned = $5,
+          bricks_earned = $5,
           updated_at = NOW()
         WHERE id = $6
         RETURNING *, total_hours AS journal_hours
       `,
-      [adminId, newTotalApprovedHours, hourJustification, feedback, newCumulativeCoins, projectId]
+      [adminId, newTotalApprovedHours, hourJustification, feedback, newCumulativeBricks, projectId]
     );
 
-    await client.query("UPDATE users SET coins = coins + $1, updated_at = NOW() WHERE id = $2", [coinsDelta, project.user_id]);
+    await client.query("UPDATE users SET bricks = bricks + $1, updated_at = NOW() WHERE id = $2", [bricksDelta, project.user_id]);
     await client.query("COMMIT");
 
     const approvedRow = updatedProjectResult.rows[0];
@@ -378,7 +382,7 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
 
     return {
       project: toPublicProject(approvedRow),
-      coinsEarned: coinsDelta,
+      bricksEarned: bricksDelta,
       approvedHours: newTotalApprovedHours,
     };
   } catch (error) {
@@ -461,6 +465,12 @@ export async function deleteProjectBySuperadmin(projectId) {
 
 export async function deleteProjectForUser(userId, projectId) {
   if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const checkResult = await pool.query("SELECT shipped FROM projects WHERE id = $1 AND user_id = $2", [projectId, userId]);
+  const project = checkResult.rows[0];
+
+  if (!project) return false;
+  if (project.shipped) throw new Error("Cannot delete a project that has been shipped.");
 
   const result = await pool.query("DELETE FROM projects WHERE id = $1 AND user_id = $2", [projectId, userId]);
   return result.rowCount > 0;
@@ -844,7 +854,7 @@ function toPublicProject(row) {
     baselineHours: row.baseline_hours != null ? Number(row.baseline_hours) : null,
     approvedHours: Number(row.approved_hours ?? 0),
     pastApprovedHours: Number(row.past_approved_hours ?? 0),
-    coinsEarned: Number(row.coins_earned ?? 0),
+    bricksEarned: Number(row.bricks_earned ?? 0),
     adminFeedback: row.admin_feedback,
     hourJustification: row.hour_justification,
     reviewedAt: row.reviewed_at,
@@ -874,7 +884,7 @@ function toAdminReviewProject(row) {
 
 function getShipMissingRequirements(project) {
   const missing = [];
-  if (project.shipped) missing.push("already shipped");
+  if (project.shipped && project.status !== "approved") missing.push("already shipped");
   if (!textOrNull(project.playable_url)) missing.push("playable URL missing");
   if (!textOrNull(project.code_url)) missing.push("code URL missing");
   if (!textOrNull(project.image_url)) missing.push("project image missing");

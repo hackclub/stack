@@ -19,7 +19,7 @@ function slackJoeToolUrl(slackId) {
   if (!slackId || typeof slackId !== "string") return null;
   const id = slackId.trim();
   if (!id) return null;
-  return `https://hackclub.slack.com/team/${encodeURIComponent(id)}`;
+  return `https://joe.fraud.hackclub.com/profile/${encodeURIComponent(id)}`;
 }
 
 export function AdminReviewPage({ projectId }) {
@@ -260,7 +260,7 @@ function AdminReviewDetail({ projectId }) {
       setMessage(
         selectedAction === "reject"
           ? "Project rejected and returned to the participant deck."
-          : `Project approved. Awarded ${data.coinsEarned} coins.`
+          : `Project approved. Awarded ${data.bricksEarned} bricks.`
       );
     } catch (err) {
       setMessage(err.message);
@@ -325,6 +325,13 @@ function AdminReviewDetail({ projectId }) {
           <div className="admin-review-banner admin-review-banner--empty">Screenshot unavailable</div>
         )}
 
+        {project.status === "rejected" && project.adminFeedback ? (
+          <section className="admin-review-panel admin-review-rejection-feedback">
+            <h2>Rejection Reason</h2>
+            <p>{project.adminFeedback}</p>
+          </section>
+        ) : null}
+
         <section className="admin-review-quick-links" aria-label="Project links">
           {project.codeUrl ? (
             <a className="admin-review-tool-btn" href={project.codeUrl} target="_blank" rel="noreferrer">
@@ -342,11 +349,11 @@ function AdminReviewDetail({ projectId }) {
           )}
           {joeUrl ? (
             <a className="admin-review-tool-btn" href={joeUrl} target="_blank" rel="noreferrer">
-              Joe tool
+              Joe
             </a>
           ) : (
             <span className="admin-review-tool-btn admin-review-tool-btn--disabled" title="Slack ID not set for this user">
-              Joe tool (no Slack ID)
+              Joe (no Slack ID)
             </span>
           )}
         </section>
@@ -371,7 +378,7 @@ function AdminReviewDetail({ projectId }) {
             </div>
             <div>
               <span>Raw Hours</span>
-              <strong>{formatHours(project.totalHours)}</strong>
+              <strong>{formatHours((Number(project.totalHours || 0) + Number(project.hackatimeHours || 0)).toFixed(2))}</strong>
             </div>
             <div>
               <span>Previously banked</span>
@@ -390,12 +397,16 @@ function AdminReviewDetail({ projectId }) {
               />
             </div>
             <div>
-              <span>Journal entries</span>
+              <span>Journal hours</span>
               <strong>{formatHours(project.journalHours)} h</strong>
             </div>
             <div>
-              <span>Total</span>
-              <strong>{formatHours(project.totalHours)} h</strong>
+              <span>Hackatime hours</span>
+              <strong>{formatHours(project.hackatimeHours)} h</strong>
+            </div>
+            <div>
+              <span>Combined total</span>
+              <strong>{formatHours((Number(project.journalHours || 0) + Number(project.hackatimeHours || 0)).toFixed(2))} h</strong>
             </div>
           </div>
         </section>

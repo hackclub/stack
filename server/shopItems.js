@@ -72,7 +72,7 @@ export async function ensureShopItemsTable() {
       item_id BIGINT NOT NULL REFERENCES shop_items(id) ON DELETE CASCADE,
       quantity INTEGER NOT NULL DEFAULT 1,
       shipping_tax_usd NUMERIC(10, 2),
-      total_coins NUMERIC(10, 2) NOT NULL,
+      total_bricks NUMERIC(10, 2) NOT NULL,
       fulfilled BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
@@ -207,35 +207,35 @@ export async function purchaseShopItemForUser(userId, itemId, input = {}) {
       throw new Error(`Limit is ${item.max_per_person} per person.`);
     }
 
-    const itemCoins = Number(item.price ?? 0);
-    const shippingCoins = Math.ceil(shippingTaxUsd * 10);
-    const totalCoins = itemCoins * quantity + shippingCoins;
+    const itemBricks = Number(item.price ?? 0);
+    const shippingBricks = Math.ceil(shippingTaxUsd * 10);
+    const totalBricks = itemBricks * quantity + shippingBricks;
 
     const userResult = await client.query(
       `
         UPDATE users
-        SET coins = coins - $1,
+        SET bricks = bricks - $1,
             updated_at = NOW()
         WHERE id = $2
-          AND coins >= $1
-        RETURNING id, coins
+          AND bricks >= $1
+        RETURNING id, bricks
       `,
-      [totalCoins, userId]
+      [totalBricks, userId]
     );
 
     if (!userResult.rows[0]) {
-      const currentUser = await client.query("SELECT coins FROM users WHERE id = $1", [userId]);
-      const availableCoins = Number(currentUser.rows[0]?.coins ?? 0);
-      throw new Error(`Not enough coins. You have ${Math.floor(availableCoins)} coins, but this costs ${totalCoins}.`);
+      const currentUser = await client.query("SELECT bricks FROM users WHERE id = $1", [userId]);
+      const availableBricks = Number(currentUser.rows[0]?.bricks ?? 0);
+      throw new Error(`Not enough bricks. You have ${Math.floor(availableBricks)} bricks, but this costs ${totalBricks}.`);
     }
 
     const orderResult = await client.query(
       `
-        INSERT INTO shop_orders (user_id, item_id, quantity, shipping_tax_usd, total_coins)
+        INSERT INTO shop_orders (user_id, item_id, quantity, shipping_tax_usd, total_bricks)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING id
       `,
-      [userId, itemId, quantity, shippingTaxUsd || null, totalCoins]
+      [userId, itemId, quantity, shippingTaxUsd || null, totalBricks]
     );
 
     await client.query("COMMIT");
@@ -244,8 +244,8 @@ export async function purchaseShopItemForUser(userId, itemId, input = {}) {
       item: toPublicShopItem(item),
       quantity,
       shippingTaxUsd,
-      totalCoins,
-      userCoins: Number(userResult.rows[0].coins ?? 0),
+      totalBricks,
+      userBricks: Number(userResult.rows[0].bricks ?? 0),
       orderId: orderResult.rows[0].id,
     };
   } catch (error) {
@@ -323,7 +323,7 @@ export async function listShopOrders() {
       i.name as item_name,
       o.quantity,
       o.shipping_tax_usd,
-      o.total_coins,
+      o.total_bricks,
       o.fulfilled,
       o.created_at
     FROM shop_orders o
@@ -379,7 +379,7 @@ function toPublicShopOrder(row) {
     itemName: row.item_name,
     quantity: row.quantity,
     shippingTaxUsd: row.shipping_tax_usd,
-    totalCoins: row.total_coins,
+    totalBricks: row.total_bricks,
     fulfilled: row.fulfilled,
     createdAt: row.created_at,
   };

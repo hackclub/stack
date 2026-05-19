@@ -10,7 +10,7 @@ import { getPeriodicAirtableSyncStatus, startPeriodicAirtableSync, syncAllUsersA
 import { isHackatimeOAuthConfigured } from "./hackatimeAuth.js";
 import { getHackatimeStatusForUser, listHackatimeProjectsForUser } from "./hackatimeService.js";
 import { checkDatabaseConnection, getTestRows } from "./db.js";
-import { adjustUserCoins, ensureAuditLogTable, getAdminStats, getAuditLogForTarget } from "./adminStats.js";
+import { adjustUserbricks, ensureAuditLogTable, getAdminStats, getAuditLogForTarget } from "./adminStats.js";
 import {
   createShopItem,
   deleteShopItem,
@@ -571,7 +571,7 @@ app.patch("/api/admin/users/:id/balance", requireFullAdmin, async (req, res) => 
       res.status(400).json({ error: "delta must be a non-zero number." });
       return;
     }
-    const updated = await adjustUserCoins(adminUserId, req.params.id, { delta: parsedDelta, reason });
+    const updated = await adjustUserbricks(adminUserId, req.params.id, { delta: parsedDelta, reason });
     console.log(`[admin] balance_adjustment user=${req.params.id} delta=${parsedDelta} by admin=${adminUserId}`);
     res.json({ user: updated });
   } catch (error) {
