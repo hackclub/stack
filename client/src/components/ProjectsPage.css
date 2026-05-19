@@ -372,16 +372,58 @@
   resize: vertical;
 }
 
+.projects-page__hackatime {
+  border: 2px solid #c7d6ff;
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.5);
+  color: #27376f;
+}
+
+.projects-page__hackatime legend {
+  color: #1d2a57;
+  font-weight: 700;
+  padding: 0 0.4rem;
+}
+
 .projects-page__hackatime-disabled {
   border: 2px dashed #9cb7ff;
   border-radius: 12px;
   color: #304389;
+  padding: 0.75rem;
+}
+
+.projects-page__hackatime-disabled legend {
+  color: #304389;
+  font-weight: 700;
+  padding: 0 0.4rem;
 }
 
 .projects-page__hackatime-list {
   display: grid;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 0.75rem;
+  max-height: clamp(6rem, 20vh, 12rem);
+  overflow-y: auto;
+  padding-right: 0.4rem;
+}
+
+.projects-page__hackatime-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.projects-page__hackatime-list::-webkit-scrollbar-track {
+  background: rgba(199, 214, 255, 0.3);
+  border-radius: 4px;
+}
+
+.projects-page__hackatime-list::-webkit-scrollbar-thumb {
+  background: #9cb7ff;
+  border-radius: 4px;
+}
+
+.projects-page__hackatime-list::-webkit-scrollbar-thumb:hover {
+  background: #7a9fe0;
 }
 
 .projects-page__hackatime-option {
@@ -389,6 +431,21 @@
   gap: 8px;
   align-items: center;
   font-weight: 600;
+  color: #27376f;
+  user-select: none;
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 8px;
+  transition: background-color 150ms ease;
+}
+
+.projects-page__hackatime-option:hover {
+  background: rgba(27, 76, 192, 0.08);
+}
+
+.projects-page__hackatime-option input {
+  cursor: pointer;
+  accent-color: #1b4cc0;
 }
 
 .projects-page__hackatime-summary {
