@@ -1,5 +1,6 @@
 import { pool } from "./db.js";
 import { persistProjectAirtableRecordId, syncProjectToAirtable } from "./airtableProjects.js";
+import { syncJournalEntryToAirtable } from "./airtableJournals.js";
 import { fetchHackatimeProjects, sumHackatimeHoursForNames } from "./hackatimeAuth.js";
 
 export async function ensureProjectsTable() {
@@ -522,6 +523,11 @@ export async function createJournalEntryForUser(userId, input = {}) {
   );
 
   const updatedProject = await refreshProjectJournalHours(userId, project.id);
+
+  syncJournalEntryToAirtable(result.rows[0]).catch((err) => {
+    console.error("[airtable] Failed to sync journal entry:", err.message);
+  });
+
   return {
     entry: toPublicJournalEntry(result.rows[0]),
     project: updatedProject,

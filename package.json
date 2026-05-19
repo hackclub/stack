@@ -17,6 +17,7 @@
     "concurrently": "^9.1.0"
   },
   "dependencies": {
-    "airtable": "^0.12.2"
+    "airtable": "^0.12.2",
+    "canvas-confetti": "^1.9.4"
   }
 }

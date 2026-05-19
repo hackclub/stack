@@ -16,6 +16,8 @@ import {
   deleteShopItem,
   ensureShopItemsTable,
   listShopItems,
+  listShopOrders,
+  markShopOrderFulfilled,
   purchaseShopItemForUser,
   setAllShopItemsActive,
   updateShopItem,
@@ -502,6 +504,30 @@ app.post("/api/admin/shop/items/bulk_active", requireFullAdmin, async (req, res)
   }
 });
 
+app.get("/api/admin/shop/orders", requireFullAdmin, async (req, res) => {
+  try {
+    const orders = await listShopOrders();
+    res.json({ orders });
+  } catch (error) {
+    console.error("Failed to load shop orders:", error);
+    res.status(500).json({ error: "Failed to load shop orders." });
+  }
+});
+
+app.post("/api/admin/shop/orders/:id/fulfill", requireFullAdmin, async (req, res) => {
+  try {
+    const order = await markShopOrderFulfilled(req.params.id);
+    if (!order) {
+      res.status(404).json({ error: "Order not found." });
+      return;
+    }
+    res.json({ order });
+  } catch (error) {
+    console.error("Failed to fulfill shop order:", error);
+    res.status(500).json({ error: "Failed to fulfill order." });
+  }
+});
+
 app.get("/api/admin/stats", requireFullAdmin, async (req, res) => {
   try {
     const stats = await getAdminStats();
@@ -612,7 +638,7 @@ async function startServer() {
     }
   }
 
-  app.listen(PORT, () => {
+  app.listen(PORT, "127.0.0.1", () => {
     console.log(
       `Server http://127.0.0.1:${PORT} (${isProd ? "serving React build" : "API only — use Vite on :5173 for UI"})${siteLockEnabled ? " [site lock enabled]" : " [site lock disabled]"}`
     );

@@ -64,6 +64,27 @@ export async function ensureShopItemsTable() {
   for (const column of REMOVED_SHOP_ITEM_COLUMNS) {
     await pool.query(`ALTER TABLE shop_items DROP COLUMN IF EXISTS ${column}`);
   }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS shop_orders (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      item_id BIGINT NOT NULL REFERENCES shop_items(id) ON DELETE CASCADE,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      shipping_tax_usd NUMERIC(10, 2),
+      total_coins NUMERIC(10, 2) NOT NULL,
+      fulfilled BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS fulfilled BOOLEAN NOT NULL DEFAULT FALSE
+  `);
+  await pool.query(`
+    ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+  `);
 }
 
 async function ensureShopItemColumn(column) {
@@ -208,6 +229,15 @@ export async function purchaseShopItemForUser(userId, itemId, input = {}) {
       throw new Error(`Not enough coins. You have ${Math.floor(availableCoins)} coins, but this costs ${totalCoins}.`);
     }
 
+    const orderResult = await client.query(
+      `
+        INSERT INTO shop_orders (user_id, item_id, quantity, shipping_tax_usd, total_coins)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
+      `,
+      [userId, itemId, quantity, shippingTaxUsd || null, totalCoins]
+    );
+
     await client.query("COMMIT");
 
     return {
@@ -216,6 +246,7 @@ export async function purchaseShopItemForUser(userId, itemId, input = {}) {
       shippingTaxUsd,
       totalCoins,
       userCoins: Number(userResult.rows[0].coins ?? 0),
+      orderId: orderResult.rows[0].id,
     };
   } catch (error) {
     await client.query("ROLLBACK");
@@ -280,6 +311,46 @@ function dateOrNull(value) {
   return text;
 }
 
+export async function listShopOrders() {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const result = await pool.query(`
+    SELECT
+      o.id,
+      o.user_id,
+      u.email,
+      o.item_id,
+      i.name as item_name,
+      o.quantity,
+      o.shipping_tax_usd,
+      o.total_coins,
+      o.fulfilled,
+      o.created_at
+    FROM shop_orders o
+    JOIN users u ON o.user_id = u.id
+    JOIN shop_items i ON o.item_id = i.id
+    ORDER BY o.created_at DESC
+  `);
+
+  return result.rows.map(toPublicShopOrder);
+}
+
+export async function markShopOrderFulfilled(orderId) {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const result = await pool.query(
+    `
+      UPDATE shop_orders
+      SET fulfilled = TRUE, updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `,
+    [orderId]
+  );
+
+  return result.rows[0] ? toPublicShopOrder(result.rows[0]) : null;
+}
+
 function toPublicShopItem(row) {
   return {
     id: row.id,
@@ -296,5 +367,20 @@ function toPublicShopItem(row) {
     dollarPerHour: row.dollar_per_hour,
     airtableId: row.airtable_id,
     syncedAt: row.synced_at,
+  };
+}
+
+function toPublicShopOrder(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    email: row.email,
+    itemId: row.item_id,
+    itemName: row.item_name,
+    quantity: row.quantity,
+    shippingTaxUsd: row.shipping_tax_usd,
+    totalCoins: row.total_coins,
+    fulfilled: row.fulfilled,
+    createdAt: row.created_at,
   };
 }

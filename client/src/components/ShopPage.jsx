@@ -1,5 +1,6 @@
 import platformBackground from "@assets/platform/main/bkg.png";
 import { useEffect, useState } from "react";
+import confetti from "canvas-confetti";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { PlatformStatusBar } from "./PlatformStatusBar.jsx";
 import shelfBox from "@assets/platform/shop/shelfBox.png";
@@ -80,8 +81,19 @@ export function ShopPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to buy item.");
-      setPurchaseMessage(`Bought! Remaining balance: ${Math.floor(data.purchase.userCoins)} coins.`);
+
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+
+      setPurchaseMessage(`Bought ${selectedItem.name}! Remaining balance: ${Math.floor(data.purchase.userCoins)} coins.`);
       await reload?.();
+
+      setTimeout(() => {
+        setSelectedItem(null);
+      }, 2000);
     } catch (err) {
       setPurchaseMessage(err.message);
     }

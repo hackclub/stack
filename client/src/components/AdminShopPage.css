@@ -248,6 +248,109 @@
   cursor: pointer;
 }
 
+/* Order groups */
+.admin-shop-orders {
+  display: grid;
+  gap: 2rem;
+}
+
+.admin-shop-order-group {
+  border: 3px solid #4bb3ff;
+  border-radius: 14px;
+  background: rgba(27, 58, 122, 0.72);
+  padding: 1.2rem;
+}
+
+.admin-shop-order-group h2 {
+  margin: 0 0 1rem;
+  color: #f7cf57;
+  font-size: 1.1rem;
+  word-break: break-word;
+}
+
+.admin-shop-orders-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-shop-orders-table th,
+.admin-shop-orders-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid rgba(75, 179, 255, 0.25);
+  text-align: left;
+  color: #e8f4ff;
+}
+
+.admin-shop-orders-table th {
+  color: #f7cf57;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.admin-shop-orders-table tbody tr:hover {
+  background: rgba(75, 162, 255, 0.08);
+}
+
+.admin-shop-orders-table tbody tr.fulfilled {
+  opacity: 0.6;
+}
+
+.admin-shop-orders-table .text-center {
+  text-align: center;
+}
+
+.admin-shop-orders-table .text-right {
+  text-align: right;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.status-badge.pending {
+  background: rgba(255, 152, 0, 0.25);
+  color: #ffb74d;
+  border: 1px solid rgba(255, 152, 0, 0.5);
+}
+
+.status-badge.fulfilled {
+  background: rgba(76, 175, 80, 0.25);
+  color: #81c784;
+  border: 1px solid rgba(76, 175, 80, 0.5);
+}
+
+.admin-shop-fulfill-btn {
+  border: 3px dashed rgba(109, 104, 98, 0.85);
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  background: linear-gradient(140deg, #ffe9bd 0%, #d8d2c8 100%);
+  color: #50483f;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(85, 81, 76, 0.4);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.admin-shop-fulfill-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 rgba(85, 81, 76, 0.35);
+}
+
+.admin-shop-error {
+  color: #ff8fab;
+  padding: 1rem;
+  border: 2px solid rgba(255, 138, 171, 0.5);
+  border-radius: 8px;
+  background: rgba(255, 138, 171, 0.1);
+}
+
 @media (max-width: 820px) {
   .admin-shop-form {
     grid-template-columns: 1fr;
@@ -257,5 +360,19 @@
   .admin-shop-orders-link {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .admin-shop-orders-table {
+    font-size: 0.9rem;
+  }
+
+  .admin-shop-orders-table th,
+  .admin-shop-orders-table td {
+    padding: 0.5rem;
+  }
+
+  .admin-shop-fulfill-btn {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
   }
 }
