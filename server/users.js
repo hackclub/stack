@@ -413,6 +413,55 @@ export async function getAdminUserById(id) {
   return result.rows[0] ? toAdminUser(result.rows[0]) : null;
 }
 
+export async function getAdminUserWithProjects(id) {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const userResult = await pool.query(
+    `SELECT
+       id, email, name, slug, role, coins, hackclub_sub, profile_image_url,
+       verification_status, hackatime_total_hours, hackatime_connected_at,
+       created_at, updated_at
+     FROM users WHERE id = $1`,
+    [id]
+  );
+
+  const row = userResult.rows[0];
+  if (!row) return null;
+
+  const projectResult = await pool.query(
+    `SELECT
+       p.id, p.name, p.status, p.total_hours, p.approved_hours, p.coins_earned,
+       p.shipped, p.reviewed, p.fraud_flag, p.created_at, p.updated_at,
+       COALESCE(SUM(je.hours_worked), 0) AS journal_hours
+     FROM projects p
+     LEFT JOIN journal_entries je ON je.project_id = p.id
+     WHERE p.user_id = $1
+     GROUP BY p.id
+     ORDER BY p.created_at DESC`,
+    [id]
+  );
+
+  return {
+    ...toAdminUser(row),
+    hackatimeTotalHours: Number(row.hackatime_total_hours ?? 0),
+    hackatimeConnectedAt: row.hackatime_connected_at,
+    projects: projectResult.rows.map((p) => ({
+      id: Number(p.id),
+      name: p.name,
+      status: p.status,
+      totalHours: Number(p.total_hours ?? 0),
+      approvedHours: Number(p.approved_hours ?? 0),
+      coinsEarned: Number(p.coins_earned ?? 0),
+      journalHours: Number(p.journal_hours ?? 0),
+      shipped: p.shipped,
+      reviewed: p.reviewed,
+      fraudFlag: p.fraud_flag,
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
+    })),
+  };
+}
+
 export async function getUserByEmail(email) {
   if (!pool) {
     throw new Error("DATABASE_URL is not set.");

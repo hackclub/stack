@@ -2,9 +2,8 @@
   position: fixed;
   inset: 0;
   overflow-y: auto;
-  background: linear-gradient(145deg, #0b1226 0%, #171f3e 48%, #2a1452 100%);
-  color: #f0e6d2;
-  font-family: Georgia, "Times New Roman", serif;
+  background: #73a5ca;
+  color: #e8f4ff;
 }
 
 .admin-review-container {
@@ -20,35 +19,43 @@
 .admin-review-back {
   display: inline-flex;
   margin-bottom: 1.5rem;
-  padding: 0.55rem 0.9rem;
-  border: 2px solid #4ba2ff;
+  padding: 0.5rem 1rem;
+  border: 2px solid #4bb3ff;
   border-radius: 999px;
-  color: #98e8ff;
+  color: #e8f4ff;
   text-decoration: none;
-  background: rgb(9 18 42 / 82%);
+  background: rgba(27, 58, 122, 0.75);
   font-weight: 700;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.admin-review-back:hover {
+  background: rgba(27, 58, 122, 0.95);
+  border-color: #f7cf57;
+  color: #f7cf57;
 }
 
 .admin-review-header h1 {
   margin: 0 0 0.6rem;
-  color: #8af4ff;
+  color: #f5f5f5;
   font-size: 2.5rem;
-  text-shadow: 1px 2px 4px rgb(0 0 0 / 60%);
+  text-shadow: 0 3px 0 #1b2a5a;
 }
 
 .admin-review-header p {
   margin: 0 0 1.5rem;
-  color: #c8d4ff;
+  color: rgba(232, 244, 255, 0.75);
 }
 
+/* Inputs */
 .admin-review-search,
 .admin-review-tabs-row select,
 .admin-review-feedback textarea,
 .admin-review-hours-input {
-  border: 2px solid #4ba2ff;
+  border: 2px solid #4bb3ff;
   border-radius: 12px;
-  background: rgb(9 18 42 / 82%);
-  color: #e9f4ff;
+  background: rgba(10, 22, 60, 0.7);
+  color: #e8f4ff;
   font: inherit;
 }
 
@@ -65,7 +72,7 @@
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 2rem;
-  border-bottom: 2px solid #4ba2ff;
+  border-bottom: 2px solid rgba(75, 179, 255, 0.4);
 }
 
 .admin-review-tabs {
@@ -78,21 +85,26 @@
   border-bottom: 3px solid transparent;
   padding: 1rem 0;
   background: transparent;
-  color: #c8d4ff;
+  color: rgba(232, 244, 255, 0.7);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+  transition: color 0.15s;
+}
+
+.admin-review-tabs button:hover {
+  color: #e8f4ff;
 }
 
 .admin-review-tabs button.active {
-  color: #8af4ff;
-  border-bottom-color: #8af4ff;
+  color: #f7cf57;
+  border-bottom-color: #f7cf57;
 }
 
 .admin-review-tabs-row label {
   display: grid;
   gap: 0.35rem;
-  color: #c8d4ff;
+  color: rgba(232, 244, 255, 0.75);
   font-size: 0.85rem;
   font-weight: 700;
 }
@@ -101,6 +113,11 @@
   padding: 0.55rem 0.7rem;
 }
 
+.admin-review-tabs-row select option {
+  background: #0f1e4a;
+}
+
+/* Cards grid */
 .admin-review-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -112,25 +129,25 @@
   flex-direction: column;
   overflow: hidden;
   min-height: 100%;
-  border: 2px solid #4ba2ff;
-  border-radius: 12px;
-  background: rgb(9 18 42 / 82%);
+  border: 3px solid #4bb3ff;
+  border-radius: 14px;
+  background: rgba(27, 58, 122, 0.72);
   color: inherit;
   text-decoration: none;
-  transition: transform 180ms ease, border-color 180ms ease;
+  transition: transform 150ms ease, border-color 150ms ease;
 }
 
 .admin-review-card:hover {
   transform: translateY(-4px);
-  border-color: #a765ff;
+  border-color: #f7cf57;
 }
 
 .admin-review-thumb {
   display: grid;
   place-items: center;
   height: 180px;
-  background: #0b0d17;
-  color: #7d8abd;
+  background: rgba(12, 28, 72, 0.8);
+  color: rgba(232, 244, 255, 0.4);
 }
 
 .admin-review-thumb img {
@@ -145,7 +162,7 @@
   flex-direction: column;
   gap: 0.85rem;
   padding: 1.2rem;
-  border-left: 3px solid #4ba2ff;
+  border-left: 3px solid rgba(75, 179, 255, 0.4);
 }
 
 .admin-review-card-header {
@@ -156,7 +173,7 @@
 
 .admin-review-card-header h2 {
   margin: 0;
-  color: #f0e6d2;
+  color: #f5f5f5;
   font-size: 1.1rem;
   overflow-wrap: anywhere;
 }
@@ -165,16 +182,16 @@
 .admin-review-tags span,
 .admin-review-stats strong {
   border-radius: 999px;
-  padding: 0.3rem 0.65rem;
-  background: #4ba2ff;
-  color: #09122a;
+  padding: 0.25rem 0.65rem;
+  background: #f7cf57;
+  color: #1b2a5a;
   font-weight: 800;
   white-space: nowrap;
 }
 
 .admin-review-card p {
   margin: 0;
-  color: #d7ddff;
+  color: rgba(232, 244, 255, 0.8);
   line-height: 1.4;
 }
 
@@ -185,13 +202,15 @@
 }
 
 .admin-review-tags span {
-  background: rgb(75 162 255 / 28%);
-  color: #d7eeff;
+  background: rgba(75, 179, 255, 0.22);
+  color: #e8f4ff;
+  border: 1px solid rgba(75, 179, 255, 0.4);
 }
 
 .admin-review-tag--fraud {
-  background: rgb(255 120 72 / 32%) !important;
+  background: rgba(255, 120, 72, 0.25) !important;
   color: #ffe4d9 !important;
+  border-color: rgba(255, 120, 72, 0.5) !important;
   font-weight: 800;
 }
 
@@ -202,14 +221,14 @@
   gap: 1rem;
   margin-top: auto;
   padding-top: 1rem;
-  border-top: 1px solid #4ba2ff;
+  border-top: 1px solid rgba(75, 179, 255, 0.25);
 }
 
 .admin-review-user {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  color: #d7ddff;
+  color: rgba(232, 244, 255, 0.8);
 }
 
 .admin-review-user span {
@@ -218,8 +237,8 @@
   width: 1.6rem;
   height: 1.6rem;
   border-radius: 50%;
-  background: #4ba2ff;
-  color: #09122a;
+  background: #f7cf57;
+  color: #1b2a5a;
   font-weight: 800;
 }
 
@@ -230,51 +249,53 @@
 }
 
 .admin-review-stats small {
-  color: #c8d4ff;
+  color: rgba(232, 244, 255, 0.6);
 }
 
+/* State / status panels */
 .admin-review-state {
   padding: 0.9rem 1rem;
-  border: 2px solid #4ba2ff;
+  border: 2px solid rgba(75, 179, 255, 0.45);
   border-radius: 12px;
-  background: rgb(9 18 42 / 82%);
-  color: #d7eeff;
+  background: rgba(27, 58, 122, 0.72);
+  color: #e8f4ff;
 }
 
 .admin-review-state--error {
-  border-color: #ff8ea0;
+  border-color: rgba(255, 143, 171, 0.55);
   color: #ffccd4;
 }
 
+/* Detail view */
 .admin-review-banner {
   display: block;
   width: 100%;
   max-height: 28rem;
   margin-bottom: 1.3rem;
-  border: 2px solid #4ba2ff;
+  border: 3px solid #4bb3ff;
   border-radius: 16px;
   object-fit: cover;
-  background: #0b0d17;
+  background: rgba(12, 28, 72, 0.8);
 }
 
 .admin-review-banner--empty {
   display: grid;
   place-items: center;
   min-height: 16rem;
-  color: #7d8abd;
+  color: rgba(232, 244, 255, 0.4);
 }
 
 .admin-review-panel {
   margin: 1rem 0;
   padding: 1.1rem;
-  border: 2px solid #4ba2ff;
+  border: 3px solid #4bb3ff;
   border-radius: 14px;
-  background: rgb(9 18 42 / 82%);
+  background: rgba(27, 58, 122, 0.72);
 }
 
 .admin-review-panel h2 {
   margin: 0 0 0.7rem;
-  color: #8af4ff;
+  color: #f7cf57;
 }
 
 .admin-review-links {
@@ -287,15 +308,23 @@
 .admin-review-links a,
 .admin-review-actions button,
 .admin-review-submit {
-  border: 2px solid #4ba2ff;
+  border: 2px solid #4bb3ff;
   border-radius: 999px;
-  padding: 0.65rem 1rem;
-  background: rgb(9 18 42 / 82%);
-  color: #98e8ff;
+  padding: 0.6rem 1rem;
+  background: rgba(27, 58, 122, 0.75);
+  color: #e8f4ff;
   font: inherit;
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: none;
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.admin-review-links a:hover,
+.admin-review-actions button:hover {
+  background: rgba(27, 58, 122, 0.95);
+  border-color: #f7cf57;
+  color: #f7cf57;
 }
 
 .admin-review-hours-grid {
@@ -309,11 +338,12 @@
   gap: 0.25rem;
   padding: 0.8rem;
   border-radius: 12px;
-  background: rgb(20 32 67 / 62%);
+  background: rgba(12, 28, 72, 0.55);
+  border: 1px solid rgba(75, 179, 255, 0.25);
 }
 
 .admin-review-hours-grid span {
-  color: #c8d4ff;
+  color: rgba(232, 244, 255, 0.7);
   font-size: 0.85rem;
 }
 
@@ -324,9 +354,9 @@
 .admin-review-journal-entry {
   margin: 0.75rem 0;
   padding: 0.75rem;
-  border: 1px solid #4ba2ff;
+  border: 1px solid rgba(75, 179, 255, 0.3);
   border-radius: 12px;
-  background: rgb(20 32 67 / 62%);
+  background: rgba(12, 28, 72, 0.55);
 }
 
 .admin-review-journal-entry p {
@@ -341,20 +371,22 @@
 }
 
 .admin-review-actions .approve.active {
-  border-color: #64e27e;
-  color: #a8ffb8;
+  border-color: #9cffcf;
+  color: #9cffcf;
+  background: rgba(10, 60, 35, 0.5);
 }
 
 .admin-review-actions .reject.active {
-  border-color: #ff8ea0;
-  color: #ffccd4;
+  border-color: #ff8fab;
+  color: #ff8fab;
+  background: rgba(60, 10, 25, 0.5);
 }
 
 .admin-review-feedback {
   display: grid;
   gap: 0.5rem;
   margin: 1rem 0;
-  color: #c8d4ff;
+  color: rgba(232, 244, 255, 0.85);
   font-weight: 700;
 }
 
@@ -365,27 +397,38 @@
 }
 
 .admin-review-submit {
-  border-color: #a765ff;
-  background: linear-gradient(135deg, #43c6ff, #8d4dff);
-  color: #fff;
+  border: 3px dashed rgba(109, 104, 98, 0.85) !important;
+  background: linear-gradient(140deg, #ffe9bd 0%, #d8d2c8 100%) !important;
+  color: #50483f !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 0 rgba(85, 81, 76, 0.4);
+  transition: transform 0.1s, box-shadow 0.1s !important;
 }
 
+.admin-review-submit:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 0 rgba(85, 81, 76, 0.35) !important;
+  border-color: rgba(109, 104, 98, 0.85) !important;
+}
+
+/* Participant details */
 .admin-review-participant-line {
   margin: 0.35rem 0 0;
-  color: #c8d4ff;
+  color: rgba(232, 244, 255, 0.8);
   font-size: 1rem;
 }
 
 .admin-review-participant-email {
-  color: #ffe18a;
+  color: #f7cf57;
   word-break: break-word;
 }
 
 .admin-review-participant-name {
   font-weight: 600;
-  color: #98e8ff;
+  color: #e8f4ff;
 }
 
+/* Tool buttons */
 .admin-review-quick-links {
   display: flex;
   flex-wrap: wrap;
@@ -394,31 +437,40 @@
 }
 
 .admin-review-tool-btn {
-  border: 2px solid #4ba2ff;
+  border: 2px solid #4bb3ff;
   border-radius: 999px;
   padding: 0.55rem 1rem;
-  background: rgb(9 18 42 / 82%);
-  color: #98e8ff;
+  background: rgba(27, 58, 122, 0.75);
+  color: #e8f4ff;
   font: inherit;
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: none;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 2.5rem;
+  transition: background 0.15s, border-color 0.15s;
 }
 
 .admin-review-tool-btn:hover {
-  filter: brightness(1.08);
+  background: rgba(27, 58, 122, 0.95);
+  border-color: #f7cf57;
+  color: #f7cf57;
 }
 
 .admin-review-tool-btn--disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: not-allowed;
-  font-weight: 700;
 }
 
+.admin-review-tool-btn--disabled:hover {
+  background: rgba(27, 58, 122, 0.75);
+  border-color: #4bb3ff;
+  color: #e8f4ff;
+}
+
+/* Fraud flag */
 .admin-review-fraud {
   display: inline-flex;
   align-items: center;
@@ -426,12 +478,17 @@
   margin: 0 0 0.5rem;
   padding: 0.6rem 0.85rem;
   border-radius: 12px;
-  border: 2px solid rgb(255 148 90 / 55%);
-  background: rgb(42 18 9 / 62%);
+  border: 2px solid rgba(255, 148, 90, 0.5);
+  background: rgba(255, 120, 72, 0.1);
   color: #ffd4bf;
   font-weight: 700;
   cursor: pointer;
   user-select: none;
+  transition: background 0.15s;
+}
+
+.admin-review-fraud:hover {
+  background: rgba(255, 120, 72, 0.18);
 }
 
 .admin-review-fraud input {
@@ -441,25 +498,26 @@
 
 .admin-review-fraud-saving {
   margin-left: 0.25rem;
-  color: #98e8ff;
+  color: #9cffcf;
   font-weight: 600;
 }
 
+/* Danger zone */
 .admin-review-danger-zone {
   margin-top: 2rem;
   padding-top: 1rem;
-  border-top: 2px dashed rgb(255 120 120 / 35%);
+  border-top: 2px dashed rgba(255, 120, 120, 0.35);
 }
 
 .admin-review-danger-zone h3 {
   margin: 0 0 0.35rem;
-  color: #ffa8a8;
+  color: #ff8fab;
   font-size: 1rem;
 }
 
 .admin-review-danger-zone p {
   margin: 0 0 0.65rem;
-  color: #ffc8c8;
+  color: rgba(255, 200, 200, 0.85);
   font-size: 0.92rem;
 }
 
@@ -467,14 +525,19 @@
   border: 2px solid #ff6b7a;
   border-radius: 999px;
   padding: 0.55rem 1rem;
-  background: rgb(60 12 20 / 72%);
+  background: rgba(80, 10, 22, 0.6);
   color: #ffc8ce;
   font: inherit;
   font-weight: 800;
   cursor: pointer;
+  transition: background 0.15s;
+}
+
+.admin-review-delete-btn:hover {
+  background: rgba(120, 15, 30, 0.75);
 }
 
 .admin-review-delete-btn:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: wait;
 }

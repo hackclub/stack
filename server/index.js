@@ -10,6 +10,7 @@ import { getPeriodicAirtableSyncStatus, startPeriodicAirtableSync, syncAllUsersA
 import { isHackatimeOAuthConfigured } from "./hackatimeAuth.js";
 import { getHackatimeStatusForUser, listHackatimeProjectsForUser } from "./hackatimeService.js";
 import { checkDatabaseConnection, getTestRows } from "./db.js";
+import { adjustUserCoins, ensureAuditLogTable, getAdminStats, getAuditLogForTarget } from "./adminStats.js";
 import {
   createShopItem,
   deleteShopItem,
@@ -44,6 +45,7 @@ import {
   effectiveRole,
   ensureUsersTable,
   getAdminUserById,
+  getAdminUserWithProjects,
   getUserById,
   listAdminUsers,
 } from "./users.js";
@@ -500,6 +502,16 @@ app.post("/api/admin/shop/items/bulk_active", requireFullAdmin, async (req, res)
   }
 });
 
+app.get("/api/admin/stats", requireFullAdmin, async (req, res) => {
+  try {
+    const stats = await getAdminStats();
+    res.json({ stats });
+  } catch (error) {
+    console.error("Failed to load admin stats:", error);
+    res.status(500).json({ error: "Failed to load stats." });
+  }
+});
+
 app.get("/api/admin/users", requireFullAdmin, async (req, res) => {
   try {
     const users = await listAdminUsers();
@@ -512,7 +524,7 @@ app.get("/api/admin/users", requireFullAdmin, async (req, res) => {
 
 app.get("/api/admin/users/:id", requireFullAdmin, async (req, res) => {
   try {
-    const user = await getAdminUserById(req.params.id);
+    const user = await getAdminUserWithProjects(req.params.id);
     if (!user) {
       res.status(404).json({ error: "User not found." });
       return;
@@ -521,6 +533,34 @@ app.get("/api/admin/users/:id", requireFullAdmin, async (req, res) => {
   } catch (error) {
     console.error("Failed to load admin user:", error);
     res.status(500).json({ error: "Failed to load user." });
+  }
+});
+
+app.patch("/api/admin/users/:id/balance", requireFullAdmin, async (req, res) => {
+  const adminUserId = req.session?.userId;
+  try {
+    const { delta, reason } = req.body;
+    const parsedDelta = Number(delta);
+    if (!Number.isFinite(parsedDelta) || parsedDelta === 0) {
+      res.status(400).json({ error: "delta must be a non-zero number." });
+      return;
+    }
+    const updated = await adjustUserCoins(adminUserId, req.params.id, { delta: parsedDelta, reason });
+    console.log(`[admin] balance_adjustment user=${req.params.id} delta=${parsedDelta} by admin=${adminUserId}`);
+    res.json({ user: updated });
+  } catch (error) {
+    console.error("Failed to adjust user balance:", error);
+    res.status(400).json({ error: error.message || "Failed to adjust balance." });
+  }
+});
+
+app.get("/api/admin/users/:id/audit", requireFullAdmin, async (req, res) => {
+  try {
+    const entries = await getAuditLogForTarget("user", req.params.id);
+    res.json({ entries });
+  } catch (error) {
+    console.error("Failed to load audit log:", error);
+    res.status(500).json({ error: "Failed to load audit log." });
   }
 });
 
@@ -563,6 +603,7 @@ async function startServer() {
     await ensureUsersTable();
     await ensureProjectsTable();
     await ensureShopItemsTable();
+    await ensureAuditLogTable();
     console.log("[db] Database schema is up to date.");
   } catch (error) {
     console.error("[db] Failed to ensure database tables:", error);

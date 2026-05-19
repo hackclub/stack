@@ -12,6 +12,7 @@ import { AdminPage } from "./components/AdminPage.jsx";
 import { AdminReviewPage } from "./components/AdminReviewPage.jsx";
 import { AdminShopPage } from "./components/AdminShopPage.jsx";
 import { AdminShopOrdersPage } from "./components/AdminShopOrdersPage.jsx";
+import { AdminStatsPage } from "./components/AdminStatsPage.jsx";
 import { AdminUsersPage } from "./components/AdminUsersPage.jsx";
 import { UserAreaPage } from "./components/UserAreaPage.jsx";
 
@@ -115,6 +116,9 @@ export default function App() {
       break;
     case "/admin":
       page = <AdminPage />;
+      break;
+    case "/admin/stats":
+      page = <AdminStatsPage />;
       break;
     case "/admin/users":
       page = <AdminUsersPage />;

@@ -3,53 +3,46 @@
   inset: 0;
   z-index: 0;
   overflow-y: auto;
-}
-
-.admin-page::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(145deg, #0b1226 0%, #171f3e 48%, #2a1452 100%);
-  z-index: -1;
+  background: #73a5ca;
 }
 
 .admin-content {
   position: relative;
   max-width: 900px;
   margin: 0 auto;
-  padding: 100px 2rem 4rem;
-  font-family: Georgia, "Times New Roman", serif;
-  color: #f0e6d2;
+  padding: 80px 2rem 5rem;
+  color: #e8f4ff;
 }
 
 .admin-content h1 {
-  font-size: 2.4rem;
-  color: #8af4ff;
-  text-shadow: 1px 2px 4px rgb(0 0 0 / 60%);
+  font-size: clamp(2rem, 5vw, 3rem);
+  color: #f5f5f5;
+  text-shadow: 0 3px 0 #1b2a5a;
   margin: 0 0 2rem;
   text-align: center;
-  font-style: italic;
 }
 
 .admin-back-link {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.55rem 0.9rem;
-  border: 2px solid #4ba2ff;
+  padding: 0.5rem 1rem;
+  border: 2px solid #4bb3ff;
   border-radius: 999px;
-  background: rgb(9 18 42 / 82%);
-  color: #98e8ff;
-  font-family: Georgia, serif;
+  background: rgba(27, 58, 122, 0.75);
+  color: #e8f4ff;
   font-weight: 700;
   text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
 }
 
 .admin-back-link:hover {
-  border-color: #a765ff;
-  background: rgb(21 34 70 / 95%);
+  background: rgba(27, 58, 122, 0.95);
+  border-color: #f7cf57;
+  color: #f7cf57;
 }
 
+/* Navigation links grid */
 .admin-links {
   display: flex;
   flex-direction: column;
@@ -61,34 +54,33 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 1.2rem 1.5rem;
-  background: rgb(9 18 42 / 82%);
-  border: 2px solid #4ba2ff;
-  border-radius: 12px;
+  padding: 1.1rem 1.4rem;
+  background: rgba(27, 58, 122, 0.72);
+  border: 3px solid #4bb3ff;
+  border-radius: 14px;
   text-decoration: none;
-  font-family: Georgia, serif;
-  font-size: 1.3rem;
+  font-size: 1.15rem;
   font-weight: 700;
-  color: #98e8ff;
-  transition: all 0.2s;
+  color: #f5f5f5;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
 }
 
 .admin-link:hover {
-  background: rgb(21 34 70 / 95%);
-  border-color: #a765ff;
+  background: rgba(27, 58, 122, 0.95);
+  border-color: #f7cf57;
   transform: translateX(4px);
 }
 
 .admin-link-icon {
-  font-size: 1.6rem;
+  font-size: 1.5rem;
 }
 
 .admin-link-desc {
   display: block;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   font-weight: 400;
-  color: #c8d4ff;
-  margin-top: 0.2rem;
+  color: rgba(232, 244, 255, 0.7);
+  margin-top: 0.15rem;
 }
 
 .admin-super {
@@ -96,12 +88,12 @@
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  color: #f0e6d2;
+  color: #e8f4ff;
 }
 
 .admin-super-icon {
   font-size: 1.2rem;
-  color: #a765ff;
+  color: #f7cf57;
 }
 
 .admin-super-copy {
@@ -110,49 +102,48 @@
 }
 
 .admin-super-copy span {
-  opacity: 0.85;
+  opacity: 0.75;
 }
 
 .admin-silly {
   margin-top: 3rem;
   text-align: center;
-  opacity: 0.6;
+  opacity: 0.55;
 }
 
 .admin-silly pre {
   font-size: 0.8rem;
   line-height: 1;
-  color: #c4b89a;
+  color: #e8f4ff;
 }
 
 .admin-silly .admin-emojis {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   margin: 0.5rem 0;
 }
 
 .admin-silly .admin-tagline {
-  font-family: Georgia, serif;
-  font-size: 1.5rem;
-  color: #79a6ff;
+  font-size: 1.4rem;
+  color: #f7cf57;
   font-style: italic;
 }
 
 .admin-airtable {
   margin-top: 2.2rem;
   padding: 1.2rem;
-  border: 2px solid #4ba2ff;
-  border-radius: 12px;
-  background: rgb(10 18 43 / 78%);
+  border: 3px solid #4bb3ff;
+  border-radius: 14px;
+  background: rgba(27, 58, 122, 0.72);
 }
 
 .admin-airtable h2 {
   margin: 0 0 0.5rem;
-  color: #8af4ff;
+  color: #f7cf57;
 }
 
 .admin-airtable-subtitle {
   margin: 0 0 1rem;
-  color: #c8d4ff;
+  color: rgba(232, 244, 255, 0.75);
 }
 
 .admin-airtable-sync-row {
@@ -162,9 +153,9 @@
   gap: 1rem;
   padding: 0.8rem;
   margin-bottom: 1rem;
-  border: 1px solid #4ba2ff;
+  border: 1px solid rgba(75, 179, 255, 0.35);
   border-radius: 10px;
-  background: rgb(11 28 62 / 70%);
+  background: rgba(12, 28, 72, 0.55);
 }
 
 .admin-airtable-sync-row div {
@@ -173,21 +164,31 @@
 }
 
 .admin-airtable-sync-row button {
-  border: 1px solid #7f5cff;
-  background: linear-gradient(135deg, #43c6ff, #8d4dff);
-  color: #fff;
-  border-radius: 999px;
+  border: 3px dashed rgba(109, 104, 98, 0.85);
+  background: linear-gradient(140deg, #ffe9bd 0%, #d8d2c8 100%);
+  color: #50483f;
+  border-radius: 8px;
   padding: 0.45rem 0.95rem;
+  font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 4px 0 rgba(85, 81, 76, 0.4);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.admin-airtable-sync-row button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 rgba(85, 81, 76, 0.35);
 }
 
 .admin-airtable-sync-row button:disabled {
-  opacity: 0.7;
+  opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 4px 0 rgba(85, 81, 76, 0.4);
 }
 
 .admin-airtable-error {
-  color: #ffb5b5;
+  color: #ff8fab;
 }
 
 .admin-airtable-success {
@@ -198,7 +199,7 @@
   margin-top: 1rem;
   padding: 0.8rem;
   border-radius: 10px;
-  background: rgb(20 32 67 / 62%);
+  background: rgba(12, 28, 72, 0.5);
 }
 
 .admin-airtable-details p {
@@ -215,8 +216,9 @@
   margin: 0;
   padding: 0.75rem;
   overflow-x: auto;
-  border: 1px solid #4ba2ff;
+  border: 1px solid rgba(75, 179, 255, 0.35);
   border-radius: 8px;
-  background: rgb(6 10 26 / 95%);
-  color: #e9f4ff;
+  background: rgba(8, 15, 42, 0.85);
+  color: #e8f4ff;
+  font-size: 0.82rem;
 }
