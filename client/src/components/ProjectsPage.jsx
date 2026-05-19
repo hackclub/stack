@@ -12,6 +12,75 @@ import "./ProjectsPage.css";
 
 const PROJECTS_PER_BLOCK = 5;
 
+function isValidUrl(url) {
+  if (!url) return true;
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function throwConfetti() {
+  const canvas = document.createElement("canvas");
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  canvas.style.position = "fixed";
+  canvas.style.top = "0";
+  canvas.style.left = "0";
+  canvas.style.pointerEvents = "none";
+  canvas.style.zIndex = "9999";
+  document.body.appendChild(canvas);
+
+  const ctx = canvas.getContext("2d");
+  const pieces = [];
+  const colors = ["#ff6b6b", "#4ecdc4", "#ffe66d", "#a8e6cf", "#ff9a76", "#c7b3e5"];
+
+  for (let i = 0; i < 50; i++) {
+    pieces.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height - canvas.height,
+      vx: (Math.random() - 0.5) * 8,
+      vy: Math.random() * 4 + 3,
+      size: Math.random() * 6 + 3,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 0.2,
+    });
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let active = false;
+
+    for (let piece of pieces) {
+      piece.y += piece.vy;
+      piece.x += piece.vx;
+      piece.vy += 0.15;
+      piece.rotation += piece.rotationSpeed;
+
+      if (piece.y < canvas.height + 50) {
+        active = true;
+        ctx.save();
+        ctx.translate(piece.x, piece.y);
+        ctx.rotate(piece.rotation);
+        ctx.fillStyle = piece.color;
+        ctx.fillRect(-piece.size / 2, -piece.size / 2, piece.size, piece.size);
+        ctx.restore();
+      }
+    }
+
+    if (active) {
+      requestAnimationFrame(animate);
+    } else {
+      document.body.removeChild(canvas);
+    }
+  }
+
+  animate();
+}
+
 const emptyProject = {
   name: "",
   description: "",
@@ -36,7 +105,7 @@ function displayStatus(project) {
 }
 
 function getShipLockReason(project) {
-  if (project.shipped) return "Locked: already shipped.";
+  if (project.shipped) return "Shipped!";
   const missing = [];
   if (!project.playableUrl) missing.push("playable URL missing");
   if (!project.codeUrl) missing.push("code URL missing");
@@ -147,6 +216,34 @@ export function ProjectsPage() {
       return;
     }
 
+    if (editingProject.codeUrl && !isValidUrl(editingProject.codeUrl)) {
+      setError("Code URL must be a valid URL (e.g., https://github.com/...).");
+      return;
+    }
+
+    if (editingProject.playableUrl && !isValidUrl(editingProject.playableUrl)) {
+      setError("Playable URL must be a valid URL.");
+      return;
+    }
+
+    if (editingProject.imageUrl && !isValidUrl(editingProject.imageUrl)) {
+      setError("Banner URL must be a valid URL.");
+      return;
+    }
+
+    if (editingProject.shipped && (editingProject.hackatimeNames || []).length > 0) {
+      const shippedHackatimeProjects = projects
+        .filter((p) => p.shipped && p.id !== editingProject.id)
+        .flatMap((p) => p.hackatimeNames || []);
+      const duplicateHackatime = (editingProject.hackatimeNames || []).find((name) =>
+        shippedHackatimeProjects.includes(name)
+      );
+      if (duplicateHackatime) {
+        setError(`"${duplicateHackatime}" is already linked to another shipped project.`);
+        return;
+      }
+    }
+
     try {
       const response = await fetch(isNew ? "/api/projects" : `/api/projects/${editingProject.id}`, {
         method: isNew ? "POST" : "PATCH",
@@ -200,6 +297,7 @@ export function ProjectsPage() {
       if (!response.ok) throw new Error(data.error || "Failed to ship project.");
       setProjects((current) => current.map((item) => (item.id === data.project.id ? data.project : item)));
       setSelectedProject(data.project);
+      throwConfetti();
     } catch (err) {
       setError(err.message);
     }
@@ -225,6 +323,12 @@ export function ProjectsPage() {
     if (!journalProject) return;
 
     setError("");
+    const hoursWorked = Number.parseFloat(journalForm.hoursWorked) || 0;
+    if (hoursWorked < 0) {
+      setError("Hours worked cannot be negative.");
+      return;
+    }
+
     const toolsUsed = journalForm.toolsUsed
       .split(",")
       .map((tool) => tool.trim())
@@ -237,7 +341,7 @@ export function ProjectsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           timeDone: journalForm.timeDone || new Date().toISOString(),
-          hoursWorked: Number.parseFloat(journalForm.hoursWorked) || 0,
+          hoursWorked,
           description: journalForm.description,
           toolsUsed,
         }),
@@ -367,7 +471,13 @@ export function ProjectsPage() {
           project={journalProject}
           entries={journalEntries}
           form={journalForm}
-          onChange={(field, value) => setJournalForm((current) => ({ ...current, [field]: value }))}
+          onChange={(field, value) => {
+            if (field === "hoursWorked" && value) {
+              const numValue = Number(value);
+              if (numValue < 0) return;
+            }
+            setJournalForm((current) => ({ ...current, [field]: value }));
+          }}
           onClose={() => setJournalProject(null)}
           onSubmit={saveJournalEntry}
         />
@@ -556,15 +666,15 @@ function ProjectFormModal({
           </label>
           <label>
             Playable URL (required before shipping)
-            <input value={project.playableUrl || ""} onChange={(event) => onChange("playableUrl", event.target.value)} />
+            <input type="url" value={project.playableUrl || ""} onChange={(event) => onChange("playableUrl", event.target.value)} />
           </label>
           <label>
             Code URL (required before shipping)
-            <input value={project.codeUrl || ""} onChange={(event) => onChange("codeUrl", event.target.value)} />
+            <input type="url" value={project.codeUrl || ""} onChange={(event) => onChange("codeUrl", event.target.value)} />
           </label>
           <label>
             Project image URL (required before shipping)
-            <input value={project.imageUrl || ""} onChange={(event) => onChange("imageUrl", event.target.value)} />
+            <input type="url" value={project.imageUrl || ""} onChange={(event) => onChange("imageUrl", event.target.value)} />
           </label>
           <fieldset
             disabled={!hackatimeConnected}

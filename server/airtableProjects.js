@@ -123,8 +123,16 @@ function hackatimeProjectsLabel(row) {
   return "";
 }
 
+export function isProjectFullyApproved(row) {
+  return (
+    String(row.status || "").toLowerCase() === "approved" &&
+    Boolean(row.shipped) &&
+    Boolean(row.reviewed)
+  );
+}
+
 function buildFieldsFromProjectRow(row) {
-  const combined = combinedLoggedHours(row);
+  const approvedHours = isProjectFullyApproved(row) ? Number(row.approved_hours ?? 0) : 0;
   const fields = {
     [F.name]: row.name,
     [F.description]: row.description || undefined,
@@ -133,7 +141,7 @@ function buildFieldsFromProjectRow(row) {
     [F.playableUrl]: row.playable_url || undefined,
     [F.shipped]: Boolean(row.shipped),
     [F.status]: mapProjectStatusToAirtable(row),
-    [F.approvedHours]: combined,
+    [F.approvedHours]: approvedHours,
     [F.bricksEarned]: numberOrZero(row.coins_earned),
     [F.reviewed]: Boolean(row.reviewed),
     [F.hackatimeProjects]: hackatimeProjectsLabel(row) || undefined,
