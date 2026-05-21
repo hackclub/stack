@@ -24,6 +24,7 @@ import {
 } from "./shopItems.js";
 import {
   approveAdminReviewProject,
+  blockAdminReviewProject,
   createProjectForUser,
   getProjectForUser,
   createJournalEntryForUser,
@@ -428,6 +429,16 @@ app.post("/api/admin/review/projects/:id/reject", requireStaffReview, async (req
   } catch (error) {
     console.error("Failed to reject review project:", error);
     res.status(400).json({ error: error.message || "Failed to reject project." });
+  }
+});
+
+app.post("/api/admin/review/projects/:id/block", requireStaffReview, async (req, res) => {
+  try {
+    const project = await blockAdminReviewProject(req.session.userId, req.params.id, req.body);
+    res.json({ project });
+  } catch (error) {
+    console.error("Failed to block review project:", error);
+    res.status(400).json({ error: error.message || "Failed to block project." });
   }
 });
 

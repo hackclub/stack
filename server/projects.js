@@ -1,6 +1,7 @@
 import { pool } from "./db.js";
 import { persistProjectAirtableRecordId, syncProjectToAirtable } from "./airtableProjects.js";
 import { syncJournalEntryToAirtable } from "./airtableJournals.js";
+import { submitProjectToYsws } from "./airtableYsws.js";
 import { fetchHackatimeProjects, sumHackatimeHoursForNames } from "./hackatimeAuth.js";
 
 export async function ensureProjectsTable() {
@@ -36,6 +37,10 @@ export async function ensureProjectsTable() {
       baseline_hours NUMERIC(10, 2),
       hackatime_hours NUMERIC(10, 2) NOT NULL DEFAULT 0,
       airtable_record_id TEXT,
+      ysws_record_id TEXT,
+      parent_project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL,
+      ship_kind TEXT NOT NULL DEFAULT 'initial',
+      blocked BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -66,6 +71,10 @@ export async function ensureProjectsTable() {
     baseline_hours: "NUMERIC(10, 2)",
     hackatime_hours: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
     airtable_record_id: "TEXT",
+    ysws_record_id: "TEXT",
+    parent_project_id: "BIGINT REFERENCES projects(id) ON DELETE SET NULL",
+    ship_kind: "TEXT NOT NULL DEFAULT 'initial'",
+    blocked: "BOOLEAN NOT NULL DEFAULT FALSE",
     created_at: "TIMESTAMPTZ NOT NULL DEFAULT NOW()",
     updated_at: "TIMESTAMPTZ NOT NULL DEFAULT NOW()",
   };
@@ -79,6 +88,8 @@ export async function ensureProjectsTable() {
   await pool.query(`UPDATE projects SET past_approved_hours = COALESCE(approved_hours, 0) WHERE past_approved_hours IS NULL`);
   await pool.query(`UPDATE projects SET bricks_earned = 0 WHERE bricks_earned IS NULL`);
   await pool.query(`UPDATE projects SET fraud_flag = FALSE WHERE fraud_flag IS NULL`);
+  await pool.query(`UPDATE projects SET ship_kind = 'initial' WHERE ship_kind IS NULL`);
+  await pool.query(`UPDATE projects SET blocked = FALSE WHERE blocked IS NULL`);
 
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_projects_user_name_lower ON projects(user_id, LOWER(name))`);
@@ -231,12 +242,17 @@ export async function shipProjectForUser(userId, projectId) {
     throw new Error("Project not found.");
   }
 
+  if (project.blocked) {
+    throw new Error("This project has been blocked and cannot be shipped again.");
+  }
+
   const missing = getShipMissingRequirements(project);
   if (missing.length > 0) {
     throw new Error(`Cannot ship yet: ${missing.join(", ")}.`);
   }
 
-  if (project.status === "approved") {
+  const isReship = project.status === "approved" && project.reviewed;
+  if (isReship) {
     const totalLoggedHours = Number(project.total_hours ?? 0) + Number(project.hackatime_hours ?? 0);
     const bankedHours = Number(project.past_approved_hours ?? 0);
     const newHours = totalLoggedHours - bankedHours;
@@ -250,23 +266,54 @@ export async function shipProjectForUser(userId, projectId) {
       UPDATE projects
       SET
         shipped = TRUE,
-        status = 'in-review',
+        status = $3,
+        ship_kind = $4,
         reviewed = FALSE,
         reviewed_at = NULL,
         reviewed_by_user_id = NULL,
         admin_feedback = NULL,
         shipped_at = NOW(),
+        hour_justification = $5,
         updated_at = NOW()
       WHERE user_id = $1
         AND id = $2
       RETURNING *, total_hours AS journal_hours
     `,
-    [userId, projectId]
+    [
+      userId,
+      projectId,
+      isReship ? "pending-reship" : "in-review",
+      isReship ? "reship" : "initial",
+      buildDefaultJustificationTemplate(),
+    ]
   );
 
   const row = result.rows[0];
   await trySyncProjectToAirtable(row.id);
   return toPublicProject(row);
+}
+
+export function buildDefaultJustificationTemplate({
+  approvedHours = null,
+  totalHours = null,
+  reductionHours = null,
+  reviewerName = null,
+} = {}) {
+  const approved = approvedHours != null ? `${Number(approvedHours).toFixed(2)} h` : "<approved_hours> h";
+  const total = totalHours != null ? `${Number(totalHours).toFixed(2)} h` : "<tot_hours> h";
+  const reduction = reductionHours != null ? `${Number(reductionHours).toFixed(2)} h` : "<red_hours> h";
+  const reviewer = reviewerName || "<reviewer>";
+
+  return [
+    "The project includes [leave empty, I'll manually enter this].",
+    "The commit history shows [leave empty, I'll manually enter this] commits. 3.5 hours is consistent with this scope.",
+    "Hackatime project user analyzed from 02/13/26 to 05/14/26 shows 6.86 hours tracked. The heartbeat pattern is consistent with active development.",
+    "",
+    `Total hours approved (cumulative on this project): ${approved}.`,
+    `>Total logged at review (Hackatime + journal): ${total}.`,
+    `>Reduction from logged: ${reduction} less approved than logged.`,
+    `>Project reviewed by ${reviewer}. Demo and repository looked solid, including heartbeats.`,
+  ].join("\n");
 }
 
 export async function listAdminReviewProjects({ shipSort = "oldest" } = {}) {
@@ -360,7 +407,19 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
 
     const newTotalApprovedHours = Number((bankedHours + approvedHours).toFixed(2));
     const bricksDelta = Math.ceil(approvedHours * 10);
+    const reductionHours = Math.max(0, Number((totalLoggedHours - newTotalApprovedHours).toFixed(2)));
     const newCumulativeBricks = Number(project.bricks_earned ?? 0) + bricksDelta;
+
+    const reviewerResult = await client.query("SELECT name, email FROM users WHERE id = $1", [adminId]);
+    const reviewerName = reviewerResult.rows[0]?.name || reviewerResult.rows[0]?.email || "<reviewer>";
+    const finalJustification =
+      hourJustification ||
+      buildDefaultJustificationTemplate({
+        approvedHours: newTotalApprovedHours,
+        totalHours: totalLoggedHours,
+        reductionHours,
+        reviewerName,
+      });
 
     const updatedProjectResult = await client.query(
       `
@@ -370,24 +429,26 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
           reviewed_at = NOW(),
           reviewed_by_user_id = $1,
           status = 'approved',
+          ship_kind = 'initial',
           approved_hours = $2,
           past_approved_hours = $2,
           baseline_hours = COALESCE(baseline_hours, total_hours),
-          hour_justification = COALESCE($3, hour_justification),
+          hour_justification = $3,
           admin_feedback = $4,
           bricks_earned = $5,
           updated_at = NOW()
         WHERE id = $6
         RETURNING *, total_hours AS journal_hours
       `,
-      [adminId, newTotalApprovedHours, hourJustification, feedback, newCumulativeBricks, projectId]
+      [adminId, newTotalApprovedHours, finalJustification, feedback, newCumulativeBricks, projectId]
     );
+    const approvedRow = updatedProjectResult.rows[0];
 
     await client.query("UPDATE users SET bricks = bricks + $1, updated_at = NOW() WHERE id = $2", [bricksDelta, project.user_id]);
     await client.query("COMMIT");
 
-    const approvedRow = updatedProjectResult.rows[0];
     await trySyncProjectToAirtable(approvedRow.id);
+    await trySubmitProjectToYsws(approvedRow.id, { forceCreate: true });
 
     return {
       project: toPublicProject(approvedRow),
@@ -410,23 +471,27 @@ export async function rejectAdminReviewProject(adminId, projectId, input = {}) {
     throw new Error("Rejection requires a written comment (what to fix before resubmitting).");
   }
 
+  const lookup = await pool.query("SELECT ship_kind FROM projects WHERE id = $1", [projectId]);
+  const isReship = lookup.rows[0]?.ship_kind === "reship";
+
   const result = await pool.query(
     `
       UPDATE projects
       SET
         shipped = FALSE,
         shipped_at = NULL,
-        reviewed = FALSE,
+        reviewed = TRUE,
         reviewed_at = NOW(),
         reviewed_by_user_id = $1,
-        status = 'rejected',
+        status = $4,
+        ship_kind = 'initial',
         admin_feedback = $2,
         updated_at = NOW()
       WHERE id = $3
         AND shipped IS TRUE
       RETURNING *, total_hours AS journal_hours
     `,
-    [adminId, feedback, projectId]
+    [adminId, feedback, projectId, isReship ? "reship-rejected" : "rejected"]
   );
 
   if (!result.rows[0]) {
@@ -434,6 +499,50 @@ export async function rejectAdminReviewProject(adminId, projectId, input = {}) {
   }
 
   const row = result.rows[0];
+  await trySyncProjectToAirtable(row.id);
+  return toPublicProject(row);
+}
+
+export async function blockAdminReviewProject(adminId, projectId, input = {}) {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const feedback = textOrNull(input.feedback);
+  if (!feedback) {
+    throw new Error("Blocking requires a written reason.");
+  }
+
+  const result = await pool.query(
+    `
+      UPDATE projects
+      SET
+        shipped = FALSE,
+        shipped_at = NULL,
+        reviewed = TRUE,
+        reviewed_at = NOW(),
+        reviewed_by_user_id = $1,
+        status = 'blocked',
+        blocked = TRUE,
+        admin_feedback = $2,
+        updated_at = NOW()
+      WHERE id = $3
+      RETURNING *, total_hours AS journal_hours
+    `,
+    [adminId, feedback, projectId]
+  );
+
+  if (!result.rows[0]) {
+    throw new Error("Project not found.");
+  }
+
+  const row = result.rows[0];
+  if (row.parent_project_id) {
+    await pool.query(
+      `UPDATE projects SET blocked = TRUE, updated_at = NOW() WHERE id = $1`,
+      [row.parent_project_id]
+    );
+    await trySyncProjectToAirtable(row.parent_project_id);
+  }
+
   await trySyncProjectToAirtable(row.id);
   return toPublicProject(row);
 }
@@ -830,6 +939,24 @@ async function getProjectRowForAirtableSync(projectId) {
   return result.rows[0] ?? null;
 }
 
+async function trySubmitProjectToYsws(projectId, options = {}) {
+  try {
+    const result = await submitProjectToYsws(projectId, options);
+    if (!result.skipped) {
+      console.log("[projects] Airtable YSWS submit:", {
+        projectId,
+        recordId: result.recordId,
+        created: result.created,
+      });
+    }
+  } catch (error) {
+    console.error("[projects] Airtable YSWS submit failed:", {
+      projectId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 async function trySyncProjectToAirtable(projectId) {
   try {
     const row = await getProjectRowForAirtableSync(projectId);
@@ -886,6 +1013,9 @@ function toPublicProject(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     fraudFlag: Boolean(row.fraud_flag),
+    blocked: Boolean(row.blocked),
+    shipKind: row.ship_kind || "initial",
+    parentProjectId: row.parent_project_id != null ? Number(row.parent_project_id) : null,
   };
 }
 
@@ -908,7 +1038,12 @@ function toAdminReviewProject(row) {
 function getShipMissingRequirements(project) {
   const missing = [];
   // Block shipping only if already shipped but not in a valid state for re-shipping
-  if (project.shipped && project.status !== "approved" && project.status !== "rejected") {
+  if (
+    project.shipped &&
+    project.status !== "approved" &&
+    project.status !== "rejected" &&
+    project.status !== "reship-rejected"
+  ) {
     missing.push("already shipped");
   }
   if (!textOrNull(project.playable_url)) missing.push("playable URL missing");

@@ -1,6 +1,7 @@
 import { pool } from "./db.js";
 import { syncPostgresUserToAirtable } from "./airtableUsers.js";
 import {
+  fetchHackatimeMe,
   fetchHackatimeProjects,
   fetchHackatimeTotalHours,
   isHackatimeOAuthConfigured,
@@ -94,6 +95,23 @@ export async function refreshUserHackatimeCache(userId, accessToken) {
 
 export async function connectHackatimeForUser(userId, tokenResponse) {
   await saveHackatimeTokensForUser(userId, tokenResponse);
+
+  try {
+    const me = await fetchHackatimeMe(tokenResponse.access_token);
+    const githubUsername = me?.data?.username ?? me?.username ?? null;
+    if (githubUsername) {
+      await pool.query(
+        `UPDATE users SET hackatime_github_username = $1, updated_at = NOW() WHERE id = $2`,
+        [githubUsername, userId]
+      );
+    }
+  } catch (error) {
+    console.error("[hackatime] failed to fetch /me for GitHub username:", {
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   return refreshUserHackatimeCache(userId, tokenResponse.access_token);
 }
 
