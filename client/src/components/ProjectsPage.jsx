@@ -410,7 +410,7 @@ export function ProjectsPage() {
               </div>
               <div className="projects-page__meta-chip">
                 <img src={hoursBtn} alt="" aria-hidden="true" />
-                <span>{project.totalHours || 0} hours</span>
+                <span>{project.combinedHours || 0} hours</span>
               </div>
             </div>
           </button>
