@@ -1,7 +1,7 @@
 import { pool } from "./db.js";
 import { persistProjectAirtableRecordId, syncProjectToAirtable } from "./airtableProjects.js";
 import { syncJournalEntryToAirtable } from "./airtableJournals.js";
-import { submitProjectToYsws } from "./airtableYsws.js";
+import { ensureYswsProjectSubmissionsTable, submitProjectToYsws } from "./airtableYsws.js";
 import { fetchHackatimeProjects, sumHackatimeHoursForNames } from "./hackatimeAuth.js";
 
 export async function ensureProjectsTable() {
@@ -128,6 +128,7 @@ export async function ensureProjectsTable() {
   }
 
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_journal_entries_user_project ON journal_entries(user_id, project_id)`);
+  await ensureYswsProjectSubmissionsTable();
 }
 
 export async function listProjectsForUser(userId) {
@@ -290,6 +291,7 @@ export async function shipProjectForUser(userId, projectId) {
 
   const row = result.rows[0];
   await trySyncProjectToAirtable(row.id);
+  await trySubmitProjectToYsws(row.id);
   return toPublicProject(row);
 }
 
@@ -448,7 +450,7 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
     await client.query("COMMIT");
 
     await trySyncProjectToAirtable(approvedRow.id);
-    await trySubmitProjectToYsws(approvedRow.id, { forceCreate: true });
+    await trySubmitProjectToYsws(approvedRow.id);
 
     return {
       project: toPublicProject(approvedRow),
@@ -500,6 +502,7 @@ export async function rejectAdminReviewProject(adminId, projectId, input = {}) {
 
   const row = result.rows[0];
   await trySyncProjectToAirtable(row.id);
+  await trySubmitProjectToYsws(row.id);
   return toPublicProject(row);
 }
 
@@ -544,6 +547,7 @@ export async function blockAdminReviewProject(adminId, projectId, input = {}) {
   }
 
   await trySyncProjectToAirtable(row.id);
+  await trySubmitProjectToYsws(row.id);
   return toPublicProject(row);
 }
 
@@ -946,6 +950,7 @@ async function trySubmitProjectToYsws(projectId, options = {}) {
       console.log("[projects] Airtable YSWS submit:", {
         projectId,
         recordId: result.recordId,
+        status: result.status,
         created: result.created,
       });
     }
