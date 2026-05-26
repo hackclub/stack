@@ -117,6 +117,22 @@ function getShipLockReason(project) {
   return missing.length ? `Locked: ${missing.join(", ")}.` : "";
 }
 
+function formatHours(value) {
+  return Number(value ?? 0).toFixed(2);
+}
+
+function getLoggedHours(project) {
+  return Number(project.combinedHours ?? project.totalHours ?? project.journalHours ?? 0);
+}
+
+function getApprovedBankedHours(project) {
+  return Math.max(Number(project.approvedHours ?? 0), Number(project.pastApprovedHours ?? 0));
+}
+
+function getUnshippedHours(project) {
+  return Math.max(0, Number((getLoggedHours(project) - getApprovedBankedHours(project)).toFixed(2)));
+}
+
 export function ProjectsPage() {
   const { user } = useAuth();
   const [projects, setProjects] = useState([]);
@@ -490,6 +506,7 @@ export function ProjectsPage() {
 
 function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDelete }) {
   const shipLockReason = getShipLockReason(project);
+  const unshippedHours = getUnshippedHours(project);
 
   return (
     <div className="projects-page__modal-overlay" role="presentation" onClick={onClose}>
@@ -518,19 +535,23 @@ function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDe
         </div>
         <div className="projects-page__modal-row">
           <span>Hours logged (combined)</span>
-          <strong>{project.combinedHours ?? project.totalHours ?? 0}</strong>
+          <strong>{formatHours(getLoggedHours(project))}</strong>
         </div>
         <div className="projects-page__modal-row">
           <span>Hours approved</span>
-          <strong>{project.approvedHours || 0}</strong>
+          <strong>{formatHours(getApprovedBankedHours(project))}</strong>
+        </div>
+        <div className="projects-page__modal-row">
+          <span>Unshipped hours</span>
+          <strong>{formatHours(unshippedHours)}</strong>
         </div>
         <div className="projects-page__modal-row">
           <span>Journal hours</span>
-          <strong>{project.journalHours || 0}</strong>
+          <strong>{formatHours(project.journalHours)}</strong>
         </div>
         <div className="projects-page__modal-row">
           <span>Hackatime hours</span>
-          <strong>{project.hackatimeHours || 0}</strong>
+          <strong>{formatHours(project.hackatimeHours)}</strong>
         </div>
         <div className="projects-page__modal-row">
           <span>Hackatime projects</span>

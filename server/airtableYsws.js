@@ -129,8 +129,12 @@ function totalLoggedHours(project) {
   return roundedHours(numberOrZero(project.total_hours) + numberOrZero(project.hackatime_hours));
 }
 
+function approvedBankedHours(project) {
+  return roundedHours(Math.max(numberOrZero(project.past_approved_hours), numberOrZero(project.approved_hours)));
+}
+
 function pendingHours(project) {
-  return Math.max(0, roundedHours(totalLoggedHours(project) - numberOrZero(project.past_approved_hours)));
+  return Math.max(0, roundedHours(totalLoggedHours(project) - approvedBankedHours(project)));
 }
 
 function yswsStatusForProject(project) {
