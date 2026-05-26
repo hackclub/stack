@@ -86,6 +86,11 @@ export async function ensureProjectsTable() {
   await pool.query("ALTER TABLE projects DROP COLUMN IF EXISTS github_username");
   await pool.query(`UPDATE projects SET reviewed = FALSE WHERE reviewed IS NULL`);
   await pool.query(`UPDATE projects SET past_approved_hours = COALESCE(approved_hours, 0) WHERE past_approved_hours IS NULL`);
+  await pool.query(`
+    UPDATE projects
+    SET past_approved_hours = GREATEST(COALESCE(past_approved_hours, 0), COALESCE(approved_hours, 0))
+    WHERE COALESCE(past_approved_hours, 0) < COALESCE(approved_hours, 0)
+  `);
   await pool.query(`UPDATE projects SET bricks_earned = 0 WHERE bricks_earned IS NULL`);
   await pool.query(`UPDATE projects SET fraud_flag = FALSE WHERE fraud_flag IS NULL`);
   await pool.query(`UPDATE projects SET ship_kind = 'initial' WHERE ship_kind IS NULL`);
@@ -404,7 +409,7 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
     if (!project.shipped) throw new Error("Project is not in the review queue.");
     if (project.reviewed && project.status === "approved") throw new Error("Project is already approved.");
 
-    const bankedHours = roundedHours(project.past_approved_hours);
+    const bankedHours = approvedBankedHours(project);
     const totalLoggedHours = loggedHours(project);
     const pendingCap = pendingReviewHours(project);
     if (approvedHours > pendingCap) {
@@ -941,8 +946,12 @@ function loggedHours(row) {
   return roundedHours(numberOrZero(row.journal_hours ?? row.total_hours) + numberOrZero(row.hackatime_hours));
 }
 
+function approvedBankedHours(row) {
+  return roundedHours(Math.max(numberOrZero(row.past_approved_hours), numberOrZero(row.approved_hours)));
+}
+
 function pendingReviewHours(row) {
-  return Math.max(0, roundedHours(loggedHours(row) - numberOrZero(row.past_approved_hours)));
+  return Math.max(0, roundedHours(loggedHours(row) - approvedBankedHours(row)));
 }
 
 async function getProjectRowForAirtableSync(projectId) {
@@ -1034,7 +1043,7 @@ function toPublicProject(row) {
     combinedHours: Number((journalHours + hackatimeHours).toFixed(2)),
     baselineHours: row.baseline_hours != null ? Number(row.baseline_hours) : null,
     approvedHours: Number(row.approved_hours ?? 0),
-    pastApprovedHours: Number(row.past_approved_hours ?? 0),
+    pastApprovedHours: approvedBankedHours(row),
     bricksEarned: Number(row.bricks_earned ?? 0),
     adminFeedback: row.admin_feedback,
     hourJustification: row.hour_justification,
