@@ -22,6 +22,15 @@ function slackJoeToolUrl(slackId) {
   return `https://joe.fraud.hackclub.com/profile/${encodeURIComponent(id)}`;
 }
 
+function clampApprovalHours(value, maxHours) {
+  if (value === "") return "";
+  const numeric = Number.parseFloat(value);
+  if (!Number.isFinite(numeric)) return value;
+  if (numeric < 0) return "0";
+  if (Number.isFinite(maxHours) && numeric > maxHours) return maxHours.toFixed(2);
+  return value;
+}
+
 export function AdminReviewPage({ projectId }) {
   if (projectId) return <AdminReviewDetail projectId={projectId} />;
   return <AdminReviewIndex />;
@@ -114,6 +123,7 @@ function AdminReviewIndex() {
               <option value="any">Any status</option>
               <option value="draft">Draft</option>
               <option value="in-review">In review</option>
+              <option value="pending-reship">Pending reship</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
             </select>
@@ -232,6 +242,13 @@ function AdminReviewDetail({ projectId }) {
       return;
     }
 
+    const newHoursMax = Number(project.pendingReviewHours ?? 0);
+    const requestedApprovedHours = Number.parseFloat(approvedHours) || 0;
+    if (selectedAction === "approve" && requestedApprovedHours > newHoursMax) {
+      setMessage(`Approval cannot exceed ${formatHours(newHoursMax)} new hours.`);
+      return;
+    }
+
     const endpoint =
       selectedAction === "reject"
         ? `/api/admin/review/projects/${project.id}/reject`
@@ -303,6 +320,8 @@ function AdminReviewDetail({ projectId }) {
   const isAlreadyReviewed = project.reviewed || project.status === "approved";
   const joeUrl = slackJoeToolUrl(project.user?.slackId);
   const isSuperadmin = user?.role === "superadmin";
+  const newHoursMax = Number(project.pendingReviewHours ?? 0);
+  const newHoursPlaceholder = formatHours(newHoursMax);
 
   return (
     <main className="admin-review-page">
@@ -385,15 +404,21 @@ function AdminReviewDetail({ projectId }) {
               <strong>{formatHours(project.pastApprovedHours)} h</strong>
             </div>
             <div>
+              <span>New hours</span>
+              <strong>{newHoursPlaceholder} h</strong>
+            </div>
+            <div>
               <span>New hours to approve</span>
               <input
                 className="admin-review-hours-input"
                 type="number"
                 min="0"
+                max={newHoursPlaceholder}
                 step="0.25"
+                placeholder={newHoursPlaceholder}
                 value={approvedHours}
                 disabled={isAlreadyReviewed}
-                onChange={(event) => setApprovedHours(event.target.value)}
+                onChange={(event) => setApprovedHours(clampApprovalHours(event.target.value, newHoursMax))}
               />
             </div>
             <div>

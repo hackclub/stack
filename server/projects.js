@@ -254,9 +254,7 @@ export async function shipProjectForUser(userId, projectId) {
 
   const isReship = project.status === "approved" && project.reviewed;
   if (isReship) {
-    const totalLoggedHours = Number(project.total_hours ?? 0) + Number(project.hackatime_hours ?? 0);
-    const bankedHours = Number(project.past_approved_hours ?? 0);
-    const newHours = totalLoggedHours - bankedHours;
+    const newHours = pendingReviewHours(project);
     if (newHours <= 0) {
       throw new Error("No new hours to ship. Add more hours before re-shipping.");
     }
@@ -343,7 +341,12 @@ export async function listAdminReviewProjects({ shipSort = "oldest" } = {}) {
   const projects = result.rows.map(toAdminReviewProject);
   return {
     projects,
-    pendingProjects: projects.filter((project) => project.shipped && project.status === "in-review" && !project.reviewed),
+    pendingProjects: projects.filter(
+      (project) =>
+        project.shipped &&
+        (project.status === "in-review" || project.status === "pending-reship") &&
+        !project.reviewed
+    ),
   };
 }
 
@@ -381,11 +384,12 @@ export async function getAdminReviewProject(projectId) {
 export async function approveAdminReviewProject(adminId, projectId, input = {}) {
   if (!pool) throw new Error("DATABASE_URL is not set.");
 
-  const approvedHours = Number.parseFloat(input.approvedHours ?? input.approved_hours ?? 0);
+  const requestedApprovedHours = Number.parseFloat(input.approvedHours ?? input.approved_hours ?? 0);
+  const approvedHours = roundedHours(requestedApprovedHours);
   const feedback = textOrNull(input.feedback);
   const hourJustification = textOrNull(input.hourJustification ?? input.hour_justification);
 
-  if (!Number.isFinite(approvedHours) || approvedHours <= 0) {
+  if (!Number.isFinite(requestedApprovedHours) || approvedHours <= 0) {
     throw new Error("Enter a positive number of new hours to approve for this submission.");
   }
 
@@ -400,16 +404,20 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
     if (!project.shipped) throw new Error("Project is not in the review queue.");
     if (project.reviewed && project.status === "approved") throw new Error("Project is already approved.");
 
-    const bankedHours = Number(project.past_approved_hours ?? 0);
-    const totalLoggedHours = Number(project.total_hours ?? 0) + Number(project.hackatime_hours ?? 0);
-    const pendingCap = Math.max(0, totalLoggedHours - bankedHours);
-    if (approvedHours > pendingCap + 0.02) {
+    const bankedHours = roundedHours(project.past_approved_hours);
+    const totalLoggedHours = loggedHours(project);
+    const pendingCap = pendingReviewHours(project);
+    if (approvedHours > pendingCap) {
       throw new Error(`Cannot approve more new hours than the participant has logged beyond prior approvals (${pendingCap.toFixed(2)} h max).`);
     }
 
-    const newTotalApprovedHours = Number((bankedHours + approvedHours).toFixed(2));
+    const newTotalApprovedHours = roundedHours(bankedHours + approvedHours);
+    if (newTotalApprovedHours > totalLoggedHours) {
+      throw new Error(`Cannot approve ${newTotalApprovedHours.toFixed(2)} total hours because only ${totalLoggedHours.toFixed(2)} hours are logged.`);
+    }
+
     const bricksDelta = Math.ceil(approvedHours * 10);
-    const reductionHours = Math.max(0, Number((totalLoggedHours - newTotalApprovedHours).toFixed(2)));
+    const reductionHours = Math.max(0, roundedHours(totalLoggedHours - newTotalApprovedHours));
     const newCumulativeBricks = Number(project.bricks_earned ?? 0) + bricksDelta;
 
     const reviewerResult = await client.query("SELECT name, email FROM users WHERE id = $1", [adminId]);
@@ -919,6 +927,24 @@ function textOrNull(value) {
   return text ? text : null;
 }
 
+function numberOrZero(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function roundedHours(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Number(numeric.toFixed(2)) : 0;
+}
+
+function loggedHours(row) {
+  return roundedHours(numberOrZero(row.journal_hours ?? row.total_hours) + numberOrZero(row.hackatime_hours));
+}
+
+function pendingReviewHours(row) {
+  return Math.max(0, roundedHours(loggedHours(row) - numberOrZero(row.past_approved_hours)));
+}
+
 async function getProjectRowForAirtableSync(projectId) {
   if (!pool) return null;
 
@@ -1036,7 +1062,7 @@ function toAdminReviewProject(row) {
       profileImageUrl: row.user_profile_image_url,
       slackId: row.user_slack_id,
     },
-    pendingReviewHours: Math.max(0, Number(row.total_hours ?? 0) - Number(row.past_approved_hours ?? 0)),
+    pendingReviewHours: pendingReviewHours(row),
   };
 }
 
