@@ -129,8 +129,12 @@ function getApprovedBankedHours(project) {
   return Math.max(Number(project.approvedHours ?? 0), Number(project.pastApprovedHours ?? 0));
 }
 
+function getPreviouslyShippedHours(project) {
+  return Math.max(Number(project.lastShippedHours ?? 0), getApprovedBankedHours(project));
+}
+
 function getUnshippedHours(project) {
-  return Math.max(0, Number((getLoggedHours(project) - getApprovedBankedHours(project)).toFixed(2)));
+  return Math.max(0, Number((getLoggedHours(project) - getPreviouslyShippedHours(project)).toFixed(2)));
 }
 
 export function ProjectsPage() {
