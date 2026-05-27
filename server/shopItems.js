@@ -80,6 +80,15 @@ export async function ensureShopItemsTable() {
   `);
 
   await pool.query(`
+    ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 1
+  `);
+  await pool.query(`
+    ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS shipping_tax_usd NUMERIC(10, 2)
+  `);
+  await pool.query(`
+    ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS total_bricks NUMERIC(10, 2) NOT NULL DEFAULT 0
+  `);
+  await pool.query(`
     ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS fulfilled BOOLEAN NOT NULL DEFAULT FALSE
   `);
   await pool.query(`
