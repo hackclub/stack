@@ -12,6 +12,7 @@ const SHOP_ITEM_COLUMNS = [
   "max_per_person",
   "price_usd",
   "dollar_per_hour",
+  "discount_percent",
   "airtable_id",
   "synced_at",
 ];
@@ -47,6 +48,7 @@ export async function ensureShopItemsTable() {
       max_per_person INTEGER,
       price_usd NUMERIC(10, 2),
       dollar_per_hour NUMERIC(10, 2),
+      discount_percent NUMERIC(5, 2),
       airtable_id VARCHAR,
       synced_at DATE
     )
@@ -121,6 +123,7 @@ async function ensureShopItemColumn(column) {
     max_per_person: "INTEGER",
     price_usd: "NUMERIC(10, 2)",
     dollar_per_hour: "NUMERIC(10, 2)",
+    discount_percent: "NUMERIC(5, 2)",
     airtable_id: "VARCHAR",
     synced_at: "DATE",
   };
@@ -149,10 +152,10 @@ export async function createShopItem(input) {
     `
       INSERT INTO shop_items (
         name, price, item_link, image_url, description, active, max_per_person,
-        price_usd, dollar_per_hour, airtable_id, synced_at
+        price_usd, dollar_per_hour, discount_percent, airtable_id, synced_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7,
-        $8, $9, $10, $11
+        $8, $9, $10, $11, $12
       )
       RETURNING *
     `,
@@ -178,10 +181,11 @@ export async function updateShopItem(id, input) {
         max_per_person = $7,
         price_usd = $8,
         dollar_per_hour = $9,
-        airtable_id = $10,
-        synced_at = $11,
+        discount_percent = $10,
+        airtable_id = $11,
+        synced_at = $12,
         updated_at = NOW()
-      WHERE id = $12
+      WHERE id = $13
       RETURNING *
     `,
     [...shopItemValues(values), id]
@@ -303,6 +307,7 @@ function normalizeShopItemInput(input = {}) {
     maxPerPerson: integerOrNull(input.maxPerPerson ?? input.max_per_person),
     priceUsd,
     dollarPerHour: numberOrNull(input.dollarPerHour ?? input.dollar_per_hour),
+    discountPercent: discountPercentOrNull(input.discountPercent ?? input.discount_percent),
     airtableId: textOrNull(input.airtableId ?? input.airtable_id),
     syncedAt: dateOrNull(input.syncedAt ?? input.synced_at),
   };
@@ -319,6 +324,7 @@ function shopItemValues(item) {
     item.maxPerPerson,
     item.priceUsd,
     item.dollarPerHour,
+    item.discountPercent,
     item.airtableId,
     item.syncedAt,
   ];
@@ -339,6 +345,12 @@ function numberOrNull(value) {
 function integerOrNull(value) {
   const number = numberOrNull(value);
   return number === null ? null : Math.trunc(number);
+}
+
+function discountPercentOrNull(value) {
+  const number = numberOrNull(value);
+  if (number === null || number <= 0) return null;
+  return Math.min(100, Number(number.toFixed(2)));
 }
 
 function dateOrNull(value) {
@@ -453,6 +465,7 @@ function toPublicShopItem(row) {
     maxPerPerson: row.max_per_person,
     priceUsd: row.price_usd,
     dollarPerHour: row.dollar_per_hour,
+    discountPercent: row.discount_percent,
     airtableId: row.airtable_id,
     syncedAt: row.synced_at,
   };

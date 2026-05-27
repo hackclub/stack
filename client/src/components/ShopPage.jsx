@@ -13,6 +13,17 @@ const stackTitle = "https://cdn.hackclub.com/019e3e5a-8745-7bee-a1ab-07b5743f98c
 const legoCharacter = "https://cdn.hackclub.com/019e3e5a-6d71-79f0-9633-8668b69f464d/legoChar_1.png";
 import "./ShopPage.css";
 
+function formatBricks(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.round(numeric).toString() : "0";
+}
+
+function formatDiscount(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  return Math.round(numeric);
+}
+
 export function ShopPage() {
   const { user, reload } = useAuth();
   const [shopItems, setShopItems] = useState([]);
@@ -22,7 +33,8 @@ export function ShopPage() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [purchaseQuantity, setPurchaseQuantity] = useState(1);
   const [shippingTaxUsd, setShippingTaxUsd] = useState("");
-  const [rulesAccepted, setRulesAccepted] = useState(false);
+  const [showPurchaseConfirm, setShowPurchaseConfirm] = useState(false);
+  const [isFromUsa, setIsFromUsa] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -54,7 +66,8 @@ export function ShopPage() {
     setSelectedItem(item);
     setPurchaseQuantity(1);
     setShippingTaxUsd("");
-    setRulesAccepted(false);
+    setShowPurchaseConfirm(false);
+    setIsFromUsa(false);
     setPurchaseMessage("");
   }
 
@@ -70,7 +83,7 @@ export function ShopPage() {
   const hasEnoughBricks = userBricks >= totalBricks;
 
   async function buySelectedItem() {
-    if (!selectedItem || !rulesAccepted || !hasEnoughBricks) return;
+    if (!selectedItem || !hasEnoughBricks) return;
 
     setPurchaseMessage("");
     try {
@@ -93,6 +106,7 @@ export function ShopPage() {
       });
 
       setPurchaseMessage(`Bought ${selectedItem.name}! Remaining balance: ${Math.floor(data.purchase.userBricks)} bricks.`);
+      setShowPurchaseConfirm(false);
       await reload?.();
 
       setTimeout(() => {
@@ -106,13 +120,17 @@ export function ShopPage() {
   useEffect(() => {
     function handleEscape(event) {
       if (event.key === "Escape") {
-        setSelectedItem(null);
+        if (showPurchaseConfirm) {
+          setShowPurchaseConfirm(false);
+        } else {
+          setSelectedItem(null);
+        }
       }
     }
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, []);
+  }, [showPurchaseConfirm]);
 
   return (
     <main className="shop-page" aria-label="Shop page">
@@ -121,7 +139,7 @@ export function ShopPage() {
       <PlatformStatusBar user={user} />
 
       <section className="shop-page__left-panel" aria-label="Inspiration panel">
-        <p className="shop-page__inspired">Be inspired!</p>
+        <p className="shop-page__inspired">1 hour = 20 Coins!</p>
         <img src={legoCharacter} alt="" aria-hidden="true" />
       </section>
 
@@ -129,36 +147,40 @@ export function ShopPage() {
         {status ? <p className="shop-page__status">{status}</p> : null}
         {error ? <p className="shop-page__status shop-page__status--error">{error}</p> : null}
         {!status && !error && shopItems.length === 0 ? <p className="shop-page__status">No shop items yet.</p> : null}
-        {shopItems.map((item, index) => (
-          <article className="shop-page__card" key={item.id ?? `${item.name}-${index}`}>
-            <img className="shop-page__shelf" src={shelfBox} alt="" aria-hidden="true" />
-            {item.imageUrl ? (
-              <img className="shop-page__item-image" src={item.imageUrl} alt={item.name || "Shop item"} />
-            ) : (
-              <div
-                className="shop-page__item-art"
-                role="img"
-                aria-label={item.name}
-                style={{
-                  backgroundImage: `url(${shopReference})`,
-                  backgroundPosition: `-${327 + (index % 3) * 185}px -${180 + Math.floor(index / 3) * 170}px`,
-                }}
-              />
-            )}
-            <button
-              className="shop-page__buy"
-              type="button"
-              aria-label={`Buy ${item.name}`}
-              onClick={() => openItem(item)}
-            >
-              <img src={buyBtn} alt="" aria-hidden="true" />
-            </button>
-            <span className="shop-page__cost">
-              <img src={shopCoin} alt="" aria-hidden="true" />
-              <strong>{item.price ?? "0"}</strong>
-            </span>
-          </article>
-        ))}
+        {shopItems.map((item, index) => {
+          const discount = formatDiscount(item.discountPercent);
+          return (
+            <article className="shop-page__card" key={item.id ?? `${item.name}-${index}`}>
+              <img className="shop-page__shelf" src={shelfBox} alt="" aria-hidden="true" />
+              {item.imageUrl ? (
+                <img className="shop-page__item-image" src={item.imageUrl} alt={item.name || "Shop item"} />
+              ) : (
+                <div
+                  className="shop-page__item-art"
+                  role="img"
+                  aria-label={item.name}
+                  style={{
+                    backgroundImage: `url(${shopReference})`,
+                    backgroundPosition: `-${327 + (index % 3) * 185}px -${180 + Math.floor(index / 3) * 170}px`,
+                  }}
+                />
+              )}
+              {discount ? <span className="shop-page__discount">{discount}% off!</span> : null}
+              <button
+                className="shop-page__buy"
+                type="button"
+                aria-label={`Buy ${item.name}`}
+                onClick={() => openItem(item)}
+              >
+                <img src={buyBtn} alt="" aria-hidden="true" />
+              </button>
+              <span className="shop-page__cost">
+                <img src={shopCoin} alt="" aria-hidden="true" />
+                <strong>{formatBricks(item.price)}</strong>
+              </span>
+            </article>
+          );
+        })}
       </section>
 
       <div className="shop-page__actions" aria-label="Shop pagination">
@@ -208,7 +230,7 @@ export function ShopPage() {
 
             <div className="shop-page__modal-price-row">
               <span>Item price</span>
-              <strong>{selectedItem.price ?? "0"} bricks</strong>
+              <strong>{formatBricks(selectedItem.price)} bricks</strong>
             </div>
             <div className="shop-page__modal-price-row">
               <span>USD value</span>
@@ -250,37 +272,80 @@ export function ShopPage() {
               />
             </label>
 
-            <div className="shop-page__modal-rules">
-              <strong>Shop Rules</strong>
-              <p>
-                Fulfillment will be provided as a grant/card to buy this prize. If shipping, customs, or taxes cost extra,
-                add the extra USD amount above before purchase.
-              </p>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={rulesAccepted}
-                  onChange={(event) => setRulesAccepted(event.target.checked)}
-                />
-                I have read the shop rules and understand the conditions.
-              </label>
-            </div>
-
             <div className="shop-page__modal-total">
               <span>Total</span>
-              <strong>{totalBricks} bricks · ${totalUsd.toFixed(2)}</strong>
+              <strong>{formatBricks(totalBricks)} bricks · ${totalUsd.toFixed(2)}</strong>
             </div>
 
             {!hasEnoughBricks ? (
               <p className="shop-page__modal-warning">
-                Not enough bricks. You have {Math.floor(userBricks)} bricks, but this costs {totalBricks}.
+                Not enough bricks. You have {Math.floor(userBricks)} bricks, but this costs {formatBricks(totalBricks)}.
               </p>
             ) : null}
             {purchaseMessage ? <p className="shop-page__modal-warning">{purchaseMessage}</p> : null}
 
-            <button className="shop-page__modal-buy" type="button" disabled={!rulesAccepted || !hasEnoughBricks} onClick={buySelectedItem}>
+            <button className="shop-page__modal-buy" type="button" disabled={!hasEnoughBricks} onClick={() => setShowPurchaseConfirm(true)}>
               Buy
             </button>
+
+            {showPurchaseConfirm ? (
+              <div className="shop-page__confirm-backdrop" role="presentation" onClick={() => setShowPurchaseConfirm(false)}>
+                <section
+                  className="shop-page__confirm"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Confirm purchase"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <button
+                    className="shop-page__modal-close"
+                    type="button"
+                    aria-label="Close purchase confirmation"
+                    onClick={() => setShowPurchaseConfirm(false)}
+                  >
+                    x
+                  </button>
+                  <h3>Confirm purchase</h3>
+                  <label className="shop-page__confirm-toggle">
+                    <input
+                      type="checkbox"
+                      checked={isFromUsa}
+                      onChange={(event) => setIsFromUsa(event.target.checked)}
+                    />
+                    <span>I'm from USA</span>
+                  </label>
+                  <p>
+                    {isFromUsa ? (
+                      <>
+                        The gift card will be issued through the{" "}
+                        <a href="https://www.lego.com/en-us/gift-cards/buy" target="_blank" rel="noreferrer">
+                          official LEGO online store
+                        </a>{" "}
+                        and delivered to your address. If the physical delivery doesn’t work out, we’ll instead provide a virtual gift card from the website.
+                      </>
+                    ) : (
+                      <>
+                        The Gift card will be issued virtually on the{" "}
+                        <a href="https://www.lego.com/en-us/gift-cards/buy" target="_blank" rel="noreferrer">
+                          official LEGO online store
+                        </a>
+                        . If the activation turns out not to work, we'll issue an{" "}
+                        <a href="https://hcb.hackclub.com/" target="_blank" rel="noreferrer">
+                          HCB grant
+                        </a>{" "}
+                        (prepaid Hack Club virtual card), which you can use to buy the same item in your country
+                      </>
+                    )}
+                  </p>
+                  <div className="shop-page__confirm-total">
+                    {formatBricks(totalBricks)} bricks · ${totalUsd.toFixed(2)}
+                  </div>
+                  <button className="shop-page__modal-buy" type="button" onClick={buySelectedItem}>
+                    Confirm purchase
+                  </button>
+                </section>
+              </div>
+            ) : null}
           </section>
         </div>
       )}

@@ -5,7 +5,7 @@ const emptyForm = {
   name: "",
   price: "",
   priceUsd: "",
-  dollarPerHour: "",
+  discountPercent: "",
   maxPerPerson: "",
   itemLink: "",
   imageUrl: "",
@@ -185,7 +185,7 @@ export function AdminShopPage() {
                   <th>Max / person</th>
                   <th>bricks</th>
                   <th>$ price</th>
-                  <th>$/h</th>
+                  <th>Discount</th>
                   <th>Link</th>
                   <th>Active</th>
                   <th>Actions</th>
@@ -204,7 +204,7 @@ export function AdminShopPage() {
                       <td>{item.maxPerPerson ?? "None"}</td>
                       <td>{item.price ?? "—"}</td>
                       <td>{item.priceUsd ?? "—"}</td>
-                      <td>{item.dollarPerHour ?? "—"}</td>
+                      <td>{item.discountPercent ? `${item.discountPercent}% off` : "—"}</td>
                       <td>{item.itemLink ? <a href={item.itemLink} target="_blank" rel="noreferrer">View</a> : "—"}</td>
                       <td>{item.active ? "Yes" : "No"}</td>
                       <td>
@@ -268,17 +268,20 @@ function ShopItemForm({ value, submitLabel, onChange, onSubmit }) {
         />
       </label>
       <label>
-        $/h *
-        <input
-          type="number"
-          step="0.01"
-          value={value.dollarPerHour || ""}
-          onChange={(event) => onChange("dollarPerHour", event.target.value)}
-        />
-      </label>
-      <label>
         bricks
         <input type="number" value={brickValue || ""} readOnly />
+      </label>
+      <label>
+        Discount %
+        <input
+          type="number"
+          min="0"
+          max="100"
+          step="1"
+          placeholder="25"
+          value={value.discountPercent || ""}
+          onChange={(event) => onChange("discountPercent", event.target.value)}
+        />
       </label>
       <label>
         Max purchases per person
