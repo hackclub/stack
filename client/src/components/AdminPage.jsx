@@ -8,12 +8,16 @@ const adminLinks = [
   { href: "/admin/review", icon: "📋", title: "Project Review", desc: "Review shipped projects and approve hours" },
   { href: "/admin/shop", icon: "🛒", title: "Shop Admin", desc: "Manage catalog, categories, and pricing" },
   { href: "/admin/shop/orders", icon: "📦", title: "Shop orders", desc: "Fulfillment queue, group by user or item, refunds" },
+];
+
+const superAdminLinks = [
   { href: "/admin/airtable_sync", icon: "🔄", title: "Airtable Sync", desc: "Sync status, logs, and diagnostics" },
 ];
 
 export function AdminPage() {
   const { user } = useAuth();
   const showSuperAdmin = user?.role === "superadmin";
+  const links = showSuperAdmin ? [...adminLinks, ...superAdminLinks] : adminLinks;
 
   return (
     <main className="admin-page" aria-label="Admin page">
@@ -24,7 +28,7 @@ export function AdminPage() {
         <h1>Admin Panel</h1>
 
         <div className="admin-links">
-          {adminLinks.map((item) => (
+          {links.map((item) => (
             <a key={item.href} href={item.href} className="admin-link">
               <span className="admin-link-icon" aria-hidden="true">
                 {item.icon}

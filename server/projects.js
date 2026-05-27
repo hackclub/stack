@@ -363,14 +363,10 @@ export async function listAdminReviewProjects({ shipSort = "oldest" } = {}) {
   `);
 
   const projects = result.rows.map(toAdminReviewProject);
+  const pendingProjects = projects.filter(isPendingReviewProject);
   return {
-    projects,
-    pendingProjects: projects.filter(
-      (project) =>
-        project.shipped &&
-        (project.status === "in-review" || project.status === "pending-reship") &&
-        !project.reviewed
-    ),
+    projects: projects.filter((project) => !isPendingReviewProject(project)),
+    pendingProjects,
   };
 }
 
@@ -733,7 +729,7 @@ export async function getJournalEntriesCsv() {
       journal_entries.*,
       projects.name AS current_project_name,
       users.email AS user_email,
-      users.username AS user_display_name
+      COALESCE(users.name, users.slug) AS user_display_name
     FROM journal_entries
     LEFT JOIN projects ON projects.id = journal_entries.project_id
     LEFT JOIN users ON users.id = journal_entries.user_id
@@ -1126,6 +1122,16 @@ function toAdminReviewProject(row) {
   };
 }
 
+function isPendingReviewProject(project) {
+  if (project.reviewed) return false;
+
+  const status = String(project.status || "").toLowerCase();
+  if (status === "in-review" && project.shipped) return true;
+  if (status === "pending-reship") return true;
+
+  return project.shipped && project.shipKind === "reship";
+}
+
 function getShipMissingRequirements(project) {
   const missing = [];
   // Block shipping only if already shipped but not in a valid state for re-shipping
@@ -1178,5 +1184,6 @@ function csvCell(value) {
 
 function toIsoString(value) {
   if (!value) return "";
-  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
 }
