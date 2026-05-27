@@ -109,7 +109,16 @@ export async function getAdminStats() {
         COUNT(*) FILTER (WHERE status = 'rejected')::int AS rejected,
         COALESCE(SUM(total_hours), 0) AS total_hours,
         COALESCE(SUM(approved_hours), 0) AS approved_hours,
-        COALESCE(SUM(total_hours) FILTER (WHERE status = 'in-review'), 0) AS pending_review_hours
+        COALESCE(SUM(
+          GREATEST(
+            COALESCE(total_hours, 0) + COALESCE(hackatime_hours, 0) - GREATEST(
+              COALESCE(last_shipped_hours, 0),
+              COALESCE(past_approved_hours, 0),
+              COALESCE(approved_hours, 0)
+            ),
+            0
+          )
+        ) FILTER (WHERE status IN ('in-review', 'pending-reship')), 0) AS pending_review_hours
       FROM projects
     `),
     pool.query(`

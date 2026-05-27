@@ -35,6 +35,7 @@ export async function ensureProjectsTable() {
       shipped_at TIMESTAMPTZ,
       fraud_flag BOOLEAN NOT NULL DEFAULT FALSE,
       baseline_hours NUMERIC(10, 2),
+      last_shipped_hours NUMERIC(10, 2) NOT NULL DEFAULT 0,
       hackatime_hours NUMERIC(10, 2) NOT NULL DEFAULT 0,
       airtable_record_id TEXT,
       ysws_record_id TEXT,
@@ -69,6 +70,7 @@ export async function ensureProjectsTable() {
     shipped_at: "TIMESTAMPTZ",
     fraud_flag: "BOOLEAN NOT NULL DEFAULT FALSE",
     baseline_hours: "NUMERIC(10, 2)",
+    last_shipped_hours: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
     hackatime_hours: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
     airtable_record_id: "TEXT",
     ysws_record_id: "TEXT",
@@ -95,6 +97,21 @@ export async function ensureProjectsTable() {
   await pool.query(`UPDATE projects SET fraud_flag = FALSE WHERE fraud_flag IS NULL`);
   await pool.query(`UPDATE projects SET ship_kind = 'initial' WHERE ship_kind IS NULL`);
   await pool.query(`UPDATE projects SET blocked = FALSE WHERE blocked IS NULL`);
+  await pool.query(`
+    UPDATE projects
+    SET last_shipped_hours = GREATEST(
+      COALESCE(last_shipped_hours, 0),
+      COALESCE(baseline_hours, 0),
+      COALESCE(past_approved_hours, 0),
+      COALESCE(approved_hours, 0)
+    )
+    WHERE COALESCE(last_shipped_hours, 0) = 0
+      AND (
+        status IN ('approved', 'pending-reship', 'reship-rejected')
+        OR COALESCE(past_approved_hours, 0) > 0
+        OR COALESCE(approved_hours, 0) > 0
+      )
+  `);
 
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_projects_user_name_lower ON projects(user_id, LOWER(name))`);
@@ -257,7 +274,9 @@ export async function shipProjectForUser(userId, projectId) {
     throw new Error(`Cannot ship yet: ${missing.join(", ")}.`);
   }
 
-  const isReship = project.status === "approved" && project.reviewed;
+  const isReship =
+    (project.status === "approved" && project.reviewed) ||
+    project.status === "reship-rejected";
   if (isReship) {
     const newHours = pendingReviewHours(project);
     if (newHours <= 0) {
@@ -447,7 +466,8 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
           ship_kind = 'initial',
           approved_hours = $2,
           past_approved_hours = $2,
-          baseline_hours = COALESCE(baseline_hours, total_hours),
+          baseline_hours = COALESCE(baseline_hours, $7),
+          last_shipped_hours = $7,
           hour_justification = $3,
           admin_feedback = $4,
           bricks_earned = $5,
@@ -455,7 +475,7 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
         WHERE id = $6
         RETURNING *, total_hours AS journal_hours
       `,
-      [adminId, newTotalApprovedHours, finalJustification, feedback, newCumulativeBricks, projectId]
+      [adminId, newTotalApprovedHours, finalJustification, feedback, newCumulativeBricks, projectId, totalLoggedHours]
     );
     const approvedRow = updatedProjectResult.rows[0];
 
@@ -486,37 +506,57 @@ export async function rejectAdminReviewProject(adminId, projectId, input = {}) {
     throw new Error("Rejection requires a written comment (what to fix before resubmitting).");
   }
 
-  const lookup = await pool.query("SELECT ship_kind FROM projects WHERE id = $1", [projectId]);
-  const isReship = lookup.rows[0]?.ship_kind === "reship";
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await refreshProjectJournalHoursWithClient(client, projectId);
 
-  const result = await pool.query(
-    `
-      UPDATE projects
-      SET
-        shipped = FALSE,
-        shipped_at = NULL,
-        reviewed = TRUE,
-        reviewed_at = NOW(),
-        reviewed_by_user_id = $1,
-        status = $4,
-        ship_kind = 'initial',
-        admin_feedback = $2,
-        updated_at = NOW()
-      WHERE id = $3
-        AND shipped IS TRUE
-      RETURNING *, total_hours AS journal_hours
-    `,
-    [adminId, feedback, projectId, isReship ? "reship-rejected" : "rejected"]
-  );
+    const lookup = await client.query("SELECT ship_kind FROM projects WHERE id = $1 FOR UPDATE", [projectId]);
+    const isReship = lookup.rows[0]?.ship_kind === "reship";
 
-  if (!result.rows[0]) {
-    throw new Error("Project is not in the review queue.");
+    const result = await client.query(
+      `
+        UPDATE projects
+        SET
+          shipped = FALSE,
+          shipped_at = NULL,
+          reviewed = TRUE,
+          reviewed_at = NOW(),
+          reviewed_by_user_id = $1,
+          status = $4,
+          ship_kind = 'initial',
+          admin_feedback = $2,
+          last_shipped_hours = CASE
+            WHEN $5 THEN GREATEST(
+              COALESCE(last_shipped_hours, 0),
+              COALESCE(total_hours, 0) + COALESCE(hackatime_hours, 0)
+            )
+            ELSE last_shipped_hours
+          END,
+          updated_at = NOW()
+        WHERE id = $3
+          AND shipped IS TRUE
+        RETURNING *, total_hours AS journal_hours
+      `,
+      [adminId, feedback, projectId, isReship ? "reship-rejected" : "rejected", isReship]
+    );
+
+    if (!result.rows[0]) {
+      throw new Error("Project is not in the review queue.");
+    }
+
+    await client.query("COMMIT");
+
+    const row = result.rows[0];
+    await trySyncProjectToAirtable(row.id);
+    await trySubmitProjectToYsws(row.id);
+    return toPublicProject(row);
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
-
-  const row = result.rows[0];
-  await trySyncProjectToAirtable(row.id);
-  await trySubmitProjectToYsws(row.id);
-  return toPublicProject(row);
 }
 
 export async function blockAdminReviewProject(adminId, projectId, input = {}) {
@@ -950,8 +990,12 @@ function approvedBankedHours(row) {
   return roundedHours(Math.max(numberOrZero(row.past_approved_hours), numberOrZero(row.approved_hours)));
 }
 
+function previouslyShippedHours(row) {
+  return roundedHours(Math.max(numberOrZero(row.last_shipped_hours), approvedBankedHours(row)));
+}
+
 function pendingReviewHours(row) {
-  return Math.max(0, roundedHours(loggedHours(row) - approvedBankedHours(row)));
+  return Math.max(0, roundedHours(loggedHours(row) - previouslyShippedHours(row)));
 }
 
 async function getProjectRowForAirtableSync(projectId) {
@@ -1042,6 +1086,7 @@ function toPublicProject(row) {
     hackatimeHours,
     combinedHours: Number((journalHours + hackatimeHours).toFixed(2)),
     baselineHours: row.baseline_hours != null ? Number(row.baseline_hours) : null,
+    lastShippedHours: previouslyShippedHours(row),
     approvedHours: Number(row.approved_hours ?? 0),
     pastApprovedHours: approvedBankedHours(row),
     bricksEarned: Number(row.bricks_earned ?? 0),

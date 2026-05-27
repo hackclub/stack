@@ -133,8 +133,12 @@ function approvedBankedHours(project) {
   return roundedHours(Math.max(numberOrZero(project.past_approved_hours), numberOrZero(project.approved_hours)));
 }
 
+function previouslyShippedHours(project) {
+  return roundedHours(Math.max(numberOrZero(project.last_shipped_hours), approvedBankedHours(project)));
+}
+
 function pendingHours(project) {
-  return Math.max(0, roundedHours(totalLoggedHours(project) - approvedBankedHours(project)));
+  return Math.max(0, roundedHours(totalLoggedHours(project) - previouslyShippedHours(project)));
 }
 
 function yswsStatusForProject(project) {
