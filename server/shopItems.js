@@ -25,6 +25,8 @@ const REMOVED_SHOP_ITEM_COLUMNS = [
   "position",
 ];
 
+const REMOVED_SHOP_ORDER_COLUMNS = ["total_coins"];
+
 export async function ensureShopItemsTable() {
   if (!pool) {
     console.warn("[shop] DATABASE_URL not set; skipping shop_items table setup.");
@@ -94,6 +96,10 @@ export async function ensureShopItemsTable() {
   await pool.query(`
     ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
   `);
+
+  for (const column of REMOVED_SHOP_ORDER_COLUMNS) {
+    await pool.query(`ALTER TABLE shop_orders DROP COLUMN IF EXISTS ${column}`);
+  }
 }
 
 async function ensureShopItemColumn(column) {
