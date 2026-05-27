@@ -209,7 +209,7 @@ function buildFieldsFromSubmission(submission) {
     [F.zip]: submission.zip || undefined,
     [F.birthday]: airtableDate(submission.birthday),
     [F.overrideHours]: roundedHours(submission.override_hours),
-    [F.overrideHoursJustification]: submission.override_hours_justification || undefined,
+    [F.overrideHoursJustification]: submission.override_hours_justification || null,
     [F.status]: submission.status,
   };
 

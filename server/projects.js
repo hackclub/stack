@@ -307,7 +307,7 @@ export async function shipProjectForUser(userId, projectId) {
       projectId,
       isReship ? "pending-reship" : "in-review",
       isReship ? "reship" : "initial",
-      buildDefaultJustificationTemplate(),
+      null,
     ]
   );
 
@@ -322,21 +322,23 @@ export function buildDefaultJustificationTemplate({
   totalHours = null,
   reductionHours = null,
   reviewerName = null,
+  shippingDate = null,
 } = {}) {
-  const approved = approvedHours != null ? `${Number(approvedHours).toFixed(2)} h` : "<approved_hours> h";
-  const total = totalHours != null ? `${Number(totalHours).toFixed(2)} h` : "<tot_hours> h";
-  const reduction = reductionHours != null ? `${Number(reductionHours).toFixed(2)} h` : "<red_hours> h";
-  const reviewer = reviewerName || "<reviewer>";
+  const approved = approvedHours != null ? Number(approvedHours).toFixed(2) : "<tot_approved_hours>";
+  const total = totalHours != null ? Number(totalHours).toFixed(2) : "<tot_logged_hours>";
+  const reduction = reductionHours != null ? Number(reductionHours).toFixed(2) : "<red_hours>";
+  const reviewer = reviewerName || "<reviewer_name>";
+  const shipped = formatJustificationDate(shippingDate) || "<shipping_date>";
 
   return [
     "The project includes [leave empty, I'll manually enter this].",
-    "The commit history shows [leave empty, I'll manually enter this] commits. 3.5 hours is consistent with this scope.",
-    "Hackatime project user analyzed from 02/13/26 to 05/14/26 shows 6.86 hours tracked. The heartbeat pattern is consistent with active development.",
+    `The commit history shows [leave empty, I'll manually enter this] commits. ${approved} hours is consistent with this scope.`,
+    `Hackatime project user analyzed from 05/28/26 to ${shipped} shows ${total} hours tracked. The heartbeat pattern is consistent with active development.`,
     "",
-    `Total hours approved (cumulative on this project): ${approved}.`,
-    `>Total logged at review (Hackatime + journal): ${total}.`,
-    `>Reduction from logged: ${reduction} less approved than logged.`,
-    `>Project reviewed by ${reviewer}. Demo and repository looked solid, including heartbeats.`,
+    `Total hours approved (cumulative on this project): ${approved} h.`,
+    `Total logged at review (Hackatime + journal): ${total} h.`,
+    `Reduction from logged: ${reduction}h less approved than logged.`,
+    `Project reviewed by ${reviewer}. Demo and repository looked solid, including heartbeats.`,
   ].join("\n");
 }
 
@@ -407,8 +409,6 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
   const requestedApprovedHours = Number.parseFloat(input.approvedHours ?? input.approved_hours ?? 0);
   const approvedHours = roundedHours(requestedApprovedHours);
   const feedback = textOrNull(input.feedback);
-  const hourJustification = textOrNull(input.hourJustification ?? input.hour_justification);
-
   if (!Number.isFinite(requestedApprovedHours) || approvedHours <= 0) {
     throw new Error("Enter a positive number of new hours to approve for this submission.");
   }
@@ -442,14 +442,13 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
 
     const reviewerResult = await client.query("SELECT name, email FROM users WHERE id = $1", [adminId]);
     const reviewerName = reviewerResult.rows[0]?.name || reviewerResult.rows[0]?.email || "<reviewer>";
-    const finalJustification =
-      hourJustification ||
-      buildDefaultJustificationTemplate({
-        approvedHours: newTotalApprovedHours,
-        totalHours: totalLoggedHours,
-        reductionHours,
-        reviewerName,
-      });
+    const finalJustification = buildDefaultJustificationTemplate({
+      approvedHours: newTotalApprovedHours,
+      totalHours: totalLoggedHours,
+      reductionHours,
+      reviewerName,
+      shippingDate: project.shipped_at,
+    });
 
     const updatedProjectResult = await client.query(
       `
@@ -1186,4 +1185,15 @@ function toIsoString(value) {
   if (!value) return "";
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
+function formatJustificationDate(value) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const year = String(date.getUTCFullYear()).slice(-2);
+  return `${month}/${day}/${year}`;
 }
