@@ -297,9 +297,10 @@ function safeHttpUrl(value) {
 
 function normalizeShopItemInput(input = {}) {
   const priceUsd = numberOrNull(input.priceUsd ?? input.price_usd);
+  const price = integerOrNull(input.price);
   return {
     name: textOrNull(input.name),
-    price: priceUsd === null ? integerOrNull(input.price) : Math.ceil(priceUsd * 10),
+    price: price ?? (priceUsd === null ? null : Math.ceil(priceUsd * 10)),
     itemLink: safeHttpUrl(input.itemLink ?? input.item_link),
     imageUrl: safeHttpUrl(input.imageUrl ?? input.image_url),
     description: textOrNull(input.description),

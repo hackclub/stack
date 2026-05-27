@@ -250,8 +250,6 @@ export function AdminShopPage() {
 }
 
 function ShopItemForm({ value, submitLabel, onChange, onSubmit }) {
-  const brickValue = value.priceUsd ? Math.ceil(Number(value.priceUsd) * 10) : 0;
-
   return (
     <form className="admin-shop-form" onSubmit={onSubmit}>
       <label>
@@ -269,7 +267,7 @@ function ShopItemForm({ value, submitLabel, onChange, onSubmit }) {
       </label>
       <label>
         bricks
-        <input type="number" value={brickValue || ""} readOnly />
+        <input type="number" min="0" step="1" value={value.price || ""} onChange={(event) => onChange("price", event.target.value)} />
       </label>
       <label>
         Discount %
