@@ -249,9 +249,44 @@
 }
 
 /* Order groups */
+.admin-shop-order-controls {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+}
+
+.admin-shop-order-controls label {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 180px;
+  color: rgba(232, 244, 255, 0.85);
+  font-weight: 700;
+}
+
+.admin-shop-order-controls select {
+  border: 2px solid #4bb3ff;
+  border-radius: 10px;
+  padding: 0.65rem 0.8rem;
+  background: rgba(10, 22, 60, 0.78);
+  color: #e8f4ff;
+  font: inherit;
+}
+
+.admin-shop-order-count {
+  margin-left: auto;
+  border: 2px solid rgba(247, 207, 87, 0.65);
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  background: rgba(247, 207, 87, 0.16);
+  color: #fff3b2;
+  font-weight: 800;
+}
+
 .admin-shop-orders {
   display: grid;
-  gap: 2rem;
+  gap: 1.2rem;
 }
 
 .admin-shop-order-group {
@@ -266,6 +301,94 @@
   color: #f7cf57;
   font-size: 1.1rem;
   word-break: break-word;
+}
+
+.admin-shop-order-cards {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.admin-shop-order-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 1rem;
+  padding: 1.2rem;
+  border: 2px solid rgba(247, 207, 87, 0.55);
+  border-radius: 14px;
+  background: rgba(9, 21, 52, 0.55);
+}
+
+.admin-shop-order-card.is-fulfilled,
+.admin-shop-order-card.is-rejected {
+  opacity: 0.72;
+}
+
+.admin-shop-order-card-main h2 {
+  margin: 0.5rem 0 0.25rem;
+  color: #f5f5f5;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+}
+
+.admin-shop-order-card-main p {
+  margin: 0 0 0.85rem;
+  color: rgba(232, 244, 255, 0.9);
+  font-weight: 700;
+}
+
+.admin-shop-order-money,
+.admin-shop-order-customer {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.75rem 0;
+  padding: 0.8rem;
+  border: 1px solid rgba(75, 179, 255, 0.28);
+  border-radius: 10px;
+  background: rgba(3, 12, 32, 0.42);
+  color: #e8f4ff;
+}
+
+.admin-shop-order-customer strong {
+  color: #f7cf57;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-shop-order-card footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  color: rgba(232, 244, 255, 0.65);
+  font-size: 0.9rem;
+}
+
+.admin-shop-order-card-actions {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+}
+
+.admin-shop-order-card-actions button {
+  border: 2px solid rgba(129, 199, 132, 0.65);
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  background: rgba(46, 125, 50, 0.8);
+  color: #f3fff5;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(6, 35, 20, 0.45);
+}
+
+.admin-shop-order-card-actions button.danger {
+  border-color: rgba(255, 138, 171, 0.65);
+  background: rgba(160, 44, 58, 0.85);
+  color: #fff3f5;
+}
+
+.admin-shop-order-card-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+  box-shadow: none;
 }
 
 .admin-shop-orders-table {
@@ -325,6 +448,12 @@
   border: 1px solid rgba(76, 175, 80, 0.5);
 }
 
+.status-badge.rejected {
+  background: rgba(255, 138, 171, 0.22);
+  color: #ffb0c4;
+  border: 1px solid rgba(255, 138, 171, 0.5);
+}
+
 .admin-shop-fulfill-btn {
   border: 3px dashed rgba(109, 104, 98, 0.85);
   border-radius: 8px;
@@ -357,9 +486,18 @@
   }
 
   .admin-shop-table-header,
-  .admin-shop-orders-link {
+  .admin-shop-orders-link,
+  .admin-shop-order-controls {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .admin-shop-order-count {
+    margin-left: 0;
+  }
+
+  .admin-shop-order-card {
+    grid-template-columns: 1fr;
   }
 
   .admin-shop-orders-table {

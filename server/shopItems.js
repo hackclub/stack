@@ -94,6 +94,12 @@ export async function ensureShopItemsTable() {
     ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS fulfilled BOOLEAN NOT NULL DEFAULT FALSE
   `);
   await pool.query(`
+    ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS rejected BOOLEAN NOT NULL DEFAULT FALSE
+  `);
+  await pool.query(`
+    ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMP(6) WITHOUT TIME ZONE
+  `);
+  await pool.query(`
     ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
   `);
 
@@ -348,12 +354,16 @@ export async function listShopOrders() {
       o.id,
       o.user_id,
       u.email,
+      u.name,
       o.item_id,
       i.name as item_name,
+      i.price as item_bricks,
+      i.price_usd as item_price_usd,
       o.quantity,
       o.shipping_tax_usd,
       o.total_bricks,
       o.fulfilled,
+      o.rejected,
       o.created_at
     FROM shop_orders o
     JOIN users u ON o.user_id = u.id
@@ -372,12 +382,61 @@ export async function markShopOrderFulfilled(orderId) {
       UPDATE shop_orders
       SET fulfilled = TRUE, updated_at = NOW()
       WHERE id = $1
+        AND rejected IS NOT TRUE
       RETURNING *
     `,
     [orderId]
   );
 
   return result.rows[0] ? toPublicShopOrder(result.rows[0]) : null;
+}
+
+export async function rejectShopOrderWithRefund(orderId) {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const orderResult = await client.query(
+      `
+        SELECT *
+        FROM shop_orders
+        WHERE id = $1
+        FOR UPDATE
+      `,
+      [orderId]
+    );
+    const order = orderResult.rows[0];
+    if (!order) throw new Error("Order not found.");
+    if (order.fulfilled) throw new Error("Fulfilled orders cannot be rejected.");
+    if (order.rejected) throw new Error("Order is already rejected.");
+
+    await client.query("UPDATE users SET bricks = bricks + $1, updated_at = NOW() WHERE id = $2", [
+      Number(order.total_bricks ?? 0),
+      order.user_id,
+    ]);
+
+    const result = await client.query(
+      `
+        UPDATE shop_orders
+        SET rejected = TRUE,
+            rejected_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+      `,
+      [orderId]
+    );
+
+    await client.query("COMMIT");
+    return toPublicShopOrder(result.rows[0]);
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 function toPublicShopItem(row) {
@@ -404,12 +463,16 @@ function toPublicShopOrder(row) {
     id: row.id,
     userId: row.user_id,
     email: row.email,
+    name: row.name,
     itemId: row.item_id,
     itemName: row.item_name,
+    itemBricks: row.item_bricks,
+    itemPriceUsd: row.item_price_usd,
     quantity: row.quantity,
     shippingTaxUsd: row.shipping_tax_usd,
     totalBricks: row.total_bricks,
     fulfilled: row.fulfilled,
+    rejected: row.rejected,
     createdAt: row.created_at,
   };
 }

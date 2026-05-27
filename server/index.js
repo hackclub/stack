@@ -19,6 +19,7 @@ import {
   listShopOrders,
   markShopOrderFulfilled,
   purchaseShopItemForUser,
+  rejectShopOrderWithRefund,
   setAllShopItemsActive,
   updateShopItem,
 } from "./shopItems.js";
@@ -545,6 +546,16 @@ app.post("/api/admin/shop/orders/:id/fulfill", requireFullAdmin, async (req, res
   } catch (error) {
     console.error("Failed to fulfill shop order:", error);
     res.status(500).json({ error: "Failed to fulfill order." });
+  }
+});
+
+app.post("/api/admin/shop/orders/:id/reject", requireFullAdmin, async (req, res) => {
+  try {
+    const order = await rejectShopOrderWithRefund(req.params.id);
+    res.json({ order });
+  } catch (error) {
+    console.error("Failed to reject shop order:", error);
+    res.status(400).json({ error: error.message || "Failed to reject order." });
   }
 });
 

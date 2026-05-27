@@ -1,10 +1,46 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./AdminShopPage.css";
+
+function formatUsd(value) {
+  return `$${Number(value ?? 0).toFixed(2)}`;
+}
+
+function formatDate(value) {
+  if (!value) return "Unknown date";
+  return new Date(value).toLocaleString();
+}
+
+function orderStatus(order) {
+  if (order.rejected) return "rejected";
+  if (order.fulfilled) return "fulfilled";
+  return "pending";
+}
+
+function orderUsdTotals(order) {
+  const quantity = Number(order.quantity ?? 1);
+  const shipping = Number(order.shippingTaxUsd ?? 0);
+  const itemUsd = order.itemPriceUsd != null ? Number(order.itemPriceUsd) : Number(order.itemBricks ?? 0) / 10;
+  const itemsOnly = itemUsd * quantity;
+  return {
+    itemsOnly,
+    shipping,
+    total: itemsOnly + shipping,
+  };
+}
+
+function groupLabel(groupBy, key) {
+  if (groupBy === "user") return `Customer: ${key}`;
+  if (groupBy === "item") return `Item: ${key}`;
+  return "Flat list";
+}
 
 export function AdminShopOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [statusFilter, setStatusFilter] = useState("pending");
+  const [groupBy, setGroupBy] = useState("flat");
+  const [sortOrder, setSortOrder] = useState("newest");
 
   useEffect(() => {
     async function loadOrders() {
@@ -40,16 +76,48 @@ export function AdminShopOrdersPage() {
     }
   }
 
-  const groupedOrders = orders.reduce((acc, order) => {
-    const key = order.email;
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(order);
-    return acc;
-  }, {});
+  async function rejectOrder(order) {
+    const ok = window.confirm(`Reject order #${order.id} and refund ${Number(order.totalBricks ?? 0)} bricks?`);
+    if (!ok) return;
 
-  const sortedEmails = Object.keys(groupedOrders).sort();
+    try {
+      const response = await fetch(`/api/admin/shop/orders/${order.id}/reject`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to reject order.");
+
+      setOrders((prev) =>
+        prev.map((current) => (current.id === order.id ? { ...current, rejected: true } : current))
+      );
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
+  }
+
+  const visibleOrders = useMemo(() => {
+    const filtered = orders.filter((order) => statusFilter === "all" || orderStatus(order) === statusFilter);
+    return [...filtered].sort((a, b) => {
+      if (sortOrder === "oldest") return new Date(a.createdAt) - new Date(b.createdAt);
+      if (sortOrder === "bricks-high") return Number(b.totalBricks ?? 0) - Number(a.totalBricks ?? 0);
+      if (sortOrder === "usd-high") return orderUsdTotals(b).total - orderUsdTotals(a).total;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+  }, [orders, sortOrder, statusFilter]);
+
+  const groupedOrders = useMemo(() => {
+    if (groupBy === "flat") return [["all", visibleOrders]];
+
+    const groups = visibleOrders.reduce((acc, order) => {
+      const key = groupBy === "item" ? order.itemName || "Unknown item" : order.email || "Unknown customer";
+      if (!acc.has(key)) acc.set(key, []);
+      acc.get(key).push(order);
+      return acc;
+    }, new Map());
+
+    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [groupBy, visibleOrders]);
 
   return (
     <main className="admin-shop-page">
@@ -65,53 +133,95 @@ export function AdminShopOrdersPage() {
         {!loading && !error && orders.length === 0 && <p>No orders yet.</p>}
 
         {!loading && !error && orders.length > 0 && (
-          <div className="admin-shop-orders">
-            {sortedEmails.map((email) => (
-              <div key={email} className="admin-shop-order-group">
-                <h2>{email}</h2>
-                <table className="admin-shop-orders-table">
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th>Quantity</th>
-                      <th>Total Cost</th>
-                      <th>Date</th>
-                      <th>Status</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {groupedOrders[email].map((order) => (
-                      <tr key={order.id} className={order.fulfilled ? "fulfilled" : ""}>
-                        <td>{order.itemName}</td>
-                        <td className="text-center">{order.quantity}</td>
-                        <td className="text-right">
-                          {order.totalbricks} bricks
-                          {order.shippingTaxUsd ? ` (+$${order.shippingTaxUsd})` : ""}
-                        </td>
-                        <td>{new Date(order.createdAt).toLocaleDateString()}</td>
-                        <td className="text-center">
-                          <span className={`status-badge ${order.fulfilled ? "fulfilled" : "pending"}`}>
-                            {order.fulfilled ? "Fulfilled" : "Pending"}
-                          </span>
-                        </td>
-                        <td className="text-center">
-                          {!order.fulfilled && (
-                            <button
-                              className="admin-shop-fulfill-btn"
-                              onClick={() => markAsFulfilled(order.id)}
-                            >
-                              Mark Fulfilled
+          <>
+            <div className="admin-shop-order-controls">
+              <label>
+                Status
+                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                  <option value="pending">Pending queue</option>
+                  <option value="fulfilled">Fulfilled</option>
+                  <option value="rejected">Rejected/refunded</option>
+                  <option value="all">All orders</option>
+                </select>
+              </label>
+              <label>
+                Group by
+                <select value={groupBy} onChange={(event) => setGroupBy(event.target.value)}>
+                  <option value="flat">Flat list</option>
+                  <option value="user">Customer</option>
+                  <option value="item">Item</option>
+                </select>
+              </label>
+              <label>
+                Queue order
+                <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="bricks-high">Most bricks first</option>
+                  <option value="usd-high">Highest $ first</option>
+                </select>
+              </label>
+              <span className="admin-shop-order-count">
+                {visibleOrders.length} cards · {orders.length} DB rows
+              </span>
+            </div>
+
+            {visibleOrders.length === 0 ? <p>No orders match this view.</p> : null}
+
+            <div className="admin-shop-orders">
+              {groupedOrders.map(([key, groupOrders]) => (
+                <section key={key} className="admin-shop-order-group">
+                  {groupBy !== "flat" ? <h2>{groupLabel(groupBy, key)}</h2> : null}
+                  <div className="admin-shop-order-cards">
+                    {groupOrders.map((order) => {
+                      const usd = orderUsdTotals(order);
+                      const status = orderStatus(order);
+                      const isActionable = status === "pending";
+                      return (
+                        <article key={order.id} className={`admin-shop-order-card is-${status}`}>
+                          <div className="admin-shop-order-card-main">
+                            <span className={`status-badge ${status}`}>{status}</span>
+                            <h2>{order.itemName || "Unknown item"}</h2>
+                            <p>
+                              Qty: {order.quantity} · Total: {Number(order.totalBricks ?? 0)} bricks
+                            </p>
+
+                            <div className="admin-shop-order-money">
+                              <span>Total: {formatUsd(usd.total)}</span>
+                              <span>Items-only: {formatUsd(usd.itemsOnly)}</span>
+                              <span>Shipping/tax: {formatUsd(usd.shipping)}</span>
+                              <span>Item price: {formatUsd(order.itemPriceUsd ?? Number(order.itemBricks ?? 0) / 10)}</span>
+                            </div>
+
+                            <div className="admin-shop-order-customer">
+                              <strong>Customer</strong>
+                              <span>Name: {order.name || "Unknown"}</span>
+                              <span>Email: {order.email || "Unknown"}</span>
+                              <span>User ID: #{order.userId}</span>
+                            </div>
+
+                            <footer>
+                              <span>DB row: #{order.id}</span>
+                              <span>Created: {formatDate(order.createdAt)}</span>
+                            </footer>
+                          </div>
+
+                          <div className="admin-shop-order-card-actions">
+                            <button type="button" disabled={!isActionable} onClick={() => markAsFulfilled(order.id)}>
+                              ✓ Mark fulfilled
                             </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ))}
-          </div>
+                            <button type="button" disabled={!isActionable} className="danger" onClick={() => rejectOrder(order)}>
+                              × Reject (refund bricks)
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </>
         )}
       </section>
     </main>

@@ -60,8 +60,12 @@ export function ShopPage() {
 
   const baseBricks = selectedItem?.price ? Number(selectedItem.price) : 0;
   const quantity = Math.max(1, Number(purchaseQuantity) || 1);
-  const shippingBricks = shippingTaxUsd ? Math.ceil(Number(shippingTaxUsd) * 10) : 0;
+  const shippingUsd = shippingTaxUsd ? Number(shippingTaxUsd) : 0;
+  const safeShippingUsd = Number.isFinite(shippingUsd) ? shippingUsd : 0;
+  const shippingBricks = safeShippingUsd ? Math.ceil(safeShippingUsd * 10) : 0;
   const totalBricks = baseBricks * quantity + (Number.isFinite(shippingBricks) ? shippingBricks : 0);
+  const itemUsd = selectedItem?.priceUsd != null ? Number(selectedItem.priceUsd) : baseBricks / 10;
+  const totalUsd = (Number.isFinite(itemUsd) ? itemUsd : 0) * quantity + safeShippingUsd;
   const userBricks = Number(user?.bricks ?? 0);
   const hasEnoughBricks = userBricks >= totalBricks;
 
@@ -264,7 +268,7 @@ export function ShopPage() {
 
             <div className="shop-page__modal-total">
               <span>Total</span>
-              <strong>{totalBricks} bricks</strong>
+              <strong>{totalBricks} bricks · ${totalUsd.toFixed(2)}</strong>
             </div>
 
             {!hasEnoughBricks ? (
