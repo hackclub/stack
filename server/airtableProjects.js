@@ -262,6 +262,41 @@ export async function syncProjectToAirtable(row) {
   };
 }
 
+export async function deleteProjectFromAirtable(row) {
+  if (!hasAirtableProjectsConfig) {
+    return { ok: true, skipped: true, reason: "Airtable not configured." };
+  }
+
+  if (!row?.id) {
+    return { ok: false, skipped: true, reason: "Missing project id." };
+  }
+
+  const existing = await findProjectRecord({
+    name: row.name,
+    userEmail: row.user_email,
+    airtableRecordId: row.airtable_record_id,
+  });
+
+  if (!existing?.id) {
+    return { ok: true, skipped: true, reason: "Airtable project record not found." };
+  }
+
+  try {
+    await airtableRequest(`/${existing.id}`, { method: "DELETE" });
+  } catch (error) {
+    if (!/404|NOT_FOUND/i.test(String(error.message))) {
+      throw error;
+    }
+  }
+
+  return {
+    ok: true,
+    skipped: false,
+    recordId: existing.id,
+    postgresProjectId: row.id,
+  };
+}
+
 export async function persistProjectAirtableRecordId(projectId, recordId) {
   if (!pool || !projectId || !recordId) return;
   await pool.query(

@@ -1,7 +1,7 @@
 import { pool } from "./db.js";
-import { persistProjectAirtableRecordId, syncProjectToAirtable } from "./airtableProjects.js";
+import { deleteProjectFromAirtable, persistProjectAirtableRecordId, syncProjectToAirtable } from "./airtableProjects.js";
 import { syncJournalEntryToAirtable } from "./airtableJournals.js";
-import { ensureYswsProjectSubmissionsTable, submitProjectToYsws } from "./airtableYsws.js";
+import { deleteProjectSubmissionsFromYsws, ensureYswsProjectSubmissionsTable, submitProjectToYsws } from "./airtableYsws.js";
 import { fetchHackatimeProjects, sumHackatimeHoursForNames } from "./hackatimeAuth.js";
 
 export async function ensureProjectsTable() {
@@ -633,6 +633,12 @@ export async function patchAdminReviewProjectFlags(projectId, input = {}) {
 
 export async function deleteProjectBySuperadmin(projectId) {
   if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const row = await getProjectRowForAirtableSync(projectId);
+  if (!row) return false;
+
+  await deleteProjectFromAirtable(row);
+  await deleteProjectSubmissionsFromYsws(projectId);
 
   const result = await pool.query(`DELETE FROM projects WHERE id = $1`, [projectId]);
   return result.rowCount > 0;

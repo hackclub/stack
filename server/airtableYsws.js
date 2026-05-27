@@ -356,6 +356,27 @@ async function deleteProjectSubmissions(projectId, statuses) {
   }
 }
 
+export async function deleteProjectSubmissionsFromYsws(projectId) {
+  if (!pool) {
+    return { ok: false, skipped: true, reason: "DATABASE_URL not set." };
+  }
+
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM ysws_project_submissions
+      WHERE project_id = $1
+    `,
+    [projectId]
+  );
+
+  for (const submission of result.rows) {
+    await deleteLocalSubmission(submission);
+  }
+
+  return { ok: true, deleted: result.rows.length };
+}
+
 async function upsertLocalSubmission(submission) {
   if (submission.status === YSWS_STATUS.approved) {
     const approvedResult = await pool.query(
