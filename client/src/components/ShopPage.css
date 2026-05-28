@@ -36,8 +36,10 @@
   margin: 0 0 -0.25rem;
   font-size: clamp(2.4rem, 3.1vw, 3.4rem);
   color: #ffffff;
-  text-shadow: -2px -2px 0 #111, 2px -2px 0 #111, -2px 2px 0 #111, 2px 2px 0 #111;
-  transform: rotate(-6deg);
+  text-align: center;
+  -webkit-text-stroke: 1px #111;
+  text-shadow: -3px -3px 0 #111, 3px -3px 0 #111, -3px 3px 0 #111, 3px 3px 0 #111;
+  transform: translate(1rem, 0.55rem) rotate(-6deg);
 }
 
 .shop-page__grid {
@@ -498,6 +500,7 @@
   .shop-page__inspired {
     font-size: clamp(1.5rem, 4.4vw, 2rem);
     margin-bottom: 0.1rem;
+    transform: translate(0.55rem, 0.35rem) rotate(-6deg);
   }
 
   .shop-page__grid {

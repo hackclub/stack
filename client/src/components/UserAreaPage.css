@@ -72,12 +72,6 @@
   width: min(8.5rem, 24vw);
 }
 
-.user-area-page__back span {
-  position: absolute;
-  font-size: clamp(2.1rem, 3vw, 3rem);
-  text-shadow: 0 3px 0 #882030;
-}
-
 .user-area-page__brand {
   position: absolute;
   right: 1.3rem;

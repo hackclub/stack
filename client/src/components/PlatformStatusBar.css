@@ -39,16 +39,17 @@
 
 .platform-status__content {
   position: absolute;
-  top: 20%;
+  top: 13%;
   left: 21%;
   right: 6%;
   display: grid;
-  gap: 0.45rem;
+  gap: 0.15rem;
 }
 
 .platform-status__row {
   display: flex;
   align-items: center;
+  min-height: 2.85rem;
 }
 
 .platform-status__icon {
@@ -57,12 +58,12 @@
 }
 
 .platform-status__icon--coin {
-  width: 4rem;
+  width: 3.6rem;
   margin-left: 20px;
 }
 
 .platform-status__icon--hearts {
-  width: 8.5rem;
+  width: 7.7rem;
   margin-left: 25px;
 }
 
@@ -72,7 +73,7 @@
   overflow: hidden;
   color: #ffffff;
   font-size: clamp(1rem, 1.35vw, 1.45rem);
-  line-height: 1;
+  line-height: 1.18;
   text-overflow: ellipsis;
   text-shadow: 0 2px 0 #1b3a7a;
   white-space: nowrap;
@@ -124,7 +125,7 @@
   }
 
   .platform-status__icon--coin {
-    width: 6rem;
+    width: 4.4rem;
   }
 
   .platform-status__icon--hearts {

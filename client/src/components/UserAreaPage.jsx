@@ -34,7 +34,6 @@ export function UserAreaPage() {
 
       <a className="user-area-page__back" href="/main" aria-label="Back to main menu">
         <img src={backBtn} alt="" aria-hidden="true" />
-        <span>Back</span>
       </a>
 
       <img className="user-area-page__brand" src={stackTitle} alt="Stack" />

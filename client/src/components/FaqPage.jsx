@@ -21,7 +21,6 @@ export function FaqPage() {
 
       <a className="faq-page__back" href="/main" aria-label="Back to main menu">
         <img src={backBtn} alt="" aria-hidden="true" />
-        <span>Back</span>
       </a>
 
       <img className="faq-page__brand" src={stackTitle} alt="Stack" />

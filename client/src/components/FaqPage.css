@@ -28,15 +28,15 @@
 .faq-page__heading {
   margin: 0 0 1rem;
   font-size: clamp(2.5rem, 5vw, 4rem);
-  color: #fff;
-  text-shadow: 0 3px 0 #50483f;
+  color: #8d1f38;
+  text-shadow: 0 3px 0 #f6c65a;
 }
 
 .faq-page__note {
   margin: 0;
   font-size: clamp(1.2rem, 2vw, 1.5rem);
-  color: #fff;
-  text-shadow: 0 2px 0 #333;
+  color: #8d1f38;
+  text-shadow: 0 2px 0 #f6c65a;
 }
 
 .faq-page__back {
@@ -54,12 +54,6 @@
 
 .faq-page__back img {
   width: min(8.5rem, 24vw);
-}
-
-.faq-page__back span {
-  position: absolute;
-  font-size: clamp(2.1rem, 3vw, 3rem);
-  text-shadow: 0 3px 0 #882030;
 }
 
 .faq-page__brand {

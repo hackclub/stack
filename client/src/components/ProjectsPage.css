@@ -37,6 +37,8 @@
 
 .projects-page__card--add .projects-page__title {
   font-size: clamp(1.6rem, 2.4vw, 2.45rem);
+  z-index: 2;
+  transform: translateY(-1.15rem);
 }
 
 .projects-page__add-plus {
@@ -47,7 +49,8 @@
   font-size: clamp(2.2rem, 4vw, 4rem);
   line-height: 0.8;
   text-shadow: 0 3px 0 #50483f;
-  z-index: 1;
+  transform: translateY(-1.15rem);
+  z-index: 2;
 }
 
 .projects-page__status {
