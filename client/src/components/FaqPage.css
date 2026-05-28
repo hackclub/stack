@@ -2,7 +2,8 @@
   position: relative;
   width: 100%;
   min-height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: #73a5ca;
 }
 
@@ -18,8 +19,8 @@
 .faq-page__content {
   position: relative;
   z-index: 2;
-  max-width: 36rem;
-  margin: 10rem auto 0;
+  max-width: 52rem;
+  margin: 8rem auto 7rem;
   padding: 0 1.5rem;
   color: #162456;
   text-align: center;
@@ -37,6 +38,15 @@
   font-size: clamp(1.2rem, 2vw, 1.5rem);
   color: #8d1f38;
   text-shadow: 0 2px 0 #f6c65a;
+}
+
+.faq-page .stack-faq-list__item summary {
+  color: #8d1f38;
+  -webkit-text-stroke-color: #f6c65a;
+}
+
+.faq-page .stack-faq-list__answer {
+  color: #7a1b2d;
 }
 
 .faq-page__back {

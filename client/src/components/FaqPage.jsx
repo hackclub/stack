@@ -2,6 +2,7 @@ const platformBackground = "https://cdn.hackclub.com/019e3e5a-908f-707d-9790-91f
 const backBtn = "https://cdn.hackclub.com/019e3e5a-8541-7927-b209-5cca8c932fe6/Back_btn.png";
 const stackTitle = "https://cdn.hackclub.com/019e3e5a-8745-7bee-a1ab-07b5743f98c7/Stack_title.png";
 import { useAuth } from "../auth/AuthContext.jsx";
+import { FaqList } from "./FaqList.jsx";
 import { PlatformStatusBar } from "./PlatformStatusBar.jsx";
 import "./FaqPage.css";
 
@@ -16,7 +17,7 @@ export function FaqPage() {
 
       <section className="faq-page__content">
         <h1 className="faq-page__heading">FAQ</h1>
-        <p className="faq-page__note">Full FAQ content coming soon.</p>
+        <FaqList />
       </section>
 
       <a className="faq-page__back" href="/main" aria-label="Back to main menu">

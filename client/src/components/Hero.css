@@ -714,10 +714,13 @@
   left: 50%;
   top: clamp(110rem, 62svh, 42rem);
   z-index: 4;
-  display: grid;
-  gap: clamp(1rem, 3svh, 1.8rem);
-  width: min(38vw, 520px);
+  width: min(62vw, 780px);
   transform: translateX(-50%);
+}
+
+.section-four__questions .stack-faq-list__answer {
+  max-height: 34svh;
+  overflow: auto;
 }
 
 .section-four__question {
@@ -992,7 +995,7 @@
 
   .section-four__questions {
     top: clamp(23rem, 56svh, 31rem);
-    width: min(50vw, 390px);
+    width: min(72vw, 560px);
   }
 
   .section-four__question {
@@ -1216,8 +1219,7 @@
 
   .section-four__questions {
     top: clamp(17rem, 48svh, 24rem);
-    width: min(72vw, 310px);
-    gap: clamp(0.8rem, 2.4svh, 1.3rem);
+    width: min(82vw, 360px);
   }
 
   .section-four__question {

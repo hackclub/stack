@@ -4,8 +4,14 @@ import { MTLLoader } from "three/examples/jsm/loaders/MTLLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import brickMtlUrl from "@assets/mainPage/section_1/3D_brick_fusion/brick_main.mtl?url";
 import brickObjUrl from "@assets/mainPage/section_1/3D_brick_fusion/brick_main.obj?url";
-export function BrickModel() {
+
+const DEFAULT_BRICK_ROTATION = { x: -0.52, y: 0.38, z: 0.02 };
+
+export function BrickModel({ rotation = DEFAULT_BRICK_ROTATION }) {
   const containerRef = useRef(null);
+  const rotationX = Number.isFinite(rotation?.x) ? rotation.x : DEFAULT_BRICK_ROTATION.x;
+  const rotationY = Number.isFinite(rotation?.y) ? rotation.y : DEFAULT_BRICK_ROTATION.y;
+  const rotationZ = Number.isFinite(rotation?.z) ? rotation.z : DEFAULT_BRICK_ROTATION.z;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -23,7 +29,7 @@ export function BrickModel() {
 
     const modelRoot = new THREE.Group();
     modelRoot.position.set(-0.28, 0.22, 0);
-    modelRoot.rotation.set(-0.18, -0.38, 0.02);
+    modelRoot.rotation.set(rotationX, rotationY, rotationZ);
     scene.add(modelRoot);
 
     const ambient = new THREE.AmbientLight(0xffffff, 1.25);
@@ -37,8 +43,8 @@ export function BrickModel() {
     fillLight.position.set(-4, 1.5, 3);
     scene.add(fillLight);
 
-    const targetRotation = new THREE.Vector2(-0.38, -0.52);
-    const currentRotation = new THREE.Vector2(-0.38, -0.52);
+    const targetRotation = new THREE.Vector2(rotationY, rotationX);
+    const currentRotation = new THREE.Vector2(rotationY, rotationX);
     const dragState = {
       active: false,
       pointerId: null,
@@ -130,6 +136,7 @@ export function BrickModel() {
       currentRotation.y += (targetRotation.y - currentRotation.y) * 0.08;
       modelRoot.rotation.y = currentRotation.x;
       modelRoot.rotation.x = currentRotation.y;
+      modelRoot.rotation.z = rotationZ;
 
       renderer.render(scene, camera);
       frameId = window.requestAnimationFrame(animate);
@@ -155,7 +162,7 @@ export function BrickModel() {
         }
       });
     };
-  }, []);
+  }, [rotationX, rotationY, rotationZ]);
 
   return <div ref={containerRef} className="hero__brick-model" aria-label="Interactive LEGO brick model" />;
 }

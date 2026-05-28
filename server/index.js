@@ -65,9 +65,6 @@ const isProd = process.env.NODE_ENV === "production";
 if (isProd) {
   app.set("trust proxy", 1);
 }
-const LOCK_USERNAME = process.env.SITE_LOCK_USERNAME;
-const LOCK_PASSWORD = process.env.SITE_LOCK_PASSWORD;
-const siteLockEnabled = Boolean(LOCK_USERNAME && LOCK_PASSWORD);
 const AIRTABLE_SYNC_SECRET = process.env.AIRTABLE_SYNC_SECRET;
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const LOCAL_UPLOADS_DIR = path.join(__dirname, "uploads");
@@ -191,47 +188,6 @@ app.get("/api/db/health", async (req, res) => {
     });
   }
 });
-
-if (siteLockEnabled) {
-  app.use((req, res, next) => {
-    if (
-      req.path === "/api/health" ||
-      req.path === "/api/db/health" ||
-      req.path.startsWith("/api/auth")
-    ) {
-      next();
-      return;
-    }
-
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Basic ")) {
-      res.set("WWW-Authenticate", 'Basic realm="Stack (private)", charset="UTF-8"');
-      res.status(401).send("Authentication required.");
-      return;
-    }
-
-    let decoded;
-    try {
-      decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf8");
-    } catch {
-      res.set("WWW-Authenticate", 'Basic realm="Stack (private)", charset="UTF-8"');
-      res.status(401).send("Invalid authentication header.");
-      return;
-    }
-
-    const separatorIndex = decoded.indexOf(":");
-    const username = separatorIndex >= 0 ? decoded.slice(0, separatorIndex) : "";
-    const password = separatorIndex >= 0 ? decoded.slice(separatorIndex + 1) : "";
-
-    if (username !== LOCK_USERNAME || password !== LOCK_PASSWORD) {
-      res.set("WWW-Authenticate", 'Basic realm="Stack (private)", charset="UTF-8"');
-      res.status(401).send("Invalid credentials.");
-      return;
-    }
-
-    next();
-  });
-}
 
 app.get("/api/test", async (req, res) => {
   try {
@@ -892,7 +848,7 @@ async function startServer() {
 
   app.listen(PORT, HOST, () => {
     console.log(
-      `Server http://${HOST}:${PORT} (${isProd ? "serving React build" : "API only — use Vite on :5173 for UI"})${siteLockEnabled ? " [site lock enabled]" : " [site lock disabled]"}`
+      `Server http://${HOST}:${PORT} (${isProd ? "serving React build" : "API only - use Vite on :5173 for UI"})`
     );
   });
 

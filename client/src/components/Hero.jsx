@@ -10,7 +10,6 @@ const pageBkg = "https://cdn.hackclub.com/019e3e5a-3ad0-7120-8fb4-50638b3c0362/B
 const shelf = "https://cdn.hackclub.com/019e3e5a-680b-700c-8428-8360f7195bf4/Shelf.png";
 const joinButton = "https://cdn.hackclub.com/019e3e5a-6a7a-7e1a-b945-aa27b1fc4108/join_btn.png";
 const legoChar1 = "https://cdn.hackclub.com/019e3e5a-6d71-79f0-9633-8668b69f464d/legoChar_1.png";
-const shopButton = "https://cdn.hackclub.com/019e3e5a-6f68-719e-a33c-0592db4abd12/shop_btn.png";
 const sectionThreeChar2 = "https://cdn.hackclub.com/019e3e5a-7373-7925-95c9-6d7b841e2004/Char2.png";
 const sectionThreeChar3 = "https://cdn.hackclub.com/019e3e5a-76d6-79b5-9ed5-9ffe5ba40aa3/Char3.png";
 const sectionThreeProject1 = "https://cdn.hackclub.com/019e3e5a-79ab-7a35-9061-cc0302e01074/prj1.png";
@@ -18,7 +17,10 @@ const sectionThreeProject2 = "https://cdn.hackclub.com/019e3e5a-7c73-72e3-8fdc-e
 const sectionThreeProject3 = "https://cdn.hackclub.com/019e3e5a-80e5-71be-8d1f-3017f5349089/prj3.png";
 const faqText = "https://cdn.hackclub.com/019e3e5a-82d7-7105-a023-231cdb1aa700/faq_txt.png";
 import { BrickModel } from "./BrickModel.jsx";
+import { FaqList } from "./FaqList.jsx";
 import "./Hero.css";
+
+const landingBrickRotation = { x: -1.10, y: -0.30, z: -0.55 };
 
 export function Hero() {
   return (
@@ -52,9 +54,9 @@ export function Hero() {
           <nav className="hero__nav" aria-label="Primary">
             <img className="hero__nav-bg" src={toolbar} alt="" width={420} height={56} />
             <div className="hero__nav-links">
-              <a href="#build">Build</a>
-              <a href="#prizes">Prizes</a>
-              <a href="#learn">Learn</a>
+              <a href="#project-examples">Build</a>
+              <a href="/faq">FAQ</a>
+              <a href="https://hackclub.com" target="_blank" rel="noopener noreferrer">Hack Club</a>
             </div>
           </nav>
 
@@ -102,7 +104,7 @@ export function Hero() {
               alt=""
               aria-hidden="true"
             />
-            <BrickModel />
+            <BrickModel rotation={landingBrickRotation} />
           </div>
 
           <img
@@ -128,9 +130,6 @@ export function Hero() {
 
         <div className="section-two__shelf">
           <img className="section-two__shelf-image" src={shelf} width={768} height={640} alt="Shelf of LEGO prizes" />
-          <a className="section-two__shop" href="/shop" aria-label="See the full prize listing">
-            <img src={shopButton} width={536} height={113} alt="See the full listing..." />
-          </a>
         </div>
 
         <a className="section-two__join" href="/login" aria-label="Sign up or log in with Hack Club to join Stack">
@@ -175,7 +174,7 @@ export function Hero() {
         </p>
       </section>
 
-      <section className="section-three" aria-label="Project examples">
+      <section id="project-examples" className="section-three" aria-label="Project examples">
         <a
           href="https://what-the-duck-ten.vercel.app/"
           aria-label="Open joke website example"
@@ -234,7 +233,7 @@ export function Hero() {
         />
       </section>
 
-      <section className="section-four" aria-labelledby="faq-heading">
+      <section id="faq" className="section-four" aria-labelledby="faq-heading">
         <div className="section-four__faq-strip" aria-hidden="true">
           <img className="section-four__faq-title section-four__faq-title--left" src={faqText} width={623} height={380} alt="" />
           <img className="section-four__faq-title section-four__faq-title--center" src={faqText} width={623} height={380} alt="" />
@@ -245,17 +244,7 @@ export function Hero() {
           FAQ
         </h2>
 
-        <div className="section-four__questions">
-          <button className="section-four__question" type="button">
-            What can I build for Stack?
-          </button>
-          <button className="section-four__question" type="button">
-            How do I submit my project?
-          </button>
-          <button className="section-four__question" type="button">
-            When do I get my LEGO set?
-          </button>
-        </div>
+        <FaqList className="section-four__questions" />
       </section>
     </section>
   );
