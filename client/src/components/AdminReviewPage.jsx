@@ -1,5 +1,38 @@
 import { useAuth } from "../auth/AuthContext.jsx";
 import { useEffect, useMemo, useState } from "react";
+
+function isVideoUrl(url) {
+  const ext = url.split("?")[0].split(".").pop()?.toLowerCase();
+  return ["mp4", "webm", "ogg", "mov"].includes(ext);
+}
+
+function JournalDescriptionRenderer({ text }) {
+  if (!text) return null;
+  const parts = [];
+  const imgRe = /!\[([^\]]*)\]\((https:\/\/cdn\.hackclub\.com\/[^\s)]+)\)/g;
+  let last = 0;
+  let match;
+  while ((match = imgRe.exec(text)) !== null) {
+    if (match.index > last) parts.push({ type: "text", value: text.slice(last, match.index) });
+    parts.push({ type: "media", alt: match[1], url: match[2] });
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push({ type: "text", value: text.slice(last) });
+
+  return (
+    <div className="admin-review-journal-description">
+      {parts.map((part, i) =>
+        part.type === "text" ? (
+          <span key={i} style={{ whiteSpace: "pre-wrap" }}>{part.value}</span>
+        ) : isVideoUrl(part.url) ? (
+          <video key={i} className="admin-review-media-item" src={part.url} controls preload="metadata" />
+        ) : (
+          <img key={i} className="admin-review-media-item" src={part.url} alt={part.alt} />
+        )
+      )}
+    </div>
+  );
+}
 import "./AdminReviewPage.css";
 
 function formatHours(value) {
@@ -444,7 +477,7 @@ function AdminReviewDetail({ projectId }) {
             journalEntries.map((entry) => (
               <article className="admin-review-journal-entry" key={entry.id}>
                 <strong>{entry.timeDone ? new Date(entry.timeDone).toLocaleString() : "N/A"} · {entry.hoursWorked}h</strong>
-                <p>{entry.description}</p>
+                <JournalDescriptionRenderer text={entry.description} />
                 {entry.toolsUsed?.length ? <small>Tools: {entry.toolsUsed.join(", ")}</small> : null}
               </article>
             ))

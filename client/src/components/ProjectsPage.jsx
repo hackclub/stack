@@ -1,5 +1,5 @@
 const platformBackground = "https://cdn.hackclub.com/019e3e5a-908f-707d-9790-91f9ec414045/bkg.png";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { PlatformStatusBar } from "./PlatformStatusBar.jsx";
 const sideBrick = "https://cdn.hackclub.com/019e3e5a-9d8a-7fcb-ad80-d6166cfd97f8/side_brick.png";
@@ -97,6 +97,51 @@ const emptyJournalEntry = {
   description: "",
   toolsUsed: "",
 };
+
+const ALLOWED_UPLOAD_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "video/mp4",
+  "video/webm",
+  "video/ogg",
+  "video/quicktime",
+]);
+
+function isVideoUrl(url) {
+  const ext = url.split("?")[0].split(".").pop()?.toLowerCase();
+  return ["mp4", "webm", "ogg", "mov"].includes(ext);
+}
+
+function JournalDescriptionRenderer({ text }) {
+  if (!text) return null;
+  const parts = [];
+  const imgRe = /!\[([^\]]*)\]\((https:\/\/cdn\.hackclub\.com\/[^\s)]+)\)/g;
+  let last = 0;
+  let match;
+  while ((match = imgRe.exec(text)) !== null) {
+    if (match.index > last) parts.push({ type: "text", value: text.slice(last, match.index) });
+    parts.push({ type: "media", alt: match[1], url: match[2] });
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push({ type: "text", value: text.slice(last) });
+
+  return (
+    <div className="journal-description">
+      {parts.map((part, i) =>
+        part.type === "text" ? (
+          <span key={i} style={{ whiteSpace: "pre-wrap" }}>{part.value}</span>
+        ) : isVideoUrl(part.url) ? (
+          <video key={i} className="journal-media-item" src={part.url} controls preload="metadata" />
+        ) : (
+          <img key={i} className="journal-media-item" src={part.url} alt={part.alt} />
+        )
+      )}
+    </div>
+  );
+}
 
 function displayStatus(project) {
   if (project.status === "approved") return "Approved";
@@ -593,6 +638,71 @@ function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDe
 }
 
 function JournalModal({ project, entries, form, onChange, onClose, onSubmit }) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const textareaRef = useRef(null);
+  const descriptionRef = useRef(form.description);
+  descriptionRef.current = form.description;
+
+  async function uploadAndInsert(file) {
+    if (!ALLOWED_UPLOAD_TYPES.has(file.type)) {
+      setUploadError(`Unsupported file type: ${file.type}. Use JPEG, PNG, GIF, WebP, AVIF, MP4, WebM, OGG, or MOV.`);
+      return;
+    }
+    setUploading(true);
+    setUploadError("");
+
+    const textarea = textareaRef.current;
+    const start = textarea?.selectionStart ?? descriptionRef.current.length;
+    const end = textarea?.selectionEnd ?? start;
+    const placeholder = `![Uploading ${file.name}…]()`;
+    const before = descriptionRef.current.slice(0, start);
+    const after = descriptionRef.current.slice(end);
+    const withPlaceholder = `${before}${placeholder}${after}`;
+    onChange("description", withPlaceholder);
+    descriptionRef.current = withPlaceholder;
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/cdn/upload", {
+        method: "POST",
+        credentials: "include",
+        headers: { "x-file-type": file.type },
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Upload failed.");
+
+      const mdLink = `![${file.name}](${data.url})`;
+      const resolved = descriptionRef.current.replace(placeholder, mdLink);
+      onChange("description", resolved);
+      descriptionRef.current = resolved;
+    } catch (err) {
+      const cleaned = descriptionRef.current.replace(placeholder, "");
+      onChange("description", cleaned);
+      descriptionRef.current = cleaned;
+      setUploadError(err.message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleTextareaDrop(event) {
+    event.preventDefault();
+    setIsDraggingOver(false);
+    const files = Array.from(event.dataTransfer.files);
+    for (const file of files) uploadAndInsert(file);
+  }
+
+  function handleTextareaPaste(event) {
+    const files = Array.from(event.clipboardData?.files ?? []);
+    if (files.length === 0) return;
+    event.preventDefault();
+    for (const file of files) uploadAndInsert(file);
+  }
+
   return (
     <div className="projects-page__modal-overlay" role="presentation" onClick={onClose}>
       <section className="projects-page__modal projects-page__modal--journal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
@@ -619,13 +729,33 @@ function JournalModal({ project, entries, form, onChange, onClose, onSubmit }) {
           </label>
           <label>
             Description
-            <textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} required />
+            <div className={`journal-textarea-wrap${isDraggingOver ? " journal-textarea-wrap--drag" : ""}`}>
+              <textarea
+                ref={textareaRef}
+                value={form.description}
+                onChange={(event) => onChange("description", event.target.value)}
+                onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
+                onDragLeave={() => setIsDraggingOver(false)}
+                onDrop={handleTextareaDrop}
+                onPaste={handleTextareaPaste}
+                required
+                placeholder="Describe what you worked on… drag & drop or paste images/videos to attach them inline"
+              />
+              {isDraggingOver && (
+                <div className="journal-textarea-drop-overlay" aria-hidden="true">Drop to upload</div>
+              )}
+              {uploading && (
+                <div className="journal-textarea-uploading" aria-live="polite">Uploading…</div>
+              )}
+            </div>
+            {uploadError ? <p className="journal-upload-error">{uploadError}</p> : null}
+            <small className="journal-upload-hint-text">Drag &amp; drop or paste images/videos to embed them inline</small>
           </label>
           <label>
             Tools Used
             <input value={form.toolsUsed} onChange={(event) => onChange("toolsUsed", event.target.value)} placeholder="React, Figma, CAD" />
           </label>
-          <button type="submit">Save Entry</button>
+          <button type="submit" disabled={uploading}>Save Entry</button>
         </form>
 
         <section className="projects-page__journal-list" aria-label="Journal entries">
@@ -638,7 +768,7 @@ function JournalModal({ project, entries, form, onChange, onClose, onSubmit }) {
                 <strong>
                   {entry.timeDone ? new Date(entry.timeDone).toLocaleDateString() : "N/A"} - {entry.hoursWorked || 0} hrs
                 </strong>
-                <p>{entry.description}</p>
+                <JournalDescriptionRenderer text={entry.description} />
                 {entry.toolsUsed?.length ? <small>Tools: {entry.toolsUsed.join(", ")}</small> : null}
               </article>
             ))

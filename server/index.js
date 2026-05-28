@@ -353,6 +353,69 @@ app.delete("/api/projects/:id", requireUser, async (req, res) => {
   }
 });
 
+const CDN_API_KEY = process.env.CDN_API_KEY;
+const CDN_UPLOAD_URL = "https://cdn.hackclub.com/api/v4/upload";
+const ALLOWED_MEDIA_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "video/mp4",
+  "video/webm",
+  "video/ogg",
+  "video/quicktime",
+]);
+
+app.post("/api/cdn/upload", requireUser, async (req, res) => {
+  if (!CDN_API_KEY) {
+    return res.status(503).json({ error: "CDN uploads are not configured on this server." });
+  }
+
+  const contentType = req.headers["content-type"] || "";
+  if (!contentType.startsWith("multipart/form-data")) {
+    return res.status(400).json({ error: "Expected multipart/form-data." });
+  }
+
+  const fileType = (req.headers["x-file-type"] || "").toLowerCase().trim();
+  if (!fileType || !ALLOWED_MEDIA_TYPES.has(fileType)) {
+    return res.status(400).json({ error: "Unsupported file type. Only images (JPEG, PNG, GIF, WebP, AVIF) and videos (MP4, WebM, OGG, MOV) are allowed." });
+  }
+
+  try {
+    const cdnResponse = await fetch(CDN_UPLOAD_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${CDN_API_KEY}`,
+        "Content-Type": contentType,
+      },
+      body: req,
+      duplex: "half",
+    });
+
+    const data = await cdnResponse.json();
+    if (!cdnResponse.ok) {
+      return res.status(cdnResponse.status).json({ error: data?.error || "CDN upload failed." });
+    }
+
+    let uploadedUrl;
+    try {
+      const parsed = new URL(data.url || "");
+      if (parsed.hostname !== "cdn.hackclub.com" || parsed.protocol !== "https:") {
+        throw new Error("Unexpected CDN response URL.");
+      }
+      uploadedUrl = parsed.href;
+    } catch {
+      return res.status(502).json({ error: "CDN returned an unexpected URL." });
+    }
+
+    res.json({ url: uploadedUrl });
+  } catch (error) {
+    console.error("CDN upload proxy error:", error);
+    res.status(500).json({ error: "Failed to upload file." });
+  }
+});
+
 app.get("/api/projects/:id/journal_entries", requireUser, async (req, res) => {
   try {
     const entries = await listJournalEntriesForUserProject(req.session.userId, req.params.id);

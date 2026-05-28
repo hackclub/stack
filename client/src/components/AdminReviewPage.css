@@ -556,3 +556,22 @@
   opacity: 0.5;
   cursor: wait;
 }
+
+.admin-review-journal-description {
+  display: block;
+  margin: 0.3rem 0;
+  color: #c8d4f5;
+  font-size: 0.97rem;
+  white-space: pre-wrap;
+}
+
+.admin-review-media-item {
+  display: block;
+  max-width: 100%;
+  max-height: 24rem;
+  border-radius: 8px;
+  border: 2px solid #2e3f7a;
+  object-fit: contain;
+  background: #1a2240;
+  margin: 0.4rem 0;
+}
