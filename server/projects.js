@@ -436,7 +436,7 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
       throw new Error(`Cannot approve ${newTotalApprovedHours.toFixed(2)} total hours because only ${totalLoggedHours.toFixed(2)} hours are logged.`);
     }
 
-    const bricksDelta = Math.ceil(approvedHours * 10);
+    const bricksDelta = approvedHours * 20;
     const reductionHours = Math.max(0, roundedHours(totalLoggedHours - newTotalApprovedHours));
     const newCumulativeBricks = Number(project.bricks_earned ?? 0) + bricksDelta;
 
