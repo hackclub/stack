@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import "./AdminShopPage.css";
 
 function formatUsd(value) {
-  return `$${Number(value ?? 0).toFixed(2)}`;
+  const number = Number(value);
+  return Number.isFinite(number) ? `$${number.toFixed(2)}` : "—";
 }
 
 function formatDate(value) {
@@ -16,16 +17,10 @@ function orderStatus(order) {
   return "pending";
 }
 
-function orderUsdTotals(order) {
-  const quantity = Number(order.quantity ?? 1);
-  const shipping = Number(order.shippingTaxUsd ?? 0);
-  const itemUsd = order.itemPriceUsd != null ? Number(order.itemPriceUsd) : Number(order.itemBricks ?? 0) / 10;
-  const itemsOnly = itemUsd * quantity;
-  return {
-    itemsOnly,
-    shipping,
-    total: itemsOnly + shipping,
-  };
+function orderUsdTotal(order) {
+  const itemUsd = Number(order.itemPriceUsd);
+  if (!Number.isFinite(itemUsd)) return null;
+  return itemUsd * Number(order.quantity ?? 1);
 }
 
 function groupLabel(groupBy, key) {
@@ -101,7 +96,7 @@ export function AdminShopOrdersPage() {
     return [...filtered].sort((a, b) => {
       if (sortOrder === "oldest") return new Date(a.createdAt) - new Date(b.createdAt);
       if (sortOrder === "bricks-high") return Number(b.totalBricks ?? 0) - Number(a.totalBricks ?? 0);
-      if (sortOrder === "usd-high") return orderUsdTotals(b).total - orderUsdTotals(a).total;
+      if (sortOrder === "usd-high") return Number(orderUsdTotal(b) ?? -1) - Number(orderUsdTotal(a) ?? -1);
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
   }, [orders, sortOrder, statusFilter]);
@@ -174,7 +169,6 @@ export function AdminShopOrdersPage() {
                   {groupBy !== "flat" ? <h2>{groupLabel(groupBy, key)}</h2> : null}
                   <div className="admin-shop-order-cards">
                     {groupOrders.map((order) => {
-                      const usd = orderUsdTotals(order);
                       const status = orderStatus(order);
                       const isActionable = status === "pending";
                       return (
@@ -185,12 +179,9 @@ export function AdminShopOrdersPage() {
                             <p>
                               Qty: {order.quantity} · Total: {Number(order.totalBricks ?? 0)} bricks
                             </p>
-
                             <div className="admin-shop-order-money">
-                              <span>Total: {formatUsd(usd.total)}</span>
-                              <span>Items-only: {formatUsd(usd.itemsOnly)}</span>
-                              <span>Shipping/tax: {formatUsd(usd.shipping)}</span>
-                              <span>Item price: {formatUsd(order.itemPriceUsd ?? Number(order.itemBricks ?? 0) / 10)}</span>
+                              <span>Item $ reference: {formatUsd(order.itemPriceUsd)}</span>
+                              <span>Items $ total: {formatUsd(orderUsdTotal(order))}</span>
                             </div>
 
                             <div className="admin-shop-order-customer">

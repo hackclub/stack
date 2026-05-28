@@ -11,7 +11,6 @@ const SHOP_ITEM_COLUMNS = [
   "updated_at",
   "max_per_person",
   "price_usd",
-  "dollar_per_hour",
   "discount_percent",
   "airtable_id",
   "synced_at",
@@ -23,11 +22,11 @@ const REMOVED_SHOP_ITEM_COLUMNS = [
   "shop_grant_type_id",
   "item_quantity",
   "shipping_tax_cents",
+  "dollar_per_hour",
   "position",
 ];
 
-const REMOVED_SHOP_ORDER_COLUMNS = ["total_coins"];
-const BRICKS_PER_USD = 20;
+const REMOVED_SHOP_ORDER_COLUMNS = ["total_coins", "shipping_tax_usd"];
 
 export async function ensureShopItemsTable() {
   if (!pool) {
@@ -48,7 +47,6 @@ export async function ensureShopItemsTable() {
       updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
       max_per_person INTEGER,
       price_usd NUMERIC(10, 2),
-      dollar_per_hour NUMERIC(10, 2),
       discount_percent NUMERIC(5, 2),
       airtable_id VARCHAR,
       synced_at DATE
@@ -58,13 +56,6 @@ export async function ensureShopItemsTable() {
   for (const column of SHOP_ITEM_COLUMNS) {
     await ensureShopItemColumn(column);
   }
-
-  await pool.query(`
-    UPDATE shop_items
-    SET price = CEIL(price_usd * $1)
-    WHERE price_usd IS NOT NULL
-      AND (price IS NULL OR price != CEIL(price_usd * $1))
-  `, [BRICKS_PER_USD]);
 
   for (const column of REMOVED_SHOP_ITEM_COLUMNS) {
     await pool.query(`ALTER TABLE shop_items DROP COLUMN IF EXISTS ${column}`);
@@ -76,7 +67,6 @@ export async function ensureShopItemsTable() {
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       item_id BIGINT NOT NULL REFERENCES shop_items(id) ON DELETE CASCADE,
       quantity INTEGER NOT NULL DEFAULT 1,
-      shipping_tax_usd NUMERIC(10, 2),
       total_bricks NUMERIC(10, 2) NOT NULL,
       fulfilled BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
@@ -86,9 +76,6 @@ export async function ensureShopItemsTable() {
 
   await pool.query(`
     ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 1
-  `);
-  await pool.query(`
-    ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS shipping_tax_usd NUMERIC(10, 2)
   `);
   await pool.query(`
     ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS total_bricks NUMERIC(10, 2) NOT NULL DEFAULT 0
@@ -123,7 +110,6 @@ async function ensureShopItemColumn(column) {
     updated_at: "TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL DEFAULT NOW()",
     max_per_person: "INTEGER",
     price_usd: "NUMERIC(10, 2)",
-    dollar_per_hour: "NUMERIC(10, 2)",
     discount_percent: "NUMERIC(5, 2)",
     airtable_id: "VARCHAR",
     synced_at: "DATE",
@@ -153,10 +139,10 @@ export async function createShopItem(input) {
     `
       INSERT INTO shop_items (
         name, price, item_link, image_url, description, active, max_per_person,
-        price_usd, dollar_per_hour, discount_percent, airtable_id, synced_at
+        price_usd, discount_percent, airtable_id, synced_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7,
-        $8, $9, $10, $11, $12
+        $8, $9, $10, $11
       )
       RETURNING *
     `,
@@ -181,12 +167,11 @@ export async function updateShopItem(id, input) {
         active = $6,
         max_per_person = $7,
         price_usd = $8,
-        dollar_per_hour = $9,
-        discount_percent = $10,
-        airtable_id = $11,
-        synced_at = $12,
+        discount_percent = $9,
+        airtable_id = $10,
+        synced_at = $11,
         updated_at = NOW()
-      WHERE id = $13
+      WHERE id = $12
       RETURNING *
     `,
     [...shopItemValues(values), id]
@@ -210,8 +195,6 @@ export async function purchaseShopItemForUser(userId, itemId, input = {}) {
   if (!pool) throw new Error("DATABASE_URL is not set.");
 
   const quantity = Math.max(1, integerOrNull(input.quantity) || 1);
-  const shippingTaxUsd = Math.max(0, numberOrNull(input.shippingTaxUsd ?? input.shipping_tax_usd) || 0);
-
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -234,8 +217,7 @@ export async function purchaseShopItemForUser(userId, itemId, input = {}) {
     }
 
     const itemBricks = Number(item.price ?? 0);
-    const shippingBricks = Math.ceil(shippingTaxUsd * BRICKS_PER_USD);
-    const totalBricks = itemBricks * quantity + shippingBricks;
+    const totalBricks = itemBricks * quantity;
 
     const userResult = await client.query(
       `
@@ -257,11 +239,11 @@ export async function purchaseShopItemForUser(userId, itemId, input = {}) {
 
     const orderResult = await client.query(
       `
-        INSERT INTO shop_orders (user_id, item_id, quantity, shipping_tax_usd, total_bricks)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO shop_orders (user_id, item_id, quantity, total_bricks)
+        VALUES ($1, $2, $3, $4)
         RETURNING id
       `,
-      [userId, itemId, quantity, shippingTaxUsd || null, totalBricks]
+      [userId, itemId, quantity, totalBricks]
     );
 
     await client.query("COMMIT");
@@ -269,7 +251,6 @@ export async function purchaseShopItemForUser(userId, itemId, input = {}) {
     return {
       item: toPublicShopItem(item),
       quantity,
-      shippingTaxUsd,
       totalBricks,
       userBricks: Number(userResult.rows[0].bricks ?? 0),
       orderId: orderResult.rows[0].id,
@@ -297,18 +278,21 @@ function safeHttpUrl(value) {
 }
 
 function normalizeShopItemInput(input = {}) {
-  const priceUsd = numberOrNull(input.priceUsd ?? input.price_usd);
   const price = integerOrNull(input.price);
+  const priceUsd = numberOrNull(input.priceUsd ?? input.price_usd);
+  if (price === null || price < 0) {
+    throw new Error("Shop item price must be a non-negative brick amount.");
+  }
+
   return {
     name: textOrNull(input.name),
-    price: price ?? (priceUsd === null ? null : Math.ceil(priceUsd * BRICKS_PER_USD)),
+    price,
     itemLink: safeHttpUrl(input.itemLink ?? input.item_link),
     imageUrl: safeHttpUrl(input.imageUrl ?? input.image_url),
     description: textOrNull(input.description),
     active: input.active === undefined ? true : Boolean(input.active),
     maxPerPerson: integerOrNull(input.maxPerPerson ?? input.max_per_person),
     priceUsd,
-    dollarPerHour: numberOrNull(input.dollarPerHour ?? input.dollar_per_hour),
     discountPercent: discountPercentOrNull(input.discountPercent ?? input.discount_percent),
     airtableId: textOrNull(input.airtableId ?? input.airtable_id),
     syncedAt: dateOrNull(input.syncedAt ?? input.synced_at),
@@ -325,7 +309,6 @@ function shopItemValues(item) {
     item.active,
     item.maxPerPerson,
     item.priceUsd,
-    item.dollarPerHour,
     item.discountPercent,
     item.airtableId,
     item.syncedAt,
@@ -373,7 +356,6 @@ export async function listShopOrders() {
       i.price as item_bricks,
       i.price_usd as item_price_usd,
       o.quantity,
-      o.shipping_tax_usd,
       o.total_bricks,
       o.fulfilled,
       o.rejected,
@@ -465,7 +447,6 @@ function toPublicShopItem(row) {
     updatedAt: row.updated_at,
     maxPerPerson: row.max_per_person,
     priceUsd: row.price_usd,
-    dollarPerHour: row.dollar_per_hour,
     discountPercent: row.discount_percent,
     airtableId: row.airtable_id,
     syncedAt: row.synced_at,
@@ -482,7 +463,6 @@ function toPublicShopOrder(row) {
     itemBricks: row.item_bricks,
     itemPriceUsd: row.item_price_usd,
     quantity: row.quantity,
-    shippingTaxUsd: row.shipping_tax_usd,
     totalBricks: row.total_bricks,
     fulfilled: row.fulfilled,
     rejected: row.rejected,

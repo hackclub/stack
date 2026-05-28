@@ -12,8 +12,6 @@ const stackTitle = "https://cdn.hackclub.com/019e3e5a-8745-7bee-a1ab-07b5743f98c
 const legoCharacter = "https://cdn.hackclub.com/019e3e5a-6d71-79f0-9633-8668b69f464d/legoChar_1.png";
 import "./ShopPage.css";
 
-const BRICKS_PER_USD = 20;
-
 function formatBricks(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? Math.round(numeric).toString() : "0";
@@ -33,7 +31,6 @@ export function ShopPage() {
   const [purchaseMessage, setPurchaseMessage] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
   const [purchaseQuantity, setPurchaseQuantity] = useState(1);
-  const [shippingTaxUsd, setShippingTaxUsd] = useState("");
   const [showPurchaseConfirm, setShowPurchaseConfirm] = useState(false);
   const [isFromUsa, setIsFromUsa] = useState(false);
 
@@ -66,7 +63,6 @@ export function ShopPage() {
   function openItem(item) {
     setSelectedItem(item);
     setPurchaseQuantity(1);
-    setShippingTaxUsd("");
     setShowPurchaseConfirm(false);
     setIsFromUsa(false);
     setPurchaseMessage("");
@@ -74,12 +70,7 @@ export function ShopPage() {
 
   const baseBricks = selectedItem?.price ? Number(selectedItem.price) : 0;
   const quantity = Math.max(1, Number(purchaseQuantity) || 1);
-  const shippingUsd = shippingTaxUsd ? Number(shippingTaxUsd) : 0;
-  const safeShippingUsd = Number.isFinite(shippingUsd) ? shippingUsd : 0;
-  const shippingBricks = safeShippingUsd ? Math.ceil(safeShippingUsd * BRICKS_PER_USD) : 0;
-  const totalBricks = baseBricks * quantity + (Number.isFinite(shippingBricks) ? shippingBricks : 0);
-  const itemUsd = selectedItem?.priceUsd != null ? Number(selectedItem.priceUsd) : baseBricks / 10;
-  const totalUsd = (Number.isFinite(itemUsd) ? itemUsd : 0) * quantity + safeShippingUsd;
+  const totalBricks = baseBricks * quantity;
   const userBricks = Number(user?.bricks ?? 0);
   const hasEnoughBricks = userBricks >= totalBricks;
 
@@ -94,7 +85,6 @@ export function ShopPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           quantity,
-          shippingTaxUsd: shippingTaxUsd || 0,
         }),
       });
       const data = await response.json();
@@ -227,10 +217,6 @@ export function ShopPage() {
               <span>Item price</span>
               <strong>{formatBricks(selectedItem.price)} bricks</strong>
             </div>
-            <div className="shop-page__modal-price-row">
-              <span>USD value</span>
-              <strong>${selectedItem.priceUsd ?? "—"}</strong>
-            </div>
             {selectedItem.maxPerPerson ? (
               <div className="shop-page__modal-price-row">
                 <span>Limit</span>
@@ -255,21 +241,9 @@ export function ShopPage() {
               />
             </label>
 
-            <label className="shop-page__modal-field">
-              <span>Shipping/Tax $ <small>(optional, USD)</small></span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0"
-                value={shippingTaxUsd}
-                onChange={(event) => setShippingTaxUsd(event.target.value)}
-              />
-            </label>
-
             <div className="shop-page__modal-total">
               <span>Total</span>
-              <strong>{formatBricks(totalBricks)} bricks · ${totalUsd.toFixed(2)}</strong>
+              <strong>{formatBricks(totalBricks)} bricks</strong>
             </div>
 
             {!hasEnoughBricks ? (
@@ -333,7 +307,7 @@ export function ShopPage() {
                     )}
                   </p>
                   <div className="shop-page__confirm-total">
-                    {formatBricks(totalBricks)} bricks · ${totalUsd.toFixed(2)}
+                    {formatBricks(totalBricks)} bricks
                   </div>
                   <button className="shop-page__modal-buy" type="button" onClick={buySelectedItem}>
                     Confirm purchase

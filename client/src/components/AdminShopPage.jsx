@@ -257,17 +257,18 @@ function ShopItemForm({ value, submitLabel, onChange, onSubmit }) {
         <input value={value.name || ""} onChange={(event) => onChange("name", event.target.value)} required />
       </label>
       <label>
-        $ price *
+        Coins / bricks *
+        <input type="number" min="0" step="1" value={value.price || ""} onChange={(event) => onChange("price", event.target.value)} required />
+      </label>
+      <label>
+        $ price
         <input
           type="number"
+          min="0"
           step="0.01"
           value={value.priceUsd || ""}
           onChange={(event) => onChange("priceUsd", event.target.value)}
         />
-      </label>
-      <label>
-        bricks
-        <input type="number" min="0" step="1" value={value.price || ""} onChange={(event) => onChange("price", event.target.value)} />
       </label>
       <label>
         Discount %
