@@ -57,6 +57,10 @@ function slackJoeToolUrl(slackId) {
   return `https://joe.fraud.hackclub.com/profile/${encodeURIComponent(id)}`;
 }
 
+function slackDisplay(user) {
+  return user?.slug ? `@${user.slug}` : user?.email || "Unknown";
+}
+
 function clampApprovalHours(value, maxHours) {
   if (value === "") return "";
   const numeric = Number.parseFloat(value);
@@ -109,7 +113,7 @@ function AdminReviewIndex() {
     const needle = search.trim().toLowerCase();
     return shownProjects.filter((project) => {
       const matchesStatus = statusFilter === "any" || project.status === statusFilter;
-      const userBlob = [project.user?.email, project.user?.name, project.user?.slug].filter(Boolean).join(" ");
+      const userBlob = [project.user?.email, project.user?.slug].filter(Boolean).join(" ");
       const searchable = `${project.name} ${project.description || ""} ${userBlob}`.toLowerCase();
       return matchesStatus && (!needle || searchable.includes(needle));
     });
@@ -192,7 +196,7 @@ function AdminReviewIndex() {
                 <footer>
                   <div className="admin-review-user">
                     <span>{(project.user?.email || "?")[0]?.toUpperCase() || "?"}</span>
-                    {project.user?.email || project.user?.name || "Unknown"}
+                    {slackDisplay(project.user)}
                   </div>
                   <div className="admin-review-stats">
                     <strong>{formatHours(project.totalHours)}h</strong>
@@ -371,7 +375,7 @@ function AdminReviewDetail({ projectId }) {
           <h1>{project.name}</h1>
           <p className="admin-review-participant-line">
             <strong className="admin-review-participant-email">{project.user?.email || "No email on file"}</strong>
-            {project.user?.name ? <span className="admin-review-participant-name"> · {project.user.name}</span> : null}
+            {project.user?.slug ? <span className="admin-review-participant-name"> · @{project.user.slug}</span> : null}
           </p>
         </header>
 

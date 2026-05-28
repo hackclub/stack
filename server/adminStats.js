@@ -36,7 +36,6 @@ export async function getAuditLogForTarget(targetType, targetId, { limit = 50 } 
        a.target_id,
        a.details,
        a.created_at,
-       u.name AS admin_name,
        u.email AS admin_email
      FROM audit_log a
      LEFT JOIN users u ON u.id = a.admin_user_id
@@ -52,7 +51,6 @@ export async function getAuditLogForTarget(targetType, targetId, { limit = 50 } 
     targetId: r.target_id,
     details: r.details,
     createdAt: r.created_at,
-    adminName: r.admin_name,
     adminEmail: r.admin_email,
   }));
 }

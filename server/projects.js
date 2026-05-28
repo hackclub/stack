@@ -382,7 +382,6 @@ export async function listAdminReviewProjects({ shipSort = "oldest" } = {}) {
       projects.*,
       COALESCE(SUM(journal_entries.hours_worked), 0) AS journal_hours,
       users.email AS user_email,
-      users.name AS user_name,
       users.slug AS user_slug,
       users.profile_image_url AS user_profile_image_url,
       users.slack_id AS user_slack_id
@@ -412,7 +411,6 @@ export async function getAdminReviewProject(projectId) {
         projects.*,
         COALESCE(SUM(journal_entries.hours_worked), 0) AS journal_hours,
         users.email AS user_email,
-        users.name AS user_name,
         users.slug AS user_slug,
         users.profile_image_url AS user_profile_image_url,
         users.slack_id AS user_slack_id
@@ -760,7 +758,7 @@ export async function getJournalEntriesCsv() {
       journal_entries.*,
       projects.name AS current_project_name,
       users.email AS user_email,
-      COALESCE(users.name, users.slug) AS user_display_name
+      users.slug AS user_display_name
     FROM journal_entries
     LEFT JOIN projects ON projects.id = journal_entries.project_id
     LEFT JOIN users ON users.id = journal_entries.user_id
@@ -1144,7 +1142,6 @@ function toAdminReviewProject(row) {
     user: {
       id: row.user_id,
       email: row.user_email,
-      name: row.user_name,
       slug: row.user_slug,
       profileImageUrl: row.user_profile_image_url,
       slackId: row.user_slack_id,

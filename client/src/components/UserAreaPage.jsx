@@ -18,8 +18,8 @@ export function UserAreaPage() {
         <h1 className="user-area-page__heading">Your account</h1>
         <dl className="user-area-page__details">
           <div>
-            <dt>Name</dt>
-            <dd>{user?.name || "—"}</dd>
+            <dt>Slack</dt>
+            <dd>{user?.slug ? `@${user.slug}` : "—"}</dd>
           </div>
           <div>
             <dt>Email</dt>

@@ -13,7 +13,7 @@ export function PlatformStatusBar({ user, className = "" }) {
   const rootRef = useRef(null);
 
   const avatarSrc = user?.profileImageUrl || defaultAvatar;
-  const username = user?.name || user?.slug || user?.email?.split("@")[0] || "User";
+  const username = user?.slug ? `@${user.slug}` : user?.email?.split("@")[0] || "User";
   const isFullAdmin = user?.role === "admin" || user?.role === "superadmin";
   const isReviewerOnly = user?.role === "reviewer";
   const bricks = Math.floor(Number(user?.bricks ?? 0));

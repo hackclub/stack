@@ -195,7 +195,6 @@ export function AdminShopOrdersPage() {
 
                             <div className="admin-shop-order-customer">
                               <strong>Customer</strong>
-                              <span>Name: {order.name || "Unknown"}</span>
                               <span>Email: {order.email || "Unknown"}</span>
                               <span>User ID: #{order.userId}</span>
                             </div>

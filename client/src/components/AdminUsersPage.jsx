@@ -12,7 +12,7 @@ function fmt(n, decimals = 1) {
 }
 
 function displayName(user) {
-  return user.name || user.slug || user.email?.split("@")[0] || `User #${user.id}`;
+  return user.slug ? `@${user.slug}` : user.email?.split("@")[0] || `User #${user.id}`;
 }
 
 const STATUS_META = {
@@ -145,9 +145,6 @@ function UserDetailView({ userId }) {
             <span className="auser-role-badge" data-role={user.role}>
               {user.role || "member"}
             </span>
-            {user.verificationStatus ? (
-              <span className="auser-muted">{user.verificationStatus}</span>
-            ) : null}
           </div>
         </div>
 
@@ -309,7 +306,7 @@ function UserDetailView({ userId }) {
                     <tr key={entry.id}>
                       <td>{formatDate(entry.createdAt)}</td>
                       <td>{entry.action}</td>
-                      <td>{entry.adminName || entry.adminEmail || "—"}</td>
+                      <td>{entry.adminEmail || "—"}</td>
                       <td>
                         {entry.details ? (
                           <code className="auser-audit-detail">
@@ -366,7 +363,7 @@ export function AdminUsersPage({ userId = null }) {
   const visibleUsers = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = users.filter((u) => {
-      const blob = [u.email, u.name, u.slug, u.role, u.hackclubSub]
+      const blob = [u.email, u.slug, u.role]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -403,7 +400,7 @@ export function AdminUsersPage({ userId = null }) {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Email, name, role…"
+              placeholder="Email, Slack handle, role…"
             />
           </label>
           <label>
@@ -421,8 +418,8 @@ export function AdminUsersPage({ userId = null }) {
             <select value={sort} onChange={(e) => setSort(e.target.value)}>
               <option value="created_desc">Newest first</option>
               <option value="created_asc">Oldest first</option>
-              <option value="name_asc">Name A–Z</option>
-              <option value="name_desc">Name Z–A</option>
+              <option value="name_asc">Slack A–Z</option>
+              <option value="name_desc">Slack Z–A</option>
               <option value="role_asc">Role A–Z</option>
               <option value="role_desc">Role Z–A</option>
             </select>

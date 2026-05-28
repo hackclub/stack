@@ -71,9 +71,10 @@
   margin-left: 0.55rem;
   max-width: 10rem;
   overflow: hidden;
+  padding-bottom: 0.18rem;
   color: #ffffff;
   font-size: clamp(1rem, 1.35vw, 1.45rem);
-  line-height: 1.18;
+  line-height: 1.35;
   text-overflow: ellipsis;
   text-shadow: 0 2px 0 #1b3a7a;
   white-space: nowrap;

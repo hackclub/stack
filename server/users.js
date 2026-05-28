@@ -508,13 +508,9 @@ export function toPublicUser(row) {
   if (!row) return null;
   return {
     id: row.id,
-    hackclubSub: row.hackclub_sub,
     email: row.email,
-    name: row.name,
     slug: row.slug,
     profileImageUrl: row.profile_image_url,
-    slackId: row.slack_id,
-    verificationStatus: row.verification_status,
     role: effectiveRole(row),
     bricks: Number(row.bricks ?? 0),
     hackatimeConnected: Boolean(row.hackatime_access_token),
@@ -526,13 +522,9 @@ export function toPublicUserFromSessionSnapshot(snapshot) {
   if (!snapshot?.hackclubSub) return null;
   return {
     id: snapshot.id ?? null,
-    hackclubSub: snapshot.hackclubSub,
     email: snapshot.email ?? null,
-    name: snapshot.name ?? null,
     slug: snapshot.slug ?? null,
     profileImageUrl: snapshot.profileImageUrl ?? null,
-    slackId: snapshot.slackId ?? null,
-    verificationStatus: snapshot.verificationStatus ?? null,
     role: snapshot.role ?? DEFAULT_ROLE,
     bricks: Number(snapshot.bricks ?? 0),
   };
@@ -583,13 +575,10 @@ function toAdminUser(row) {
   return {
     id: row.id,
     email: row.email,
-    name: row.name,
     slug: row.slug,
     role: effectiveRole(row),
     bricks: Number(row.bricks ?? 0),
-    hackclubSub: row.hackclub_sub,
     profileImageUrl: row.profile_image_url,
-    verificationStatus: row.verification_status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
