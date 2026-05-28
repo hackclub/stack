@@ -1,0 +1,199 @@
+.rules-page {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: #73a5ca;
+}
+
+.rules-page__background {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.rules-page__content {
+  position: relative;
+  z-index: 2;
+  width: min(58rem, 90vw);
+  margin: 7.5rem auto 8rem;
+  color: #162456;
+}
+
+.rules-page__header {
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+.rules-page__eyebrow {
+  margin: 0 0 0.25rem;
+  color: #8d1f38;
+  font-size: 1rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.rules-page__header h1 {
+  margin: 0;
+  color: #8d1f38;
+  font-size: clamp(2.5rem, 5vw, 4.4rem);
+  line-height: 0.95;
+  text-shadow: 0 3px 0 #f6c65a;
+}
+
+.rules-page__header p {
+  max-width: 42rem;
+  margin: 0.85rem auto 0;
+  color: #fff8d8;
+  font-size: clamp(1rem, 1.8vw, 1.35rem);
+  text-shadow: 0 2px 0 #1b3a7a;
+}
+
+.rules-page__index {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+}
+
+.rules-page__index a,
+.rules-page__help a {
+  border: 3px solid #162456;
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  background: #fff8d8;
+  color: #162456;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 4px 4px 0 rgba(22, 36, 86, 0.25);
+}
+
+.rules-page__card {
+  margin: 1rem 0;
+  border: 4px solid #162456;
+  border-radius: 18px;
+  padding: clamp(1rem, 2vw, 1.35rem);
+  background: rgba(255, 248, 216, 0.94);
+  box-shadow: 7px 7px 0 rgba(22, 36, 86, 0.24);
+}
+
+.rules-page__card h2 {
+  margin: 0 0 0.7rem;
+  color: #8d1f38;
+  font-size: clamp(1.55rem, 2.6vw, 2.2rem);
+}
+
+.rules-page__card h3 {
+  margin: 0 0 0.5rem;
+  color: #162456;
+  font-size: 1.25rem;
+}
+
+.rules-page__card p,
+.rules-page__card li {
+  color: #27376f;
+  font-size: clamp(0.98rem, 1.3vw, 1.08rem);
+  line-height: 1.45;
+}
+
+.rules-page__card a {
+  color: #1b4cc0;
+  font-weight: 800;
+}
+
+.rules-page__card p {
+  margin: 0.45rem 0;
+}
+
+.rules-page__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.rules-page__checklist,
+.rules-page__card ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.rules-page__card li {
+  margin: 0.45rem 0;
+}
+
+.rules-page__callout {
+  border: 2px dashed #8d1f38;
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  background: rgba(246, 198, 90, 0.28);
+  font-weight: 800;
+}
+
+.rules-page__table-wrap {
+  overflow-x: auto;
+}
+
+.rules-page__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  background: #fff;
+}
+
+.rules-page__table th,
+.rules-page__table td {
+  border: 2px solid #c7d6ff;
+  padding: 0.65rem;
+  text-align: left;
+  color: #27376f;
+  vertical-align: top;
+}
+
+.rules-page__table th {
+  background: #dee6ff;
+  color: #162456;
+}
+
+.rules-page__help {
+  text-align: center;
+}
+
+.rules-page__help a {
+  display: inline-flex;
+  margin-top: 0.7rem;
+}
+
+.rules-page__back {
+  position: fixed;
+  left: 1.2rem;
+  bottom: 1.1rem;
+  z-index: 4;
+  transform: rotate(-9deg);
+  display: inline-flex;
+}
+
+.rules-page__back img {
+  width: min(8.5rem, 24vw);
+}
+
+.rules-page__brand {
+  position: fixed;
+  right: 1.3rem;
+  bottom: 0.7rem;
+  width: min(11rem, 30vw);
+  z-index: 4;
+}
+
+@media (max-width: 720px) {
+  .rules-page__content {
+    margin-top: 6.5rem;
+  }
+
+  .rules-page__grid {
+    grid-template-columns: 1fr;
+  }
+}

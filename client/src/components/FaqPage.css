@@ -40,6 +40,36 @@
   text-shadow: 0 2px 0 #f6c65a;
 }
 
+.faq-page__latest-warning {
+  margin: 0 auto 1rem;
+  max-width: 42rem;
+  border: 3px solid #8d1f38;
+  border-radius: 16px;
+  padding: 0.8rem 1rem;
+  background: rgba(255, 248, 216, 0.94);
+  color: #7a1b2d;
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+  font-weight: 800;
+  box-shadow: 5px 5px 0 rgba(141, 31, 56, 0.3);
+}
+
+.faq-page__latest-warning a {
+  color: #1b4cc0;
+}
+
+.faq-page__rules-link {
+  display: inline-flex;
+  margin: 0 0 1.2rem;
+  border: 3px solid #162456;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  background: #fff8d8;
+  color: #162456;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 4px 4px 0 rgba(22, 36, 86, 0.25);
+}
+
 .faq-page .stack-faq-list__item summary {
   color: #8d1f38;
   -webkit-text-stroke-color: #f6c65a;

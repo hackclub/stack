@@ -5,6 +5,7 @@ import { Hero } from "./components/Hero.jsx";
 import { LoginPage } from "./components/LoginPage.jsx";
 import { MainPage } from "./components/MainPage.jsx";
 import { ProjectsPage } from "./components/ProjectsPage.jsx";
+import { RulesPage } from "./components/RulesPage.jsx";
 import { ShopPage } from "./components/ShopPage.jsx";
 import { TestPage } from "./components/TestPage.jsx";
 import { AdminAirtableSyncPage } from "./components/AdminAirtableSyncPage.jsx";
@@ -16,7 +17,7 @@ import { AdminStatsPage } from "./components/AdminStatsPage.jsx";
 import { AdminUsersPage } from "./components/AdminUsersPage.jsx";
 import { UserAreaPage } from "./components/UserAreaPage.jsx";
 
-const PROTECTED = new Set(["/main", "/shop", "/projects", "/faq", "/user", "/test", "/admin"]);
+const PROTECTED = new Set(["/main", "/shop", "/projects", "/faq", "/rules", "/user", "/test", "/admin"]);
 
 function canStaffReviewRole(role) {
   return role === "reviewer" || role === "admin" || role === "superadmin";
@@ -110,6 +111,9 @@ export default function App() {
       break;
     case "/faq":
       page = <FaqPage />;
+      break;
+    case "/rules":
+      page = <RulesPage />;
       break;
     case "/user":
       page = <UserAreaPage />;

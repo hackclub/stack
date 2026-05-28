@@ -81,6 +81,9 @@ export function PlatformStatusBar({ user, className = "" }) {
           <span className="platform-status__username">{username}</span>
         </div>
       </div>
+      <a className="platform-status__rules" href="/rules">
+        Rules
+      </a>
     </section>
   );
 }

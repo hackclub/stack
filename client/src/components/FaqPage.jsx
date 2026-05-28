@@ -4,6 +4,7 @@ const stackTitle = "https://cdn.hackclub.com/019e3e5a-8745-7bee-a1ab-07b5743f98c
 import { useAuth } from "../auth/AuthContext.jsx";
 import { FaqList } from "./FaqList.jsx";
 import { PlatformStatusBar } from "./PlatformStatusBar.jsx";
+import { SlackChannels } from "./SlackChannels.jsx";
 import "./FaqPage.css";
 
 export function FaqPage() {
@@ -17,7 +18,16 @@ export function FaqPage() {
 
       <section className="faq-page__content">
         <h1 className="faq-page__heading">FAQ</h1>
+        <p className="faq-page__latest-warning">
+          Most recent FAQ updates live{" "}
+          <a href="https://hackclub.enterprise.slack.com/docs/T0266FRGM/F0B6U14BP4H" target="_blank" rel="noreferrer">
+            in this Slack doc
+          </a>
+          .
+        </p>
+        <a className="faq-page__rules-link" href="/rules">Read project ship rules</a>
         <FaqList />
+        <SlackChannels />
       </section>
 
       <a className="faq-page__back" href="/main" aria-label="Back to main menu">

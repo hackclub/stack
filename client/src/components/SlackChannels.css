@@ -1,0 +1,32 @@
+.stack-slack-channels {
+  margin: 1rem 0;
+  border: 4px solid #162456;
+  border-radius: 18px;
+  padding: clamp(1rem, 2vw, 1.25rem);
+  background: rgba(255, 248, 216, 0.94);
+  box-shadow: 7px 7px 0 rgba(22, 36, 86, 0.24);
+  text-align: center;
+}
+
+.stack-slack-channels h2 {
+  margin: 0 0 0.8rem;
+  color: #8d1f38;
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+}
+
+.stack-slack-channels__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.stack-slack-channels__links a {
+  border: 3px solid #162456;
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  background: #fff;
+  color: #162456;
+  font-weight: 800;
+  text-decoration: none;
+}
