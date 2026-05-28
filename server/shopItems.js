@@ -60,9 +60,9 @@ export async function ensureShopItemsTable() {
 
   await pool.query(`
     UPDATE shop_items
-    SET price = CEIL(price_usd * 10)
+    SET price = CEIL(price_usd * 20)
     WHERE price_usd IS NOT NULL
-      AND (price IS NULL OR price != CEIL(price_usd * 10))
+      AND (price IS NULL OR price != CEIL(price_usd * 20))
   `);
 
   for (const column of REMOVED_SHOP_ITEM_COLUMNS) {
@@ -300,7 +300,7 @@ function normalizeShopItemInput(input = {}) {
   const price = integerOrNull(input.price);
   return {
     name: textOrNull(input.name),
-    price: price ?? (priceUsd === null ? null : Math.ceil(priceUsd * 10)),
+    price: price ?? (priceUsd === null ? null : Math.ceil(priceUsd * 20)),
     itemLink: safeHttpUrl(input.itemLink ?? input.item_link),
     imageUrl: safeHttpUrl(input.imageUrl ?? input.image_url),
     description: textOrNull(input.description),
