@@ -844,7 +844,11 @@ function ProjectFormModal({
       const response = await fetch("/api/cdn/upload", {
         method: "POST",
         credentials: "include",
-        headers: { "x-file-type": file.type },
+        headers: {
+          "x-file-type": file.type,
+          "x-file-size": String(file.size),
+          "x-upload-purpose": "project-image",
+        },
         body: formData,
       });
       const data = await response.json();

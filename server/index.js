@@ -1,6 +1,8 @@
 import "./env.js";
 import cookieParser from "cookie-parser";
+import { randomUUID } from "crypto";
 import express from "express";
+import fs from "fs/promises";
 import session from "express-session";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -68,6 +70,7 @@ const LOCK_PASSWORD = process.env.SITE_LOCK_PASSWORD;
 const siteLockEnabled = Boolean(LOCK_USERNAME && LOCK_PASSWORD);
 const AIRTABLE_SYNC_SECRET = process.env.AIRTABLE_SYNC_SECRET;
 const SESSION_SECRET = process.env.SESSION_SECRET;
+const LOCAL_UPLOADS_DIR = path.join(__dirname, "uploads");
 
 if (isProd && !SESSION_SECRET) {
   throw new Error("[session] SESSION_SECRET must be set in production.");
@@ -100,6 +103,7 @@ app.use(
 const authRouter = createAuthRouter();
 app.use("/api/auth", authRouter);
 app.use("/auth", authRouter);
+app.use("/uploads", express.static(LOCAL_UPLOADS_DIR));
 
 async function requireFullAdmin(req, res, next) {
   const userId = req.session?.userId;
@@ -368,12 +372,99 @@ const ALLOWED_MEDIA_TYPES = new Set([
 ]);
 const ALLOWED_PROJECT_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "image/avif"]);
 const PROJECT_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
+const PROJECT_IMAGE_MULTIPART_MAX_BYTES = PROJECT_IMAGE_MAX_BYTES + 64 * 1024;
+const LOCAL_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+const LOCAL_UPLOAD_MULTIPART_MAX_BYTES = LOCAL_UPLOAD_MAX_BYTES + 256 * 1024;
+const MEDIA_EXTENSIONS = new Map([
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/gif", "gif"],
+  ["image/webp", "webp"],
+  ["image/avif", "avif"],
+  ["video/mp4", "mp4"],
+  ["video/webm", "webm"],
+  ["video/ogg", "ogv"],
+  ["video/quicktime", "mov"],
+]);
 
-app.post("/api/cdn/upload", requireUser, async (req, res) => {
-  if (!CDN_API_KEY) {
-    return res.status(503).json({ error: "CDN uploads are not configured on this server." });
+function readRequestBuffer(req, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let total = 0;
+
+    req.on("data", (chunk) => {
+      total += chunk.length;
+      if (total > maxBytes) {
+        reject(new Error("Upload too large."));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+}
+
+function multipartBoundary(contentType) {
+  return contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i)?.[1] || contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i)?.[2] || "";
+}
+
+function extractMultipartFile(buffer, contentType) {
+  const boundary = multipartBoundary(contentType);
+  if (!boundary) return null;
+
+  const delimiter = Buffer.from(`--${boundary}`);
+  const headerBreak = Buffer.from("\r\n\r\n");
+  let cursor = 0;
+
+  while (cursor < buffer.length) {
+    const boundaryStart = buffer.indexOf(delimiter, cursor);
+    if (boundaryStart === -1) return null;
+
+    let partStart = boundaryStart + delimiter.length;
+    if (buffer[partStart] === 45 && buffer[partStart + 1] === 45) return null;
+    if (buffer[partStart] === 13 && buffer[partStart + 1] === 10) partStart += 2;
+
+    const headerEnd = buffer.indexOf(headerBreak, partStart);
+    if (headerEnd === -1) return null;
+
+    const headers = buffer.subarray(partStart, headerEnd).toString("latin1");
+    const dataStart = headerEnd + headerBreak.length;
+    const nextBoundary = buffer.indexOf(Buffer.from(`\r\n--${boundary}`), dataStart);
+    if (nextBoundary === -1) return null;
+
+    if (/name="file"/i.test(headers) && /filename="/i.test(headers)) {
+      const filename = headers.match(/filename="([^"]*)"/i)?.[1] || "project-image";
+      return { filename, buffer: buffer.subarray(dataStart, nextBoundary) };
+    }
+
+    cursor = nextBoundary + 2;
   }
 
+  return null;
+}
+
+async function saveLocalUpload({ req, body, contentType, fileType, subdir, maxBytes, tooLargeMessage }) {
+  const file = extractMultipartFile(body, contentType);
+  if (!file?.buffer?.length) {
+    throw new Error("Could not read uploaded file.");
+  }
+  if (file.buffer.length > maxBytes) {
+    throw new Error(tooLargeMessage);
+  }
+
+  const uploadDir = path.join(LOCAL_UPLOADS_DIR, subdir);
+  await fs.mkdir(uploadDir, { recursive: true });
+
+  const extension = MEDIA_EXTENSIONS.get(fileType) || "bin";
+  const filename = `${Date.now()}-${randomUUID()}.${extension}`;
+  await fs.writeFile(path.join(uploadDir, filename), file.buffer);
+
+  return `${req.protocol}://${req.get("host")}/uploads/${subdir}/${filename}`;
+}
+
+app.post("/api/cdn/upload", requireUser, async (req, res) => {
   const contentType = req.headers["content-type"] || "";
   if (!contentType.startsWith("multipart/form-data")) {
     return res.status(400).json({ error: "Expected multipart/form-data." });
@@ -385,6 +476,7 @@ app.post("/api/cdn/upload", requireUser, async (req, res) => {
   }
 
   const uploadPurpose = (req.headers["x-upload-purpose"] || "").toLowerCase().trim();
+  let bufferedBody = null;
   if (uploadPurpose === "project-image") {
     const fileSize = Number(req.headers["x-file-size"]);
     const contentLength = Number(req.headers["content-length"]);
@@ -394,21 +486,66 @@ app.post("/api/cdn/upload", requireUser, async (req, res) => {
     if (!Number.isFinite(fileSize) || fileSize > PROJECT_IMAGE_MAX_BYTES) {
       return res.status(400).json({ error: "Project image must be 3MB or smaller." });
     }
-    if (Number.isFinite(contentLength) && contentLength > PROJECT_IMAGE_MAX_BYTES + 64 * 1024) {
+    if (Number.isFinite(contentLength) && contentLength > PROJECT_IMAGE_MULTIPART_MAX_BYTES) {
+      return res.status(400).json({ error: "Project image upload is too large." });
+    }
+
+    try {
+      bufferedBody = await readRequestBuffer(req, PROJECT_IMAGE_MULTIPART_MAX_BYTES);
+    } catch {
       return res.status(400).json({ error: "Project image upload is too large." });
     }
   }
 
+  if (!CDN_API_KEY) {
+    if (!bufferedBody) {
+      const contentLength = Number(req.headers["content-length"]);
+      if (Number.isFinite(contentLength) && contentLength > LOCAL_UPLOAD_MULTIPART_MAX_BYTES) {
+        return res.status(400).json({ error: "Upload is too large for local development storage." });
+      }
+      try {
+        bufferedBody = await readRequestBuffer(req, LOCAL_UPLOAD_MULTIPART_MAX_BYTES);
+      } catch {
+        return res.status(400).json({ error: "Upload is too large for local development storage." });
+      }
+    }
+
+    try {
+      const isProjectImage = uploadPurpose === "project-image";
+      const url = await saveLocalUpload({
+        req,
+        body: bufferedBody,
+        contentType,
+        fileType,
+        subdir: isProjectImage ? "project-images" : "cdn",
+        maxBytes: isProjectImage ? PROJECT_IMAGE_MAX_BYTES : LOCAL_UPLOAD_MAX_BYTES,
+        tooLargeMessage: isProjectImage ? "Project image must be 3MB or smaller." : "Upload is too large for local development storage.",
+      });
+      return res.json({ url });
+    } catch (error) {
+      return res.status(400).json({ error: error.message || "Failed to save uploaded file." });
+    }
+  }
+
   try {
-    const cdnResponse = await fetch(CDN_UPLOAD_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${CDN_API_KEY}`,
-        "Content-Type": contentType,
-      },
-      body: req,
-      duplex: "half",
-    });
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), 20000);
+    let cdnResponse;
+    try {
+      cdnResponse = await fetch(CDN_UPLOAD_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${CDN_API_KEY}`,
+          "Content-Type": contentType,
+          ...(bufferedBody ? { "Content-Length": String(bufferedBody.length) } : {}),
+        },
+        body: bufferedBody || req,
+        duplex: "half",
+        signal: abortController.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     const data = await cdnResponse.json();
     if (!cdnResponse.ok) {
