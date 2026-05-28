@@ -109,6 +109,8 @@ const ALLOWED_UPLOAD_TYPES = new Set([
   "video/ogg",
   "video/quicktime",
 ]);
+const PROJECT_IMAGE_UPLOAD_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "image/avif"]);
+const PROJECT_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
 
 function isVideoUrl(url) {
   const ext = url.split("?")[0].split(".").pop()?.toLowerCase();
@@ -669,7 +671,11 @@ function JournalModal({ project, entries, form, onChange, onClose, onSubmit }) {
       const response = await fetch("/api/cdn/upload", {
         method: "POST",
         credentials: "include",
-        headers: { "x-file-type": file.type },
+        headers: {
+          "x-file-type": file.type,
+          "x-file-size": String(file.size),
+          "x-upload-purpose": "project-image",
+        },
         body: formData,
       });
       const data = await response.json();
@@ -796,6 +802,10 @@ function ProjectFormModal({
   onSubmit,
 }) {
   const [allProjects, setAllProjects] = useState([]);
+  const [imageUploadError, setImageUploadError] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageDragging, setImageDragging] = useState(false);
+  const imageInputRef = useRef(null);
 
   useEffect(() => {
     (async () => {
@@ -814,6 +824,44 @@ function ProjectFormModal({
       .filter((p) => p.shipped && p.id !== project.id)
       .flatMap((p) => p.hackatimeNames || [])
   );
+
+  async function uploadProjectImage(file) {
+    if (!file) return;
+    if (!PROJECT_IMAGE_UPLOAD_TYPES.has(file.type)) {
+      setImageUploadError("Use an image file: JPEG, PNG, GIF, WebP, or AVIF.");
+      return;
+    }
+    if (file.size > PROJECT_IMAGE_MAX_BYTES) {
+      setImageUploadError("Project image must be 3MB or smaller.");
+      return;
+    }
+
+    setImageUploadError("");
+    setImageUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/cdn/upload", {
+        method: "POST",
+        credentials: "include",
+        headers: { "x-file-type": file.type },
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Upload failed.");
+      onChange("imageUrl", data.url);
+    } catch (err) {
+      setImageUploadError(err.message);
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
+  function handleProjectImageDrop(event) {
+    event.preventDefault();
+    setImageDragging(false);
+    uploadProjectImage(event.dataTransfer.files?.[0]);
+  }
 
   return (
     <div className="projects-page__modal-overlay" role="presentation" onClick={onClose}>
@@ -849,10 +897,46 @@ function ProjectFormModal({
             Code URL (required before shipping)
             <input type="url" value={project.codeUrl || ""} onChange={(event) => onChange("codeUrl", event.target.value)} />
           </label>
-          <label>
-            Project image URL (required before shipping)
-            <input type="url" value={project.imageUrl || ""} onChange={(event) => onChange("imageUrl", event.target.value)} />
-          </label>
+          <div className="projects-page__image-field">
+            <span>Project image (required before shipping)</span>
+            <div
+              className={`projects-page__image-dropzone${imageDragging ? " projects-page__image-dropzone--drag" : ""}`}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setImageDragging(true);
+              }}
+              onDragLeave={() => setImageDragging(false)}
+              onDrop={handleProjectImageDrop}
+            >
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp,image/avif"
+                className="projects-page__image-input"
+                onChange={(event) => {
+                  uploadProjectImage(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+              {project.imageUrl ? (
+                <img className="projects-page__image-preview" src={project.imageUrl} alt="" />
+              ) : (
+                <p>Drag &amp; drop an image here</p>
+              )}
+              <small>Max. 3MB. JPEG, PNG, GIF, WebP, or AVIF.</small>
+              <div className="projects-page__image-actions">
+                <button type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading}>
+                  {imageUploading ? "Uploading..." : project.imageUrl ? "Replace image" : "Choose image"}
+                </button>
+                {project.imageUrl ? (
+                  <button type="button" className="projects-page__danger-btn" onClick={() => onChange("imageUrl", "")} disabled={imageUploading}>
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            {imageUploadError ? <p className="journal-upload-error">{imageUploadError}</p> : null}
+          </div>
           <fieldset
             disabled={!hackatimeConnected}
             className={hackatimeConnected ? "projects-page__hackatime" : "projects-page__hackatime-disabled"}
@@ -894,7 +978,7 @@ function ProjectFormModal({
               <p className="projects-page__hackatime-summary">Linked Hackatime: {project.hackatimeHours} h</p>
             ) : null}
           </fieldset>
-          <button type="submit">Save Project</button>
+          <button type="submit" disabled={imageUploading}>Save Project</button>
         </form>
       </section>
     </div>

@@ -366,6 +366,8 @@ const ALLOWED_MEDIA_TYPES = new Set([
   "video/ogg",
   "video/quicktime",
 ]);
+const ALLOWED_PROJECT_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "image/avif"]);
+const PROJECT_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
 
 app.post("/api/cdn/upload", requireUser, async (req, res) => {
   if (!CDN_API_KEY) {
@@ -380,6 +382,21 @@ app.post("/api/cdn/upload", requireUser, async (req, res) => {
   const fileType = (req.headers["x-file-type"] || "").toLowerCase().trim();
   if (!fileType || !ALLOWED_MEDIA_TYPES.has(fileType)) {
     return res.status(400).json({ error: "Unsupported file type. Only images (JPEG, PNG, GIF, WebP, AVIF) and videos (MP4, WebM, OGG, MOV) are allowed." });
+  }
+
+  const uploadPurpose = (req.headers["x-upload-purpose"] || "").toLowerCase().trim();
+  if (uploadPurpose === "project-image") {
+    const fileSize = Number(req.headers["x-file-size"]);
+    const contentLength = Number(req.headers["content-length"]);
+    if (!ALLOWED_PROJECT_IMAGE_TYPES.has(fileType)) {
+      return res.status(400).json({ error: "Project images must be JPEG, PNG, GIF, WebP, or AVIF." });
+    }
+    if (!Number.isFinite(fileSize) || fileSize > PROJECT_IMAGE_MAX_BYTES) {
+      return res.status(400).json({ error: "Project image must be 3MB or smaller." });
+    }
+    if (Number.isFinite(contentLength) && contentLength > PROJECT_IMAGE_MAX_BYTES + 64 * 1024) {
+      return res.status(400).json({ error: "Project image upload is too large." });
+    }
   }
 
   try {

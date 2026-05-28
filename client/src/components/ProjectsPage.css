@@ -359,6 +359,13 @@
   font-weight: 700;
 }
 
+.projects-page__image-field {
+  display: grid;
+  gap: 0.25rem;
+  color: #27376f;
+  font-weight: 700;
+}
+
 .projects-page__form input,
 .projects-page__form textarea,
 .projects-page__form select {
@@ -373,6 +380,56 @@
 .projects-page__form textarea {
   min-height: 5rem;
   resize: vertical;
+}
+
+.projects-page__image-dropzone {
+  display: grid;
+  gap: 0.5rem;
+  place-items: center;
+  min-height: 9rem;
+  border: 2px dashed #9cb7ff;
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.58);
+  color: #304389;
+  text-align: center;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.projects-page__image-dropzone--drag {
+  border-color: #3b5fc0;
+  background: rgba(59, 95, 192, 0.12);
+  box-shadow: 0 0 0 3px rgba(59, 95, 192, 0.2);
+}
+
+.projects-page__image-input {
+  display: none;
+}
+
+.projects-page__image-preview {
+  max-width: 100%;
+  max-height: 10rem;
+  border: 2px solid #c7d6ff;
+  border-radius: 10px;
+  background: #eef2ff;
+  object-fit: contain;
+}
+
+.projects-page__image-dropzone p {
+  margin: 0;
+}
+
+.projects-page__image-dropzone small {
+  color: #6b7ea8;
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+
+.projects-page__image-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: center;
 }
 
 .projects-page__hackatime {
