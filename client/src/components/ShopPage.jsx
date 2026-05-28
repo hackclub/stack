@@ -12,6 +12,8 @@ const stackTitle = "https://cdn.hackclub.com/019e3e5a-8745-7bee-a1ab-07b5743f98c
 const legoCharacter = "https://cdn.hackclub.com/019e3e5a-6d71-79f0-9633-8668b69f464d/legoChar_1.png";
 import "./ShopPage.css";
 
+const BRICKS_PER_USD = 20;
+
 function formatBricks(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? Math.round(numeric).toString() : "0";
@@ -74,7 +76,7 @@ export function ShopPage() {
   const quantity = Math.max(1, Number(purchaseQuantity) || 1);
   const shippingUsd = shippingTaxUsd ? Number(shippingTaxUsd) : 0;
   const safeShippingUsd = Number.isFinite(shippingUsd) ? shippingUsd : 0;
-  const shippingBricks = safeShippingUsd ? Math.ceil(safeShippingUsd * 10) : 0;
+  const shippingBricks = safeShippingUsd ? Math.ceil(safeShippingUsd * BRICKS_PER_USD) : 0;
   const totalBricks = baseBricks * quantity + (Number.isFinite(shippingBricks) ? shippingBricks : 0);
   const itemUsd = selectedItem?.priceUsd != null ? Number(selectedItem.priceUsd) : baseBricks / 10;
   const totalUsd = (Number.isFinite(itemUsd) ? itemUsd : 0) * quantity + safeShippingUsd;

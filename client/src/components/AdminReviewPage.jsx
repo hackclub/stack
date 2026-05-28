@@ -39,6 +39,8 @@ function formatHours(value) {
   return Number(value ?? 0).toFixed(2);
 }
 
+const BRICKS_PER_APPROVED_HOUR = 20;
+
 function formatDate(value) {
   if (!value) return "Shipped (unknown date)";
   return `Shipped ${new Date(value).toLocaleDateString()}`;
@@ -231,7 +233,7 @@ function AdminReviewDetail({ projectId }) {
       if (!response.ok) throw new Error(data.error || "Failed to load project.");
       setProject(data.project);
       setJournalEntries(data.journalEntries || []);
-      setApprovedHours(data.project?.pendingReviewHours ? String(data.project.pendingReviewHours) : "");
+      setApprovedHours("");
       setStatus("");
     } catch (err) {
       setMessage(err.message);
@@ -355,6 +357,8 @@ function AdminReviewDetail({ projectId }) {
   const isSuperadmin = user?.role === "superadmin";
   const newHoursMax = Number(project.pendingReviewHours ?? 0);
   const newHoursPlaceholder = formatHours(newHoursMax);
+  const approvedHoursNumber = Number.parseFloat(approvedHours);
+  const awardPreview = Number.isFinite(approvedHoursNumber) ? approvedHoursNumber * BRICKS_PER_APPROVED_HOUR : 0;
 
   return (
     <main className="admin-review-page">
@@ -453,6 +457,7 @@ function AdminReviewDetail({ projectId }) {
                 disabled={isAlreadyReviewed}
                 onChange={(event) => setApprovedHours(clampApprovalHours(event.target.value, newHoursMax))}
               />
+              <small>Only this approved amount awards bricks: {formatHours(awardPreview)} bricks</small>
             </div>
             <div>
               <span>Journal hours</span>

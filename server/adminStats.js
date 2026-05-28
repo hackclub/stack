@@ -126,7 +126,7 @@ export async function getAdminStats() {
     `),
     pool.query(`SELECT COALESCE(SUM(bricks), 0) AS wallet_bricks FROM users`),
     pool.query(`
-      SELECT COALESCE(SUM(bricks_earned), 0) AS total_earned FROM projects WHERE status = 'approved'
+      SELECT COALESCE(SUM(bricks_earned), 0) AS total_earned FROM projects WHERE COALESCE(approved_hours, 0) > 0
     `),
     pool.query(`
       SELECT

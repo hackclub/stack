@@ -4,6 +4,8 @@ import { syncJournalEntryToAirtable } from "./airtableJournals.js";
 import { deleteProjectSubmissionsFromYsws, ensureYswsProjectSubmissionsTable, submitProjectToYsws } from "./airtableYsws.js";
 import { fetchHackatimeProjects, sumHackatimeHoursForNames } from "./hackatimeAuth.js";
 
+export const BRICKS_PER_APPROVED_HOUR = 20;
+
 export async function ensureProjectsTable() {
   if (!pool) {
     console.warn("[projects] DATABASE_URL not set; skipping projects table setup.");
@@ -97,6 +99,35 @@ export async function ensureProjectsTable() {
   await pool.query(`UPDATE projects SET fraud_flag = FALSE WHERE fraud_flag IS NULL`);
   await pool.query(`UPDATE projects SET ship_kind = 'initial' WHERE ship_kind IS NULL`);
   await pool.query(`UPDATE projects SET blocked = FALSE WHERE blocked IS NULL`);
+  await pool.query(`
+    WITH mismatched AS (
+      SELECT
+        id,
+        user_id,
+        COALESCE(bricks_earned, 0) AS old_bricks,
+        ROUND(COALESCE(approved_hours, 0) * $1, 2) AS new_bricks
+      FROM projects
+      WHERE COALESCE(bricks_earned, 0) != ROUND(COALESCE(approved_hours, 0) * $1, 2)
+    ),
+    corrected AS (
+      UPDATE projects
+      SET bricks_earned = mismatched.new_bricks,
+          updated_at = NOW()
+      FROM mismatched
+      WHERE projects.id = mismatched.id
+      RETURNING mismatched.user_id, mismatched.new_bricks - mismatched.old_bricks AS delta
+    ),
+    deltas AS (
+      SELECT user_id, SUM(delta) AS delta
+      FROM corrected
+      GROUP BY user_id
+    )
+    UPDATE users
+    SET bricks = GREATEST(0, users.bricks + deltas.delta),
+        updated_at = NOW()
+    FROM deltas
+    WHERE users.id = deltas.user_id
+  `, [BRICKS_PER_APPROVED_HOUR]);
   await pool.query(`
     UPDATE projects
     SET last_shipped_hours = GREATEST(
@@ -436,7 +467,7 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
       throw new Error(`Cannot approve ${newTotalApprovedHours.toFixed(2)} total hours because only ${totalLoggedHours.toFixed(2)} hours are logged.`);
     }
 
-    const bricksDelta = approvedHours * 20;
+    const bricksDelta = approvedHours * BRICKS_PER_APPROVED_HOUR;
     const reductionHours = Math.max(0, roundedHours(totalLoggedHours - newTotalApprovedHours));
     const newCumulativeBricks = Number(project.bricks_earned ?? 0) + bricksDelta;
 
@@ -506,8 +537,9 @@ export async function rejectAdminReviewProject(adminId, projectId, input = {}) {
     await client.query("BEGIN");
     await refreshProjectJournalHoursWithClient(client, projectId);
 
-    const lookup = await client.query("SELECT ship_kind FROM projects WHERE id = $1 FOR UPDATE", [projectId]);
-    const isReship = lookup.rows[0]?.ship_kind === "reship";
+    const lookup = await client.query("SELECT * FROM projects WHERE id = $1 FOR UPDATE", [projectId]);
+    const project = lookup.rows[0];
+    const isReship = project?.ship_kind === "reship";
 
     const result = await client.query(
       `

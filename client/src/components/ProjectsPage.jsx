@@ -889,8 +889,9 @@ function ProjectFormModal({
             <select value={project.projectType || "software"} onChange={(event) => onChange("projectType", event.target.value)}>
               <option value="software">Software</option>
               <option value="hardware">Hardware</option>
-              <option value="art">Art</option>
-              <option value="other">Other</option>
+              <option value="art" disabled title="Coming soon...">
+                Art (Coming soon...)
+              </option>
             </select>
           </label>
           <label>

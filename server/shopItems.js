@@ -27,6 +27,7 @@ const REMOVED_SHOP_ITEM_COLUMNS = [
 ];
 
 const REMOVED_SHOP_ORDER_COLUMNS = ["total_coins"];
+const BRICKS_PER_USD = 20;
 
 export async function ensureShopItemsTable() {
   if (!pool) {
@@ -60,10 +61,10 @@ export async function ensureShopItemsTable() {
 
   await pool.query(`
     UPDATE shop_items
-    SET price = CEIL(price_usd * 20)
+    SET price = CEIL(price_usd * $1)
     WHERE price_usd IS NOT NULL
-      AND (price IS NULL OR price != CEIL(price_usd * 20))
-  `);
+      AND (price IS NULL OR price != CEIL(price_usd * $1))
+  `, [BRICKS_PER_USD]);
 
   for (const column of REMOVED_SHOP_ITEM_COLUMNS) {
     await pool.query(`ALTER TABLE shop_items DROP COLUMN IF EXISTS ${column}`);
@@ -233,7 +234,7 @@ export async function purchaseShopItemForUser(userId, itemId, input = {}) {
     }
 
     const itemBricks = Number(item.price ?? 0);
-    const shippingBricks = Math.ceil(shippingTaxUsd * 10);
+    const shippingBricks = Math.ceil(shippingTaxUsd * BRICKS_PER_USD);
     const totalBricks = itemBricks * quantity + shippingBricks;
 
     const userResult = await client.query(
@@ -300,7 +301,7 @@ function normalizeShopItemInput(input = {}) {
   const price = integerOrNull(input.price);
   return {
     name: textOrNull(input.name),
-    price: price ?? (priceUsd === null ? null : Math.ceil(priceUsd * 20)),
+    price: price ?? (priceUsd === null ? null : Math.ceil(priceUsd * BRICKS_PER_USD)),
     itemLink: safeHttpUrl(input.itemLink ?? input.item_link),
     imageUrl: safeHttpUrl(input.imageUrl ?? input.image_url),
     description: textOrNull(input.description),
