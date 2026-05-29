@@ -2,7 +2,7 @@ import { pool } from "./db.js";
 import { deleteProjectFromAirtable, persistProjectAirtableRecordId, syncProjectToAirtable } from "./airtableProjects.js";
 import { syncJournalEntryToAirtable } from "./airtableJournals.js";
 import { deleteProjectSubmissionsFromYsws, ensureYswsProjectSubmissionsTable, submitProjectToYsws } from "./airtableYsws.js";
-import { fetchHackatimeProjects, sumHackatimeHoursForNames } from "./hackatimeAuth.js";
+import { fetchHackatimeProjectsForStack, sumHackatimeHoursForNames } from "./hackatimeAuth.js";
 
 export const BRICKS_PER_APPROVED_HOUR = 20;
 
@@ -290,7 +290,10 @@ export async function updateProjectForUser(userId, projectId, input) {
 export async function shipProjectForUser(userId, projectId) {
   if (!pool) throw new Error("DATABASE_URL is not set.");
 
-  await refreshProjectJournalHours(userId, projectId);
+  await Promise.all([
+    refreshProjectJournalHours(userId, projectId),
+    applyHackatimeHoursToProject(userId, projectId),
+  ]);
   const project = await getProjectRowForUser(userId, projectId);
   if (!project) {
     throw new Error("Project not found.");
@@ -847,7 +850,7 @@ export async function refreshProjectHackatimeHoursForUser(userId, hackatimeProje
   const token = tokenResult.rows[0]?.hackatime_access_token;
   if (!token && !hackatimeProjects) return;
 
-  const list = hackatimeProjects || (await fetchHackatimeProjects(token));
+  const list = hackatimeProjects || (await fetchHackatimeProjectsForStack(token));
   const projectsResult = await pool.query(
     `SELECT id, hackatime_names FROM projects WHERE user_id = $1`,
     [userId]
@@ -877,7 +880,7 @@ async function applyHackatimeHoursToProject(userId, projectId) {
     [projectId, userId]
   );
   const names = projectResult.rows[0]?.hackatime_names || [];
-  const list = await fetchHackatimeProjects(token);
+  const list = await fetchHackatimeProjectsForStack(token);
   const hours = sumHackatimeHoursForNames(list, names);
 
   await pool.query(

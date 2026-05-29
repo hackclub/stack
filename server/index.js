@@ -10,7 +10,7 @@ import { createAuthRouter } from "./authRoutes.js";
 import { getAirtableSyncStatus, syncDatabaseToAirtable } from "./airtable.js";
 import { getPeriodicAirtableSyncStatus, startPeriodicAirtableSync, syncAllUsersAndProjectsToAirtable } from "./airtablePeriodic.js";
 import { isHackatimeOAuthConfigured } from "./hackatimeAuth.js";
-import { getHackatimeStatusForUser, listHackatimeProjectsForUser } from "./hackatimeService.js";
+import { getHackatimeStatusForUser, listHackatimeProjectsForUser, refreshUserHackatimeCache } from "./hackatimeService.js";
 import { checkDatabaseConnection, getTestRows } from "./db.js";
 import { adjustUserBricks, ensureAuditLogTable, getAdminStats, getAuditLogForTarget } from "./adminStats.js";
 import {
@@ -262,6 +262,17 @@ app.get("/api/hackatime/status", requireUser, async (req, res) => {
   } catch (error) {
     console.error("Failed to load Hackatime status:", error);
     res.status(500).json({ error: "Failed to load Hackatime status." });
+  }
+});
+
+app.post("/api/hackatime/refresh", requireUser, async (req, res) => {
+  try {
+    await refreshUserHackatimeCache(req.session.userId);
+    const projects = await listProjectsForUser(req.session.userId);
+    res.json({ projects });
+  } catch (error) {
+    console.error("Failed to refresh Hackatime hours:", error);
+    res.status(500).json({ error: error.message || "Failed to refresh Hackatime hours." });
   }
 });
 

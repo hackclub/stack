@@ -114,10 +114,14 @@ export async function fetchHackatimeMe(accessToken) {
   return hackatimeApiGet(accessToken, "/api/v1/authenticated/me");
 }
 
-export async function fetchHackatimeProjects(accessToken, { includeArchived = false } = {}) {
-  const data = await hackatimeApiGet(accessToken, "/api/v1/authenticated/projects", {
-    include_archived: includeArchived ? "true" : "false",
-  });
+export const STACK_LAUNCH_UTC = new Date("2026-05-28T04:00:00Z");
+
+export async function fetchHackatimeProjects(accessToken, { includeArchived = false, start = null, end = null } = {}) {
+  const query = { include_archived: includeArchived ? "true" : "false" };
+  if (start) query.start = start;
+  if (end) query.end = end;
+
+  const data = await hackatimeApiGet(accessToken, "/api/v1/authenticated/projects", query);
 
   const projects = Array.isArray(data.projects) ? data.projects : [];
   return projects.map((project) => ({
@@ -128,6 +132,36 @@ export async function fetchHackatimeProjects(accessToken, { includeArchived = fa
     archived: Boolean(project.archived),
     mostRecentHeartbeat: project.most_recent_heartbeat ?? null,
   }));
+}
+
+export async function fetchHackatimeProjectsForStack(accessToken) {
+  const [preLaunchProjects, postLaunchProjects] = await Promise.all([
+    fetchHackatimeProjects(accessToken, { start: "2006-01-01", end: "2026-05-27" }),
+    fetchHackatimeProjects(accessToken, { start: "2026-05-28" }),
+  ]);
+
+  // Projects eligible for Stack: had any tracked time before the launch date
+  const eligibleNames = new Set(
+    preLaunchProjects
+      .filter((p) => p.totalSeconds > 0)
+      .map((p) => p.name.trim().toLowerCase())
+  );
+
+  const postLaunchByName = new Map(
+    postLaunchProjects.map((p) => [p.name.trim().toLowerCase(), p])
+  );
+
+  return preLaunchProjects
+    .filter((p) => eligibleNames.has(p.name.trim().toLowerCase()))
+    .map((p) => {
+      const post = postLaunchByName.get(p.name.trim().toLowerCase());
+      const newSeconds = post?.totalSeconds ?? 0;
+      return {
+        ...p,
+        totalSeconds: newSeconds,
+        totalHours: Number((newSeconds / 3600).toFixed(2)),
+      };
+    });
 }
 
 export async function fetchHackatimeTotalHours(accessToken) {

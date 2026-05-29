@@ -202,6 +202,7 @@ export function ProjectsPage() {
   useEffect(() => {
     loadProjects();
     loadHackatimeStatus();
+    refreshHackatimeHours();
   }, []);
 
   async function openEditProject(project) {
@@ -230,6 +231,17 @@ export function ProjectsPage() {
       setHackatimeProjects(data.projects || []);
     } catch {
       setHackatimeAvailable(false);
+    }
+  }
+
+  async function refreshHackatimeHours() {
+    try {
+      const response = await fetch("/api/hackatime/refresh", { method: "POST", credentials: "include" });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.projects) setProjects(data.projects);
+    } catch {
+      // silently ignore — hours will still show last cached values
     }
   }
 
@@ -358,6 +370,12 @@ export function ProjectsPage() {
 
     setError("");
     try {
+      const refreshRes = await fetch("/api/hackatime/refresh", { method: "POST", credentials: "include" });
+      if (refreshRes.ok) {
+        const refreshData = await refreshRes.json();
+        if (refreshData.projects) setProjects(refreshData.projects);
+      }
+
       const response = await fetch(`/api/projects/${project.id}/ship`, {
         method: "POST",
         credentials: "include",

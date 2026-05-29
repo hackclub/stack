@@ -3,6 +3,7 @@ import { syncPostgresUserToAirtable } from "./airtableUsers.js";
 import {
   fetchHackatimeMe,
   fetchHackatimeProjects,
+  fetchHackatimeProjectsForStack,
   fetchHackatimeTotalHours,
   isHackatimeOAuthConfigured,
   sumHackatimeHoursForNames,
@@ -59,8 +60,8 @@ export async function refreshUserHackatimeCache(userId, accessToken) {
     return { projects: [], totalHours: 0 };
   }
 
-  const [projects, hours] = await Promise.all([
-    fetchHackatimeProjects(token),
+  const [stackProjects, hours] = await Promise.all([
+    fetchHackatimeProjectsForStack(token),
     fetchHackatimeTotalHours(token),
   ]);
 
@@ -73,7 +74,7 @@ export async function refreshUserHackatimeCache(userId, accessToken) {
     [hours.totalHours, userId]
   );
 
-  await refreshProjectHackatimeHoursForUser(userId, projects);
+  await refreshProjectHackatimeHoursForUser(userId, stackProjects);
 
   const userRow = (
     await pool.query(`SELECT * FROM users WHERE id = $1`, [userId])
@@ -90,7 +91,7 @@ export async function refreshUserHackatimeCache(userId, accessToken) {
     }
   }
 
-  return { projects, totalHours: hours.totalHours };
+  return { projects: stackProjects, totalHours: hours.totalHours };
 }
 
 export async function connectHackatimeForUser(userId, tokenResponse) {
@@ -129,7 +130,7 @@ export async function getHackatimeStatusForUser(userId) {
     const userRow = (
       await pool.query(`SELECT hackatime_total_hours FROM users WHERE id = $1`, [userId])
     ).rows[0];
-    const projects = await fetchHackatimeProjects(token);
+    const projects = await fetchHackatimeProjectsForStack(token);
     return {
       configured: true,
       connected: true,
@@ -154,6 +155,6 @@ export async function getHackatimeStatusForUser(userId) {
 export async function listHackatimeProjectsForUser(userId) {
   const token = await getHackatimeAccessTokenForUser(userId);
   if (!token) return [];
-  return fetchHackatimeProjects(token);
+  return fetchHackatimeProjectsForStack(token);
 }
 
