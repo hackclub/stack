@@ -116,12 +116,10 @@ export async function fetchHackatimeMe(accessToken) {
 
 export const STACK_LAUNCH_UTC = new Date("2026-05-28T04:00:00Z");
 
-export async function fetchHackatimeProjects(accessToken, { includeArchived = false, start = null, end = null } = {}) {
-  const query = { include_archived: includeArchived ? "true" : "false" };
-  if (start) query.start = start;
-  if (end) query.end = end;
-
-  const data = await hackatimeApiGet(accessToken, "/api/v1/authenticated/projects", query);
+export async function fetchHackatimeProjects(accessToken, { includeArchived = false } = {}) {
+  const data = await hackatimeApiGet(accessToken, "/api/v1/authenticated/projects", {
+    include_archived: includeArchived ? "true" : "false",
+  });
 
   const projects = Array.isArray(data.projects) ? data.projects : [];
   return projects.map((project) => ({
@@ -135,26 +133,25 @@ export async function fetchHackatimeProjects(accessToken, { includeArchived = fa
 }
 
 export async function fetchHackatimeProjectsForStack(accessToken) {
-  const [preLaunchProjects, postLaunchProjects] = await Promise.all([
-    fetchHackatimeProjects(accessToken, { start: "2006-01-01", end: "2026-05-27" }),
-    fetchHackatimeProjects(accessToken, { start: "2026-05-28" }),
+  const today = new Date().toISOString().slice(0, 10);
+  const [allProjects, postLaunchProjects] = await Promise.all([
+    fetchHackatimeProjects(accessToken),
+    fetchHackatimeProjects(accessToken, { start: "2026-05-28", end: today }),
   ]);
-
-  // Projects eligible for Stack: had any tracked time before the launch date
-  const eligibleNames = new Set(
-    preLaunchProjects
-      .filter((p) => p.totalSeconds > 0)
-      .map((p) => p.name.trim().toLowerCase())
-  );
 
   const postLaunchByName = new Map(
     postLaunchProjects.map((p) => [p.name.trim().toLowerCase(), p])
   );
 
-  return preLaunchProjects
-    .filter((p) => eligibleNames.has(p.name.trim().toLowerCase()))
+  return allProjects
+    .filter((p) => {
+      const key = p.name.trim().toLowerCase();
+      const postSeconds = postLaunchByName.get(key)?.totalSeconds ?? 0;
+      return p.totalSeconds > postSeconds;
+    })
     .map((p) => {
-      const post = postLaunchByName.get(p.name.trim().toLowerCase());
+      const key = p.name.trim().toLowerCase();
+      const post = postLaunchByName.get(key);
       const newSeconds = post?.totalSeconds ?? 0;
       return {
         ...p,
