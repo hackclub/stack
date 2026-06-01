@@ -155,6 +155,7 @@ function displayStatus(project) {
 }
 
 function getShipLockReason(project) {
+  if (project.status === "in-review") return "Project is currently in review.";
   const missing = [];
   if (!project.playableUrl) missing.push("playable URL missing");
   if (!project.codeUrl) missing.push("code URL missing");
