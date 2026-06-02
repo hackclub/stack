@@ -16,6 +16,9 @@
   "devDependencies": {
     "concurrently": "^9.1.0"
   },
+  "overrides": {
+    "esbuild": "^0.25.0"
+  },
   "dependencies": {
     "airtable": "^0.12.2",
     "canvas-confetti": "^1.9.4"
