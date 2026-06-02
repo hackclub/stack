@@ -600,6 +600,15 @@
   color: #f7cf57;
 }
 
+.journal-media-loading,
+.admin-review-journal-description .journal-media-loading {
+  display: block;
+  margin: 0.4rem 0;
+  color: rgba(232, 244, 255, 0.65);
+  font-size: 0.88rem;
+  font-style: italic;
+}
+
 .admin-review-hours-warning {
   margin: 0.35rem 0 0;
   color: #ffd4bf;

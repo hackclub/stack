@@ -116,6 +116,14 @@ export async function fetchHackatimeMe(accessToken) {
 
 export const STACK_LAUNCH_UTC = new Date("2026-05-28T04:00:00Z");
 
+/** Hackatime stats range: ISO 8601 (API rejects bare YYYY-MM-DD dates). */
+export function stackHackatimeStatsRange() {
+  return {
+    start: STACK_LAUNCH_UTC.toISOString(),
+    end: new Date().toISOString(),
+  };
+}
+
 export async function fetchHackatimeProjects(accessToken, { includeArchived = false, start = null, end = null } = {}) {
   const query = { include_archived: includeArchived ? "true" : "false" };
   if (start) query.start = start;
@@ -134,10 +142,10 @@ export async function fetchHackatimeProjects(accessToken, { includeArchived = fa
 }
 
 export async function fetchHackatimeProjectsForStack(accessToken) {
-  const today = new Date().toISOString().slice(0, 10);
+  const statsRange = stackHackatimeStatsRange();
   const [allProjects, postLaunchProjects] = await Promise.all([
     fetchHackatimeProjects(accessToken),
-    fetchHackatimeProjects(accessToken, { start: "2026-05-28", end: today }),
+    fetchHackatimeProjects(accessToken, statsRange),
   ]);
 
   const postLaunchByName = new Map(
