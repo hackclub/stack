@@ -582,3 +582,72 @@
   background: #1a2240;
   margin: 0.4rem 0;
 }
+
+.admin-review-hours-warning {
+  margin: 0.35rem 0 0;
+  color: #ffd4bf;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.admin-review-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(8, 16, 40, 0.72);
+}
+
+.admin-review-modal {
+  width: min(28rem, 100%);
+  padding: 1.25rem 1.35rem;
+  border: 3px solid #f7cf57;
+  border-radius: 14px;
+  background: rgba(27, 58, 122, 0.98);
+  color: #e8f4ff;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.admin-review-modal h2 {
+  margin: 0 0 0.65rem;
+  color: #f7cf57;
+  font-size: 1.2rem;
+}
+
+.admin-review-modal p {
+  margin: 0 0 1rem;
+  line-height: 1.45;
+  color: rgba(232, 244, 255, 0.9);
+}
+
+.admin-review-exceed-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-bottom: 1.1rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.admin-review-exceed-ack input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.admin-review-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.admin-review-modal-actions .admin-review-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}

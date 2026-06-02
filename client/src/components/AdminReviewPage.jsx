@@ -49,13 +49,22 @@ function slackDisplay(user) {
   return user?.slug ? `@${user.slug}` : user?.email || "Unknown";
 }
 
-function clampApprovalHours(value, maxHours) {
+function clampApprovalHours(value, maxHours, allowAboveMax = false) {
   if (value === "") return "";
   const numeric = Number.parseFloat(value);
   if (!Number.isFinite(numeric)) return value;
   if (numeric < 0) return "0";
-  if (Number.isFinite(maxHours) && numeric > maxHours) return maxHours.toFixed(2);
+  if (!allowAboveMax && Number.isFinite(maxHours) && numeric > maxHours) return maxHours.toFixed(2);
   return value;
+}
+
+function approvalWouldExceedLogged(project, requestedNewHours) {
+  if (!project) return false;
+  const pendingCap = Number(project.pendingReviewHours ?? 0);
+  const logged = Number(project.combinedHours ?? 0);
+  const banked = Math.max(Number(project.pastApprovedHours ?? 0), Number(project.approvedHours ?? 0));
+  const newTotal = banked + requestedNewHours;
+  return requestedNewHours > pendingCap + 1e-9 || newTotal > logged + 1e-9;
 }
 
 export function AdminReviewPage({ projectId }) {
@@ -215,6 +224,8 @@ function AdminReviewDetail({ projectId }) {
   const [message, setMessage] = useState("");
   const [fraudSaving, setFraudSaving] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [exceedModalOpen, setExceedModalOpen] = useState(false);
+  const [exceedAcknowledged, setExceedAcknowledged] = useState(false);
 
   useEffect(() => {
     loadProject();
@@ -264,7 +275,7 @@ function AdminReviewDetail({ projectId }) {
     }
   }
 
-  async function submitReview() {
+  async function submitReview({ acknowledgeExceedLoggedHours = false } = {}) {
     if (!project) return;
     setMessage("");
 
@@ -273,10 +284,13 @@ function AdminReviewDetail({ projectId }) {
       return;
     }
 
-    const newHoursMax = Number(project.pendingReviewHours ?? 0);
     const requestedApprovedHours = Number.parseFloat(approvedHours) || 0;
-    if (selectedAction === "approve" && requestedApprovedHours > newHoursMax) {
-      setMessage(`Approval cannot exceed ${formatHours(newHoursMax)} new hours.`);
+    const exceedsLogged =
+      selectedAction === "approve" && approvalWouldExceedLogged(project, requestedApprovedHours);
+
+    if (exceedsLogged && !acknowledgeExceedLoggedHours) {
+      setExceedAcknowledged(false);
+      setExceedModalOpen(true);
       return;
     }
 
@@ -287,7 +301,11 @@ function AdminReviewDetail({ projectId }) {
     const body =
       selectedAction === "reject"
         ? { feedback }
-        : { approvedHours: Number.parseFloat(approvedHours) || 0, feedback };
+        : {
+            approvedHours: requestedApprovedHours,
+            feedback,
+            ...(acknowledgeExceedLoggedHours ? { acknowledgeExceedLoggedHours: true } : {}),
+          };
 
     try {
       const response = await fetch(endpoint, {
@@ -298,6 +316,8 @@ function AdminReviewDetail({ projectId }) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to submit review.");
+      setExceedModalOpen(false);
+      setExceedAcknowledged(false);
       setProject((current) => ({
         ...current,
         ...data.project,
@@ -313,6 +333,15 @@ function AdminReviewDetail({ projectId }) {
     } catch (err) {
       setMessage(err.message);
     }
+  }
+
+  function confirmExceedAndSubmit() {
+    if (!exceedAcknowledged) {
+      setMessage("Check the acknowledgment box to approve above logged hours.");
+      return;
+    }
+    setExceedModalOpen(false);
+    submitReview({ acknowledgeExceedLoggedHours: true });
   }
 
   async function deleteProjectPermanently() {
@@ -355,6 +384,11 @@ function AdminReviewDetail({ projectId }) {
   const newHoursPlaceholder = formatHours(newHoursMax);
   const approvedHoursNumber = Number.parseFloat(approvedHours);
   const awardPreview = Number.isFinite(approvedHoursNumber) ? approvedHoursNumber * BRICKS_PER_APPROVED_HOUR : 0;
+  const exceedsLoggedPreview =
+    !isAlreadyReviewed &&
+    selectedAction === "approve" &&
+    Number.isFinite(approvedHoursNumber) &&
+    approvalWouldExceedLogged(project, approvedHoursNumber);
 
   return (
     <main className="admin-review-page">
@@ -446,14 +480,25 @@ function AdminReviewDetail({ projectId }) {
                 className="admin-review-hours-input"
                 type="number"
                 min="0"
-                max={newHoursPlaceholder}
                 step="0.25"
                 placeholder={newHoursPlaceholder}
                 value={approvedHours}
                 disabled={isAlreadyReviewed}
-                onChange={(event) => setApprovedHours(clampApprovalHours(event.target.value, newHoursMax))}
+                onChange={(event) => {
+                  const next = clampApprovalHours(event.target.value, newHoursMax, true);
+                  setApprovedHours(next);
+                  const numeric = Number.parseFloat(next);
+                  if (Number.isFinite(numeric) && !approvalWouldExceedLogged(project, numeric)) {
+                    setExceedAcknowledged(false);
+                  }
+                }}
               />
               <small>Only this approved amount awards bricks: {formatHours(awardPreview)} bricks</small>
+              {exceedsLoggedPreview ? (
+                <p className="admin-review-hours-warning">
+                  Above logged hours ({formatHours(project.combinedHours ?? 0)} h combined). Submitting will ask you to confirm.
+                </p>
+              ) : null}
             </div>
             <div>
               <span>Journal hours</span>
@@ -510,7 +555,7 @@ function AdminReviewDetail({ projectId }) {
                 Comment (optional for approve; required for reject)
                 <textarea value={feedback} onChange={(event) => setFeedback(event.target.value)} />
               </label>
-              <button className="admin-review-submit" type="button" onClick={submitReview}>
+              <button className="admin-review-submit" type="button" onClick={() => submitReview()}>
                 Submit Review
               </button>
             </>
@@ -533,6 +578,50 @@ function AdminReviewDetail({ projectId }) {
           ) : null}
         </section>
       </section>
+
+      {exceedModalOpen ? (
+        <div
+          className="admin-review-modal-backdrop"
+          role="presentation"
+          onClick={() => setExceedModalOpen(false)}
+        >
+          <div
+            className="admin-review-modal"
+            role="dialog"
+            aria-labelledby="admin-review-exceed-title"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="admin-review-exceed-title">Approve above logged hours?</h2>
+            <p>
+              You are approving <strong>{formatHours(approvedHoursNumber)} h</strong> new, but only{" "}
+              <strong>{formatHours(project.combinedHours ?? 0)} h</strong> are logged (pending cap:{" "}
+              {formatHours(newHoursMax)} h).
+            </p>
+            <label className="admin-review-exceed-ack">
+              <input
+                type="checkbox"
+                checked={exceedAcknowledged}
+                onChange={(event) => setExceedAcknowledged(event.target.checked)}
+              />
+              <span>I&apos;m aware that I&apos;m giving more hours than the logged ones</span>
+            </label>
+            <div className="admin-review-modal-actions">
+              <button type="button" className="admin-review-tool-btn" onClick={() => setExceedModalOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="admin-review-submit"
+                disabled={!exceedAcknowledged}
+                onClick={confirmExceedAndSubmit}
+              >
+                Approve anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
