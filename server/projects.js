@@ -479,8 +479,17 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
   const requestedApprovedHours = Number.parseFloat(input.approvedHours ?? input.approved_hours ?? 0);
   const approvedHours = roundedHours(requestedApprovedHours);
   const feedback = textOrNull(input.feedback);
+  const acknowledgeExceedLoggedHours = Boolean(
+    input.acknowledgeExceedLoggedHours ?? input.acknowledge_exceed_logged_hours
+  );
   if (!Number.isFinite(requestedApprovedHours) || approvedHours <= 0) {
     throw new Error("Enter a positive number of new hours to approve for this submission.");
+  }
+
+  const ownerResult = await pool.query(`SELECT user_id FROM projects WHERE id = $1`, [projectId]);
+  const ownerId = ownerResult.rows[0]?.user_id;
+  if (ownerId) {
+    await refreshProjectHackatimeHoursForUser(ownerId);
   }
 
   const client = await pool.connect();
@@ -490,6 +499,9 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
 
     const projectResult = await client.query("SELECT * FROM projects WHERE id = $1 FOR UPDATE", [projectId]);
     const project = projectResult.rows[0];
+    if (project) {
+      project.journal_hours = project.total_hours;
+    }
     if (!project) throw new Error("Project not found.");
     if (!project.shipped) throw new Error("Project is not in the review queue.");
     if (project.reviewed && project.status === "approved") throw new Error("Project is already approved.");
@@ -497,17 +509,26 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
     const bankedHours = approvedBankedHours(project);
     const totalLoggedHours = loggedHours(project);
     const pendingCap = pendingReviewHours(project);
-    if (approvedHours > pendingCap) {
-      throw new Error(`Cannot approve more new hours than the participant has logged beyond prior approvals (${pendingCap.toFixed(2)} h max).`);
-    }
-
     const newTotalApprovedHours = roundedHours(bankedHours + approvedHours);
-    if (newTotalApprovedHours > totalLoggedHours) {
-      throw new Error(`Cannot approve ${newTotalApprovedHours.toFixed(2)} total hours because only ${totalLoggedHours.toFixed(2)} hours are logged.`);
+    const exceedsPendingCap = approvedHours > pendingCap + 1e-9;
+    const exceedsTotalLogged = newTotalApprovedHours > totalLoggedHours + 1e-9;
+
+    if ((exceedsPendingCap || exceedsTotalLogged) && !acknowledgeExceedLoggedHours) {
+      if (exceedsTotalLogged) {
+        throw new Error(
+          `Cannot approve ${newTotalApprovedHours.toFixed(2)} total hours because only ${totalLoggedHours.toFixed(2)} hours are logged. Confirm the exceed-hours acknowledgment to override.`
+        );
+      }
+      throw new Error(
+        `Cannot approve more new hours than the participant has logged beyond prior approvals (${pendingCap.toFixed(2)} h max). Confirm the exceed-hours acknowledgment to override.`
+      );
     }
 
     const bricksDelta = approvedHours * BRICKS_PER_APPROVED_HOUR;
-    const reductionHours = Math.max(0, roundedHours(totalLoggedHours - newTotalApprovedHours));
+    const reductionHours = acknowledgeExceedLoggedHours
+      ? 0
+      : Math.max(0, roundedHours(totalLoggedHours - newTotalApprovedHours));
+    const hoursBaselineForShip = acknowledgeExceedLoggedHours ? newTotalApprovedHours : totalLoggedHours;
     const newCumulativeBricks = Number(project.bricks_earned ?? 0) + bricksDelta;
 
     const reviewerResult = await client.query("SELECT name, email FROM users WHERE id = $1", [adminId]);
@@ -540,7 +561,7 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
         WHERE id = $6
         RETURNING *, total_hours AS journal_hours
       `,
-      [adminId, newTotalApprovedHours, finalJustification, feedback, newCumulativeBricks, projectId, totalLoggedHours]
+      [adminId, newTotalApprovedHours, finalJustification, feedback, newCumulativeBricks, projectId, hoursBaselineForShip]
     );
     const approvedRow = updatedProjectResult.rows[0];
 
