@@ -486,6 +486,12 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
     throw new Error("Enter a positive number of new hours to approve for this submission.");
   }
 
+  const ownerResult = await pool.query(`SELECT user_id FROM projects WHERE id = $1`, [projectId]);
+  const ownerId = ownerResult.rows[0]?.user_id;
+  if (ownerId) {
+    await refreshProjectHackatimeHoursForUser(ownerId);
+  }
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -493,6 +499,9 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
 
     const projectResult = await client.query("SELECT * FROM projects WHERE id = $1 FOR UPDATE", [projectId]);
     const project = projectResult.rows[0];
+    if (project) {
+      project.journal_hours = project.total_hours;
+    }
     if (!project) throw new Error("Project not found.");
     if (!project.shipped) throw new Error("Project is not in the review queue.");
     if (project.reviewed && project.status === "approved") throw new Error("Project is already approved.");
@@ -513,10 +522,6 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
       throw new Error(
         `Cannot approve more new hours than the participant has logged beyond prior approvals (${pendingCap.toFixed(2)} h max). Confirm the exceed-hours acknowledgment to override.`
       );
-    }
-
-    if (acknowledgeExceedLoggedHours && !exceedsPendingCap && !exceedsTotalLogged) {
-      throw new Error("Exceed-hours acknowledgment is only required when approving above logged hours.");
     }
 
     const bricksDelta = approvedHours * BRICKS_PER_APPROVED_HOUR;

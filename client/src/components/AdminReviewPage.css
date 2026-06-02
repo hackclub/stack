@@ -622,6 +622,11 @@
   color: rgba(232, 244, 255, 0.9);
 }
 
+.admin-review-hours-approve-cell {
+  display: grid;
+  gap: 0.35rem;
+}
+
 .admin-review-exceed-ack {
   display: flex;
   align-items: flex-start;
@@ -629,6 +634,15 @@
   margin-bottom: 1.1rem;
   cursor: pointer;
   font-weight: 700;
+}
+
+.admin-review-exceed-ack--inline {
+  margin: 0.25rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 2px solid rgba(247, 207, 87, 0.55);
+  background: rgba(247, 207, 87, 0.12);
+  color: #ffe9a8;
 }
 
 .admin-review-exceed-ack input {

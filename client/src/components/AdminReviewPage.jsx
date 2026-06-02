@@ -58,13 +58,24 @@ function clampApprovalHours(value, maxHours, allowAboveMax = false) {
   return value;
 }
 
-function approvalWouldExceedLogged(project, requestedNewHours) {
-  if (!project) return false;
+function combinedLoggedHours(project) {
+  const journal = Number(project.journalHours ?? project.totalHours ?? 0);
+  const hackatime = Number(project.hackatimeHours ?? 0);
+  return Number(project.combinedHours ?? journal + hackatime);
+}
+
+/** True when "new hours to approve" is above the logged/pending caps shown on the review page. */
+function approvalNeedsExceedAck(project, requestedNewHours) {
+  if (!project || !Number.isFinite(requestedNewHours)) return false;
   const pendingCap = Number(project.pendingReviewHours ?? 0);
-  const logged = Number(project.combinedHours ?? 0);
+  const logged = combinedLoggedHours(project);
   const banked = Math.max(Number(project.pastApprovedHours ?? 0), Number(project.approvedHours ?? 0));
   const newTotal = banked + requestedNewHours;
-  return requestedNewHours > pendingCap + 1e-9 || newTotal > logged + 1e-9;
+  return (
+    requestedNewHours > pendingCap + 1e-9 ||
+    requestedNewHours > logged + 1e-9 ||
+    newTotal > logged + 1e-9
+  );
 }
 
 export function AdminReviewPage({ projectId }) {
@@ -285,12 +296,13 @@ function AdminReviewDetail({ projectId }) {
     }
 
     const requestedApprovedHours = Number.parseFloat(approvedHours) || 0;
-    const exceedsLogged =
-      selectedAction === "approve" && approvalWouldExceedLogged(project, requestedApprovedHours);
+    const needsExceedAck =
+      selectedAction === "approve" && approvalNeedsExceedAck(project, requestedApprovedHours);
+    const hasExceedAck = acknowledgeExceedLoggedHours || exceedAcknowledged;
 
-    if (exceedsLogged && !acknowledgeExceedLoggedHours) {
-      setExceedAcknowledged(false);
+    if (needsExceedAck && !hasExceedAck) {
       setExceedModalOpen(true);
+      setMessage('Check the acknowledgment box (below the hours field or in this dialog), then submit again.');
       return;
     }
 
@@ -304,7 +316,7 @@ function AdminReviewDetail({ projectId }) {
         : {
             approvedHours: requestedApprovedHours,
             feedback,
-            ...(acknowledgeExceedLoggedHours ? { acknowledgeExceedLoggedHours: true } : {}),
+            ...(hasExceedAck && needsExceedAck ? { acknowledgeExceedLoggedHours: true } : {}),
           };
 
     try {
@@ -342,6 +354,17 @@ function AdminReviewDetail({ projectId }) {
     }
     setExceedModalOpen(false);
     submitReview({ acknowledgeExceedLoggedHours: true });
+  }
+
+  function handleApprovedHoursChange(rawValue) {
+    if (!project) return;
+    const pendingCap = Number(project.pendingReviewHours ?? 0);
+    const next = clampApprovalHours(rawValue, pendingCap, true);
+    setApprovedHours(next);
+    const numeric = Number.parseFloat(next);
+    if (Number.isFinite(numeric) && !approvalNeedsExceedAck(project, numeric)) {
+      setExceedAcknowledged(false);
+    }
   }
 
   async function deleteProjectPermanently() {
@@ -384,11 +407,12 @@ function AdminReviewDetail({ projectId }) {
   const newHoursPlaceholder = formatHours(newHoursMax);
   const approvedHoursNumber = Number.parseFloat(approvedHours);
   const awardPreview = Number.isFinite(approvedHoursNumber) ? approvedHoursNumber * BRICKS_PER_APPROVED_HOUR : 0;
-  const exceedsLoggedPreview =
+  const needsExceedAckPreview =
     !isAlreadyReviewed &&
     selectedAction === "approve" &&
     Number.isFinite(approvedHoursNumber) &&
-    approvalWouldExceedLogged(project, approvedHoursNumber);
+    approvalNeedsExceedAck(project, approvedHoursNumber);
+  const loggedHoursPreview = combinedLoggedHours(project);
 
   return (
     <main className="admin-review-page">
@@ -474,7 +498,7 @@ function AdminReviewDetail({ projectId }) {
               <span>New hours</span>
               <strong>{newHoursPlaceholder} h</strong>
             </div>
-            <div>
+            <div className="admin-review-hours-approve-cell">
               <span>New hours to approve</span>
               <input
                 className="admin-review-hours-input"
@@ -484,20 +508,25 @@ function AdminReviewDetail({ projectId }) {
                 placeholder={newHoursPlaceholder}
                 value={approvedHours}
                 disabled={isAlreadyReviewed}
-                onChange={(event) => {
-                  const next = clampApprovalHours(event.target.value, newHoursMax, true);
-                  setApprovedHours(next);
-                  const numeric = Number.parseFloat(next);
-                  if (Number.isFinite(numeric) && !approvalWouldExceedLogged(project, numeric)) {
-                    setExceedAcknowledged(false);
-                  }
-                }}
+                onChange={(event) => handleApprovedHoursChange(event.target.value)}
               />
               <small>Only this approved amount awards bricks: {formatHours(awardPreview)} bricks</small>
-              {exceedsLoggedPreview ? (
-                <p className="admin-review-hours-warning">
-                  Above logged hours ({formatHours(project.combinedHours ?? 0)} h combined). Submitting will ask you to confirm.
-                </p>
+              {needsExceedAckPreview ? (
+                <>
+                  <p className="admin-review-hours-warning">
+                    Above logged hours ({formatHours(loggedHoursPreview)} h combined
+                    {newHoursMax < loggedHoursPreview ? `, pending cap ${formatHours(newHoursMax)} h` : ""}).
+                  </p>
+                  <label className="admin-review-exceed-ack admin-review-exceed-ack--inline">
+                    <input
+                      type="checkbox"
+                      checked={exceedAcknowledged}
+                      disabled={isAlreadyReviewed}
+                      onChange={(event) => setExceedAcknowledged(event.target.checked)}
+                    />
+                    <span>I&apos;m aware that I&apos;m giving more hours than the logged ones</span>
+                  </label>
+                </>
               ) : null}
             </div>
             <div>
