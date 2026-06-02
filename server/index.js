@@ -12,6 +12,7 @@ import { getPeriodicAirtableSyncStatus, startPeriodicAirtableSync, syncAllUsersA
 import { isHackatimeOAuthConfigured } from "./hackatimeAuth.js";
 import { getHackatimeStatusForUser, listHackatimeProjectsForUser, refreshUserHackatimeCache } from "./hackatimeService.js";
 import { checkDatabaseConnection, getTestRows } from "./db.js";
+import { streamJournalMediaForReview } from "./journalMedia.js";
 import { clientErrorMessage, isProduction, publicDatabaseHealthPayload } from "./security.js";
 import { adjustUserBricks, ensureAuditLogTable, getAdminStats, getAuditLogForTarget } from "./adminStats.js";
 import {
@@ -591,6 +592,15 @@ app.get("/api/admin/journals.csv", requireFullAdmin, async (req, res) => {
   } catch (error) {
     console.error("Failed to export journal entries:", error);
     res.status(500).json({ error: "Failed to export journal entries." });
+  }
+});
+
+app.get("/api/admin/review/media", requireStaffReview, async (req, res) => {
+  try {
+    await streamJournalMediaForReview(req, res);
+  } catch (error) {
+    console.error("Failed to proxy review media:", error);
+    res.status(500).json({ error: "Failed to load media." });
   }
 });
 

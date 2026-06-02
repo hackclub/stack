@@ -668,7 +668,6 @@ function JournalModal({ project, entries, form, onChange, onClose, onSubmit }) {
         headers: {
           "x-file-type": file.type,
           "x-file-size": String(file.size),
-          "x-upload-purpose": "project-image",
         },
         body: formData,
       });

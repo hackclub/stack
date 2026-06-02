@@ -1,52 +1,159 @@
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|avif|mp4|webm|ogg|mov)$/i;
+const MARKDOWN_MEDIA_RE = /!\[([^\]]*)\]\(([^)]+)\)/g;
+const CDN_URL_RE = /https:\/\/cdn\.hackclub\.com\/[^\s)>\]]+/gi;
+
+/** Strip markdown title syntax and angle brackets from a link target. */
+export function normalizeMarkdownLinkTarget(raw) {
+  if (!raw || typeof raw !== "string") return "";
+  let url = raw.trim();
+  if (url.startsWith("<") && url.endsWith(">")) {
+    url = url.slice(1, -1).trim();
+  }
+  const titleMatch = url.match(/\s+["'][^"']*["']\s*$/);
+  if (titleMatch) {
+    url = url.slice(0, url.indexOf(titleMatch[0])).trim();
+  }
+  return url;
+}
+
+/** Encode path segments so spaces and special chars in CDN filenames load correctly. */
+export function encodeMediaUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  try {
+    const parsed = new URL(url, typeof window !== "undefined" ? window.location.origin : undefined);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    if (parsed.hostname === "cdn.hackclub.com" && parsed.protocol === "http:") {
+      parsed.protocol = "https:";
+    }
+    const segments = parsed.pathname.split("/");
+    const encodedPath = segments
+      .map((segment) => {
+        if (!segment) return segment;
+        try {
+          return encodeURIComponent(decodeURIComponent(segment));
+        } catch {
+          return encodeURIComponent(segment);
+        }
+      })
+      .join("/");
+    parsed.pathname = encodedPath;
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolve project/journal asset URLs for the current app origin.
- * Rewrites dev upload hosts (127.0.0.1:3000) and relative /uploads paths
- * so images work on the Vite dev server and in production.
+ * Rewrites dev upload hosts and relative /uploads paths so images work in review.
  */
 export function resolveStackAssetUrl(url) {
-  if (!url || typeof url !== "string") return null;
-  const trimmed = url.trim();
-  if (!trimmed) return null;
+  const normalized = normalizeMarkdownLinkTarget(url);
+  if (!normalized) return null;
+
+  if (!/^https?:\/\//i.test(normalized) && !normalized.startsWith("/")) {
+    if (IMAGE_EXT_RE.test(normalized)) {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const filename = normalized.replace(/^\.\//, "");
+      return encodeMediaUrl(`${origin}/uploads/cdn/${filename}`);
+    }
+    return null;
+  }
 
   try {
-    const parsed = new URL(trimmed, window.location.origin);
+    const parsed = new URL(normalized, typeof window !== "undefined" ? window.location.origin : undefined);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return null;
     }
 
     if (parsed.pathname.startsWith("/uploads/")) {
-      return `${window.location.origin}${parsed.pathname}${parsed.search}`;
+      const origin = typeof window !== "undefined" ? window.location.origin : parsed.origin;
+      return encodeMediaUrl(`${origin}${parsed.pathname}${parsed.search}`);
     }
 
-    const isLocalUploadHost =
-      (parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost") &&
-      parsed.pathname.startsWith("/uploads/");
-    if (isLocalUploadHost) {
-      return `${window.location.origin}${parsed.pathname}${parsed.search}`;
-    }
-
-    return parsed.href;
+    return encodeMediaUrl(parsed.href);
   } catch {
-    return trimmed.startsWith("/uploads/") ? `${window.location.origin}${trimmed}` : trimmed;
+    if (normalized.startsWith("/uploads/") && typeof window !== "undefined") {
+      return encodeMediaUrl(`${window.location.origin}${normalized}`);
+    }
+    return normalized.startsWith("/uploads/") ? normalized : null;
   }
 }
 
 /** @param {string} url */
 export function isAllowedJournalMediaUrl(url) {
-  if (!url || typeof url !== "string") return false;
+  const normalized = normalizeMarkdownLinkTarget(url);
+  if (!normalized) return false;
+
+  if (!/^https?:\/\//i.test(normalized) && !normalized.startsWith("/")) {
+    return IMAGE_EXT_RE.test(normalized);
+  }
+
   try {
-    const parsed = new URL(url.trim(), window.location.origin);
+    const parsed = new URL(normalized, typeof window !== "undefined" ? window.location.origin : undefined);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
-    if (parsed.hostname === "cdn.hackclub.com") return true;
     if (parsed.pathname.startsWith("/uploads/")) return true;
-    if (parsed.hostname === window.location.hostname) return true;
+    if (parsed.hostname === "cdn.hackclub.com" || parsed.hostname.endsWith(".hackclub.com")) return true;
+    if (typeof window !== "undefined" && parsed.hostname === window.location.hostname) return true;
     return parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost";
   } catch {
-    return false;
+    return IMAGE_EXT_RE.test(normalized);
   }
 }
 
-const MARKDOWN_MEDIA_RE = /!\[([^\]]*)\]\(([^)]+)\)/g;
+function pushMediaPart(parts, alt, rawUrl) {
+  if (!isAllowedJournalMediaUrl(rawUrl)) {
+    parts.push({ type: "text", value: `![${alt}](${rawUrl})` });
+    return;
+  }
+  const resolved = resolveStackAssetUrl(rawUrl);
+  const normalized = normalizeMarkdownLinkTarget(rawUrl);
+  if (resolved || normalized) {
+    parts.push({
+      type: "media",
+      alt,
+      url: resolved,
+      rawUrl: normalized || String(rawUrl).trim(),
+    });
+  } else {
+    parts.push({ type: "text", value: `![${alt}](${rawUrl})` });
+  }
+}
+
+/**
+ * Staff review / journal images: always load via server proxy so prod works
+ * (CDN encoding, hotlinking, dev URLs → local /uploads path, filename lookup).
+ */
+export function journalDisplaySrc({ resolved, rawUrl, alt }) {
+  if (typeof window === "undefined") return resolved || null;
+
+  const origin = window.location.origin;
+  const source = rawUrl || resolved;
+  if (source) {
+    return `${origin}/api/admin/review/media?url=${encodeURIComponent(source)}`;
+  }
+  if (alt && IMAGE_EXT_RE.test(alt)) {
+    return `${origin}/api/admin/review/media?filename=${encodeURIComponent(alt)}`;
+  }
+  return null;
+}
+
+function collectMarkdownRanges(text) {
+  const ranges = [];
+  let match;
+  const re = new RegExp(MARKDOWN_MEDIA_RE.source, "g");
+  while ((match = re.exec(text)) !== null) {
+    ranges.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      alt: match[1],
+      rawUrl: match[2],
+    });
+  }
+  return ranges;
+}
 
 /**
  * @param {string | null | undefined} text
@@ -56,31 +163,35 @@ export function parseJournalDescription(text) {
   if (!text) return [];
 
   const parts = [];
-  let last = 0;
-  let match;
-
-  while ((match = MARKDOWN_MEDIA_RE.exec(text)) !== null) {
-    if (match.index > last) {
-      parts.push({ type: "text", value: text.slice(last, match.index) });
+  const markdownRanges = collectMarkdownRanges(text);
+  let cursor = 0;
+  for (const range of markdownRanges) {
+    if (range.start > cursor) {
+      parts.push({ type: "text", value: text.slice(cursor, range.start) });
     }
-
-    const rawUrl = match[2].trim();
-    if (isAllowedJournalMediaUrl(rawUrl)) {
-      const resolved = resolveStackAssetUrl(rawUrl);
-      if (resolved) {
-        parts.push({ type: "media", alt: match[1], url: resolved });
-      } else {
-        parts.push({ type: "text", value: match[0] });
-      }
-    } else {
-      parts.push({ type: "text", value: match[0] });
-    }
-
-    last = match.index + match[0].length;
+    pushMediaPart(parts, range.alt, range.rawUrl);
+    cursor = range.end;
   }
 
-  if (last < text.length) {
-    parts.push({ type: "text", value: text.slice(last) });
+  if (cursor < text.length) {
+    const tail = text.slice(cursor);
+    const cdnRe = new RegExp(CDN_URL_RE.source, "gi");
+    let last = 0;
+    let cdnMatch;
+    while ((cdnMatch = cdnRe.exec(tail)) !== null) {
+      if (cdnMatch.index > last) {
+        parts.push({ type: "text", value: tail.slice(last, cdnMatch.index) });
+      }
+      pushMediaPart(parts, "Journal attachment", cdnMatch[0]);
+      last = cdnMatch.index + cdnMatch[0].length;
+    }
+    if (last < tail.length) {
+      parts.push({ type: "text", value: tail.slice(last) });
+    }
+  }
+
+  if (parts.length === 0) {
+    parts.push({ type: "text", value: text });
   }
 
   return parts;

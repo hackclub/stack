@@ -583,6 +583,23 @@
   margin: 0.4rem 0;
 }
 
+.journal-media-fallback,
+.admin-review-journal-description .journal-media-fallback {
+  display: block;
+  margin: 0.4rem 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px dashed rgba(75, 179, 255, 0.45);
+  background: rgba(12, 28, 72, 0.55);
+  color: rgba(232, 244, 255, 0.85);
+  font-size: 0.9rem;
+}
+
+.journal-media-fallback a,
+.admin-review-journal-description .journal-media-fallback a {
+  color: #f7cf57;
+}
+
 .admin-review-hours-warning {
   margin: 0.35rem 0 0;
   color: #ffd4bf;

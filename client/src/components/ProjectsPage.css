@@ -620,3 +620,7 @@
   background: #eef2ff;
   margin: 0.4rem 0;
 }
+
+.journal-media-fallback {
+  color: #304389;
+}
