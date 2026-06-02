@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   isVideoUrl,
   journalDisplaySrc,
@@ -6,10 +6,50 @@ import {
 } from "../utils/mediaUrls.js";
 
 function JournalMedia({ url, rawUrl, alt, className }) {
-  const displaySrc = journalDisplaySrc({ resolved: url, rawUrl, alt });
+  const apiSrc = journalDisplaySrc({ resolved: url, rawUrl, alt });
+  const [objectUrl, setObjectUrl] = useState(null);
   const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState(Boolean(apiSrc));
 
-  if (!displaySrc) {
+  useEffect(() => {
+    if (!apiSrc) {
+      setObjectUrl(null);
+      setFailed(false);
+      setLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    let blobUrl = null;
+    setLoading(true);
+    setFailed(false);
+    setObjectUrl(null);
+
+    fetch(apiSrc, { credentials: "include" })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Media request failed (${response.status})`);
+        }
+        const blob = await response.blob();
+        if (cancelled) return;
+        blobUrl = URL.createObjectURL(blob);
+        setObjectUrl(blobUrl);
+        setFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [apiSrc]);
+
+  if (!apiSrc) {
     return (
       <span className="journal-media-fallback">
         {alt || "Attachment unavailable"}
@@ -17,7 +57,11 @@ function JournalMedia({ url, rawUrl, alt, className }) {
     );
   }
 
-  if (failed) {
+  if (loading) {
+    return <span className="journal-media-loading">Loading attachment…</span>;
+  }
+
+  if (failed || !objectUrl) {
     return (
       <span className="journal-media-fallback">
         {alt ? `${alt} — ` : ""}
@@ -27,16 +71,14 @@ function JournalMedia({ url, rawUrl, alt, className }) {
   }
 
   if (isVideoUrl(rawUrl || url || alt)) {
-    return <video className={className} src={displaySrc} controls preload="metadata" />;
+    return <video className={className} src={objectUrl} controls preload="metadata" />;
   }
 
   return (
     <img
       className={className}
-      src={displaySrc}
+      src={objectUrl}
       alt={alt || "Journal attachment"}
-      loading="lazy"
-      onError={() => setFailed(true)}
     />
   );
 }
@@ -54,7 +96,7 @@ export function JournalDescription({ text, className = "journal-description", me
           </span>
         ) : (
           <JournalMedia
-            key={i}
+            key={`${i}-${part.rawUrl || part.url || part.alt}`}
             url={part.url}
             rawUrl={part.rawUrl}
             alt={part.alt}

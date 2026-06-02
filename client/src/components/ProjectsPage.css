@@ -603,6 +603,48 @@
   margin-top: 0.1rem;
 }
 
+.cdn-upload-hint {
+  margin: 0.35rem 0 0.5rem;
+  color: #304389;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.cdn-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.45rem;
+}
+
+.cdn-link-input {
+  flex: 1 1 14rem;
+  min-width: 0;
+  border: 2px solid #c7d6ff;
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  background: #fff;
+  color: #12235c;
+  font: inherit;
+}
+
+.cdn-link-row button {
+  border: 2px solid #3b5fc0;
+  border-radius: 10px;
+  padding: 0.5rem 0.85rem;
+  background: #eef2ff;
+  color: #1b2a5a;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cdn-link-row button:hover {
+  background: #dce6ff;
+}
+
 .journal-description {
   display: block;
   margin: 0.35rem 0;

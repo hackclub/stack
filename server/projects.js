@@ -3,6 +3,10 @@ import { deleteProjectFromAirtable, persistProjectAirtableRecordId, syncProjectT
 import { syncJournalEntryToAirtable } from "./airtableJournals.js";
 import { deleteProjectSubmissionsFromYsws, ensureYswsProjectSubmissionsTable, submitProjectToYsws } from "./airtableYsws.js";
 import {
+  assertJournalDescriptionMediaIsCdnOnly,
+  safeHackClubCdnUrl,
+} from "./cdnLinks.js";
+import {
   fetchHackatimeProjectsForStack,
   STACK_LAUNCH_UTC,
   sumHackatimeHoursForNames,
@@ -774,6 +778,7 @@ export async function createJournalEntryForUser(userId, input = {}) {
   }
 
   const journal = normalizeJournalEntryInput(input);
+  assertJournalDescriptionMediaIsCdnOnly(journal.description);
   const result = await pool.query(
     `
       INSERT INTO journal_entries (
@@ -894,7 +899,7 @@ function normalizeProjectInput(input = {}) {
     projectType: textOrNull(input.projectType ?? input.project_type),
     playableUrl: safeHttpUrl(input.playableUrl ?? input.playable_url),
     codeUrl: safeHttpUrl(input.codeUrl ?? input.code_url),
-    imageUrl: safeHttpUrl(input.imageUrl ?? input.image_url),
+    imageUrl: safeHackClubCdnUrl(input.imageUrl ?? input.image_url),
     hackatimeNames: normalizeHackatimeNames(input),
   };
 }

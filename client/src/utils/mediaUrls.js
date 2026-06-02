@@ -104,21 +104,35 @@ export function isAllowedJournalMediaUrl(url) {
 }
 
 function pushMediaPart(parts, alt, rawUrl) {
-  if (!isAllowedJournalMediaUrl(rawUrl)) {
-    parts.push({ type: "text", value: `![${alt}](${rawUrl})` });
+  const trimmedUrl = String(rawUrl ?? "").trim();
+  const altLooksLikeFile = IMAGE_EXT_RE.test(alt);
+
+  if (!trimmedUrl && altLooksLikeFile) {
+    parts.push({ type: "media", alt, url: null, rawUrl: "" });
     return;
   }
-  const resolved = resolveStackAssetUrl(rawUrl);
-  const normalized = normalizeMarkdownLinkTarget(rawUrl);
-  if (resolved || normalized) {
+
+  if (!trimmedUrl) {
+    parts.push({ type: "text", value: `![${alt}]()` });
+    return;
+  }
+
+  if (!isAllowedJournalMediaUrl(trimmedUrl)) {
+    parts.push({ type: "text", value: `![${alt}](${trimmedUrl})` });
+    return;
+  }
+
+  const resolved = resolveStackAssetUrl(trimmedUrl);
+  const normalized = normalizeMarkdownLinkTarget(trimmedUrl);
+  if (resolved || normalized || altLooksLikeFile) {
     parts.push({
       type: "media",
       alt,
       url: resolved,
-      rawUrl: normalized || String(rawUrl).trim(),
+      rawUrl: normalized || trimmedUrl,
     });
   } else {
-    parts.push({ type: "text", value: `![${alt}](${rawUrl})` });
+    parts.push({ type: "text", value: `![${alt}](${trimmedUrl})` });
   }
 }
 
@@ -130,14 +144,18 @@ export function journalDisplaySrc({ resolved, rawUrl, alt }) {
   if (typeof window === "undefined") return resolved || null;
 
   const origin = window.location.origin;
+  const params = new URLSearchParams();
   const source = rawUrl || resolved;
+
   if (source) {
-    return `${origin}/api/admin/review/media?url=${encodeURIComponent(source)}`;
+    params.set("url", source);
   }
   if (alt && IMAGE_EXT_RE.test(alt)) {
-    return `${origin}/api/admin/review/media?filename=${encodeURIComponent(alt)}`;
+    params.set("filename", alt);
   }
-  return null;
+
+  if ([...params.keys()].length === 0) return null;
+  return `${origin}/api/admin/review/media?${params.toString()}`;
 }
 
 function collectMarkdownRanges(text) {

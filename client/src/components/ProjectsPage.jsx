@@ -3,6 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { JournalDescription } from "./JournalDescription.jsx";
 import { PlatformStatusBar } from "./PlatformStatusBar.jsx";
+import {
+  CDN_UPLOAD_HELP,
+  isHackClubCdnUrl,
+  journalDescriptionMediaIsCdnOnly,
+  markdownImageForCdnUrl,
+  normalizeHackClubCdnUrl,
+} from "../utils/cdnLinks.js";
 import { resolveStackAssetUrl } from "../utils/mediaUrls.js";
 const sideBrick = "https://cdn.hackclub.com/019e3e5a-9d8a-7fcb-ad80-d6166cfd97f8/side_brick.png";
 const statusBtn = "https://cdn.hackclub.com/019e3e5a-9f39-7875-aec6-cf24a58b87d4/status_btn.png";
@@ -99,20 +106,6 @@ const emptyJournalEntry = {
   description: "",
   toolsUsed: "",
 };
-
-const ALLOWED_UPLOAD_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "image/avif",
-  "video/mp4",
-  "video/webm",
-  "video/ogg",
-  "video/quicktime",
-]);
-const PROJECT_IMAGE_UPLOAD_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "image/avif"]);
-const PROJECT_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
 
 function displayStatus(project) {
   if (project.status === "approved") return "Approved";
@@ -277,8 +270,8 @@ export function ProjectsPage() {
       return;
     }
 
-    if (editingProject.imageUrl && !isValidUrl(editingProject.imageUrl)) {
-      setError("Banner URL must be a valid URL.");
+    if (editingProject.imageUrl && !isHackClubCdnUrl(editingProject.imageUrl)) {
+      setError("Project image must be a https://cdn.hackclub.com/ link from #cdn on Slack.");
       return;
     }
 
@@ -378,6 +371,11 @@ export function ProjectsPage() {
   async function saveJournalEntry(event) {
     event.preventDefault();
     if (!journalProject) return;
+
+    if (!journalDescriptionMediaIsCdnOnly(journalForm.description)) {
+      setError("Attachments must be https://cdn.hackclub.com/ links from #cdn on Slack.");
+      return;
+    }
 
     setError("");
     const hoursWorked = Number.parseFloat(journalForm.hoursWorked) || 0;
@@ -634,72 +632,29 @@ function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDe
 }
 
 function JournalModal({ project, entries, form, onChange, onClose, onSubmit }) {
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [linkError, setLinkError] = useState("");
+  const [cdnLinkInput, setCdnLinkInput] = useState("");
   const textareaRef = useRef(null);
   const descriptionRef = useRef(form.description);
   descriptionRef.current = form.description;
 
-  async function uploadAndInsert(file) {
-    if (!ALLOWED_UPLOAD_TYPES.has(file.type)) {
-      setUploadError(`Unsupported file type: ${file.type}. Use JPEG, PNG, GIF, WebP, AVIF, MP4, WebM, OGG, or MOV.`);
+  function insertCdnLink() {
+    const mdLink = markdownImageForCdnUrl(cdnLinkInput);
+    if (!mdLink) {
+      setLinkError("Paste a https://cdn.hackclub.com/ link from #cdn on Slack.");
       return;
     }
-    setUploading(true);
-    setUploadError("");
 
+    setLinkError("");
     const textarea = textareaRef.current;
     const start = textarea?.selectionStart ?? descriptionRef.current.length;
     const end = textarea?.selectionEnd ?? start;
-    const placeholder = `![Uploading ${file.name}…]()`;
     const before = descriptionRef.current.slice(0, start);
     const after = descriptionRef.current.slice(end);
-    const withPlaceholder = `${before}${placeholder}${after}`;
-    onChange("description", withPlaceholder);
-    descriptionRef.current = withPlaceholder;
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await fetch("/api/cdn/upload", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "x-file-type": file.type,
-          "x-file-size": String(file.size),
-        },
-        body: formData,
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Upload failed.");
-
-      const mdLink = `![${file.name}](${data.url})`;
-      const resolved = descriptionRef.current.replace(placeholder, mdLink);
-      onChange("description", resolved);
-      descriptionRef.current = resolved;
-    } catch (err) {
-      const cleaned = descriptionRef.current.replace(placeholder, "");
-      onChange("description", cleaned);
-      descriptionRef.current = cleaned;
-      setUploadError(err.message);
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  function handleTextareaDrop(event) {
-    event.preventDefault();
-    setIsDraggingOver(false);
-    const files = Array.from(event.dataTransfer.files);
-    for (const file of files) uploadAndInsert(file);
-  }
-
-  function handleTextareaPaste(event) {
-    const files = Array.from(event.clipboardData?.files ?? []);
-    if (files.length === 0) return;
-    event.preventDefault();
-    for (const file of files) uploadAndInsert(file);
+    const next = `${before}${mdLink}${after}`;
+    onChange("description", next);
+    descriptionRef.current = next;
+    setCdnLinkInput("");
   }
 
   return (
@@ -728,33 +683,37 @@ function JournalModal({ project, entries, form, onChange, onClose, onSubmit }) {
           </label>
           <label>
             Description
-            <div className={`journal-textarea-wrap${isDraggingOver ? " journal-textarea-wrap--drag" : ""}`}>
-              <textarea
-                ref={textareaRef}
-                value={form.description}
-                onChange={(event) => onChange("description", event.target.value)}
-                onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
-                onDragLeave={() => setIsDraggingOver(false)}
-                onDrop={handleTextareaDrop}
-                onPaste={handleTextareaPaste}
-                required
-                placeholder="Describe what you worked on… drag & drop or paste images/videos to attach them inline"
+            <p className="cdn-upload-hint">{CDN_UPLOAD_HELP}</p>
+            <textarea
+              ref={textareaRef}
+              value={form.description}
+              onChange={(event) => onChange("description", event.target.value)}
+              required
+              placeholder="Describe what you worked on…"
+            />
+            <div className="cdn-link-row">
+              <input
+                type="url"
+                className="cdn-link-input"
+                value={cdnLinkInput}
+                onChange={(event) => {
+                  setCdnLinkInput(event.target.value);
+                  setLinkError("");
+                }}
+                placeholder="https://cdn.hackclub.com/…"
               />
-              {isDraggingOver && (
-                <div className="journal-textarea-drop-overlay" aria-hidden="true">Drop to upload</div>
-              )}
-              {uploading && (
-                <div className="journal-textarea-uploading" aria-live="polite">Uploading…</div>
-              )}
+              <button type="button" onClick={insertCdnLink}>
+                Add media link
+              </button>
             </div>
-            {uploadError ? <p className="journal-upload-error">{uploadError}</p> : null}
-            <small className="journal-upload-hint-text">Drag &amp; drop or paste images/videos to embed them inline</small>
+            {linkError ? <p className="journal-upload-error">{linkError}</p> : null}
+            <small className="journal-upload-hint-text">Inserts an image or video line into your description.</small>
           </label>
           <label>
             Tools Used
             <input value={form.toolsUsed} onChange={(event) => onChange("toolsUsed", event.target.value)} placeholder="React, Figma, CAD" />
           </label>
-          <button type="submit" disabled={uploading}>Save Entry</button>
+          <button type="submit">Save Entry</button>
         </form>
 
         <section className="projects-page__journal-list" aria-label="Journal entries">
@@ -795,10 +754,7 @@ function ProjectFormModal({
   onSubmit,
 }) {
   const [allProjects, setAllProjects] = useState([]);
-  const [imageUploadError, setImageUploadError] = useState("");
-  const [imageUploading, setImageUploading] = useState(false);
-  const [imageDragging, setImageDragging] = useState(false);
-  const imageInputRef = useRef(null);
+  const [imageLinkError, setImageLinkError] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -818,46 +774,14 @@ function ProjectFormModal({
       .flatMap((p) => p.hackatimeNames || [])
   );
 
-  async function uploadProjectImage(file) {
-    if (!file) return;
-    if (!PROJECT_IMAGE_UPLOAD_TYPES.has(file.type)) {
-      setImageUploadError("Use an image file: JPEG, PNG, GIF, WebP, or AVIF.");
+  function applyProjectImageLink(rawUrl) {
+    const normalized = normalizeHackClubCdnUrl(rawUrl);
+    if (!normalized) {
+      setImageLinkError("Paste a https://cdn.hackclub.com/ link from #cdn on Slack.");
       return;
     }
-    if (file.size > PROJECT_IMAGE_MAX_BYTES) {
-      setImageUploadError("Project image must be 3MB or smaller.");
-      return;
-    }
-
-    setImageUploadError("");
-    setImageUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await fetch("/api/cdn/upload", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "x-file-type": file.type,
-          "x-file-size": String(file.size),
-          "x-upload-purpose": "project-image",
-        },
-        body: formData,
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Upload failed.");
-      onChange("imageUrl", data.url);
-    } catch (err) {
-      setImageUploadError(err.message);
-    } finally {
-      setImageUploading(false);
-    }
-  }
-
-  function handleProjectImageDrop(event) {
-    event.preventDefault();
-    setImageDragging(false);
-    uploadProjectImage(event.dataTransfer.files?.[0]);
+    setImageLinkError("");
+    onChange("imageUrl", normalized);
   }
 
   return (
@@ -897,47 +821,33 @@ function ProjectFormModal({
           </label>
           <div className="projects-page__image-field">
             <span>Project image (required before shipping)</span>
-            <div
-              className={`projects-page__image-dropzone${imageDragging ? " projects-page__image-dropzone--drag" : ""}`}
-              onDragOver={(event) => {
-                event.preventDefault();
-                setImageDragging(true);
-              }}
-              onDragLeave={() => setImageDragging(false)}
-              onDrop={handleProjectImageDrop}
-            >
+            <p className="cdn-upload-hint">{CDN_UPLOAD_HELP}</p>
+            <div className="cdn-link-row">
               <input
-                ref={imageInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp,image/avif"
-                className="projects-page__image-input"
+                type="url"
+                className="cdn-link-input"
+                value={project.imageUrl || ""}
                 onChange={(event) => {
-                  uploadProjectImage(event.target.files?.[0]);
-                  event.target.value = "";
+                  onChange("imageUrl", event.target.value);
+                  setImageLinkError("");
                 }}
+                onBlur={(event) => applyProjectImageLink(event.target.value)}
+                placeholder="https://cdn.hackclub.com/…"
               />
               {project.imageUrl ? (
-                <img
-                  className="projects-page__image-preview"
-                  src={resolveStackAssetUrl(project.imageUrl) || project.imageUrl}
-                  alt=""
-                />
-              ) : (
-                <p>Drag &amp; drop an image here</p>
-              )}
-              <small>Max. 3MB. JPEG, PNG, GIF, WebP, or AVIF.</small>
-              <div className="projects-page__image-actions">
-                <button type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading}>
-                  {imageUploading ? "Uploading..." : project.imageUrl ? "Replace image" : "Choose image"}
+                <button type="button" className="projects-page__danger-btn" onClick={() => onChange("imageUrl", "")}>
+                  Remove
                 </button>
-                {project.imageUrl ? (
-                  <button type="button" className="projects-page__danger-btn" onClick={() => onChange("imageUrl", "")} disabled={imageUploading}>
-                    Remove
-                  </button>
-                ) : null}
-              </div>
+              ) : null}
             </div>
-            {imageUploadError ? <p className="journal-upload-error">{imageUploadError}</p> : null}
+            {imageLinkError ? <p className="journal-upload-error">{imageLinkError}</p> : null}
+            {isHackClubCdnUrl(project.imageUrl) ? (
+              <img
+                className="projects-page__image-preview"
+                src={project.imageUrl}
+                alt=""
+              />
+            ) : null}
           </div>
           <fieldset
             disabled={!hackatimeConnected}
@@ -980,7 +890,7 @@ function ProjectFormModal({
               <p className="projects-page__hackatime-summary">Linked Hackatime: {project.hackatimeHours} h</p>
             ) : null}
           </fieldset>
-          <button type="submit" disabled={imageUploading}>Save Project</button>
+          <button type="submit">Save Project</button>
         </form>
       </section>
     </div>
