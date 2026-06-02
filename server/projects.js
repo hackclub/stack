@@ -2,7 +2,22 @@ import { pool } from "./db.js";
 import { deleteProjectFromAirtable, persistProjectAirtableRecordId, syncProjectToAirtable } from "./airtableProjects.js";
 import { syncJournalEntryToAirtable } from "./airtableJournals.js";
 import { deleteProjectSubmissionsFromYsws, ensureYswsProjectSubmissionsTable, submitProjectToYsws } from "./airtableYsws.js";
-import { fetchHackatimeProjectsForStack, sumHackatimeHoursForNames } from "./hackatimeAuth.js";
+import {
+  fetchHackatimeProjectsForStack,
+  STACK_LAUNCH_UTC,
+  sumHackatimeHoursForNames,
+} from "./hackatimeAuth.js";
+
+const STACK_LAUNCH_TIMESTAMPTZ = STACK_LAUNCH_UTC.toISOString();
+
+/** Journal entries on or after Stack launch (28 May 2026 00:00 ET). */
+function journalEntryAfterLaunchOn(alias = "journal_entries") {
+  return `COALESCE(${alias}.time_done, ${alias}.created_at) >= '${STACK_LAUNCH_TIMESTAMPTZ}'::timestamptz`;
+}
+
+function journalEntryAfterLaunchWhere() {
+  return `COALESCE(time_done, created_at) >= '${STACK_LAUNCH_TIMESTAMPTZ}'::timestamptz`;
+}
 
 export const BRICKS_PER_APPROVED_HOUR = 20;
 
@@ -194,6 +209,7 @@ export async function listProjectsForUser(userId) {
       LEFT JOIN journal_entries
         ON journal_entries.project_id = projects.id
         AND journal_entries.user_id = projects.user_id
+        AND ${journalEntryAfterLaunchOn()}
       WHERE projects.user_id = $1
       GROUP BY projects.id
       ORDER BY projects.created_at DESC, projects.id DESC
@@ -380,7 +396,7 @@ export async function listAdminReviewProjects({ shipSort = "oldest" } = {}) {
   if (!pool) throw new Error("DATABASE_URL is not set.");
 
   const direction = shipSort === "newest" ? "DESC" : "ASC";
-  const result = await pool.query(`
+  const reviewProjectsSql = `
     SELECT
       projects.*,
       COALESCE(SUM(journal_entries.hours_worked), 0) AS journal_hours,
@@ -393,9 +409,22 @@ export async function listAdminReviewProjects({ shipSort = "oldest" } = {}) {
     LEFT JOIN journal_entries
       ON journal_entries.project_id = projects.id
       AND journal_entries.user_id = projects.user_id
+      AND ${journalEntryAfterLaunchOn()}
     GROUP BY projects.id, users.id
     ORDER BY projects.shipped_at ${direction} NULLS LAST, projects.updated_at ${direction}, projects.id ${direction}
-  `);
+  `;
+
+  const initial = await pool.query(reviewProjectsSql);
+  const userIds = [...new Set(initial.rows.map((row) => Number(row.user_id)).filter(Number.isFinite))];
+  await Promise.all(
+    userIds.map((userId) =>
+      refreshProjectHackatimeHoursForUser(userId).catch((error) => {
+        console.error("[review] hackatime refresh failed:", error?.message || error);
+      })
+    )
+  );
+
+  const result = await pool.query(reviewProjectsSql);
 
   const projects = result.rows.map(toAdminReviewProject);
   const pendingProjects = projects.filter(isPendingReviewProject);
@@ -407,6 +436,14 @@ export async function listAdminReviewProjects({ shipSort = "oldest" } = {}) {
 
 export async function getAdminReviewProject(projectId) {
   if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const ownerResult = await pool.query(`SELECT user_id FROM projects WHERE id = $1`, [projectId]);
+  const ownerId = ownerResult.rows[0]?.user_id;
+  if (ownerId) {
+    await refreshProjectHackatimeHoursForUser(ownerId).catch((error) => {
+      console.error("[review] hackatime refresh failed for project:", projectId, error?.message || error);
+    });
+  }
 
   const result = await pool.query(
     `
@@ -422,6 +459,7 @@ export async function getAdminReviewProject(projectId) {
       LEFT JOIN journal_entries
         ON journal_entries.project_id = projects.id
         AND journal_entries.user_id = projects.user_id
+        AND ${journalEntryAfterLaunchOn()}
       WHERE projects.id = $1
       GROUP BY projects.id, users.id
     `,
@@ -968,6 +1006,7 @@ async function refreshProjectJournalHours(userId, projectId) {
           FROM journal_entries
           WHERE user_id = $1
             AND project_id = $2
+            AND ${journalEntryAfterLaunchWhere()}
         ), 0),
         updated_at = NOW()
       WHERE user_id = $1
@@ -992,6 +1031,7 @@ async function refreshProjectJournalHoursWithClient(client, projectId) {
           FROM journal_entries
           WHERE journal_entries.user_id = projects.user_id
             AND journal_entries.project_id = projects.id
+            AND ${journalEntryAfterLaunchOn()}
         ), 0),
         updated_at = NOW()
       WHERE id = $1
@@ -1016,8 +1056,15 @@ function roundedHours(value) {
   return Number.isFinite(numeric) ? Number(numeric.toFixed(2)) : 0;
 }
 
+function journalHoursFromRow(row) {
+  if (row.journal_hours != null && row.journal_hours !== undefined) {
+    return numberOrZero(row.journal_hours);
+  }
+  return numberOrZero(row.total_hours);
+}
+
 function loggedHours(row) {
-  return roundedHours(numberOrZero(row.journal_hours ?? row.total_hours) + numberOrZero(row.hackatime_hours));
+  return roundedHours(journalHoursFromRow(row) + numberOrZero(row.hackatime_hours));
 }
 
 function approvedBankedHours(row) {
@@ -1047,6 +1094,7 @@ async function getProjectRowForAirtableSync(projectId) {
       LEFT JOIN journal_entries
         ON journal_entries.project_id = projects.id
         AND journal_entries.user_id = projects.user_id
+        AND ${journalEntryAfterLaunchOn()}
       WHERE projects.id = $1
       GROUP BY projects.id, users.id
     `,
@@ -1177,8 +1225,7 @@ function getShipMissingRequirements(project) {
   if (!textOrNull(project.playable_url)) missing.push("playable URL missing");
   if (!textOrNull(project.code_url)) missing.push("code URL missing");
   if (!textOrNull(project.image_url)) missing.push("project image missing");
-  const combinedHours =
-    Number(project.total_hours ?? 0) + Number(project.hackatime_hours ?? 0);
+  const combinedHours = loggedHours(project);
   if (combinedHours <= 0) missing.push("hours logged missing");
   return missing;
 }

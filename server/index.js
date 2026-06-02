@@ -12,6 +12,7 @@ import { getPeriodicAirtableSyncStatus, startPeriodicAirtableSync, syncAllUsersA
 import { isHackatimeOAuthConfigured } from "./hackatimeAuth.js";
 import { getHackatimeStatusForUser, listHackatimeProjectsForUser, refreshUserHackatimeCache } from "./hackatimeService.js";
 import { checkDatabaseConnection, getTestRows } from "./db.js";
+import { clientErrorMessage, isProduction, publicDatabaseHealthPayload } from "./security.js";
 import { adjustUserBricks, ensureAuditLogTable, getAdminStats, getAuditLogForTarget } from "./adminStats.js";
 import {
   createShopItem,
@@ -171,11 +172,26 @@ function requireUser(req, res, next) {
   next();
 }
 
+function notFoundInProduction(req, res) {
+  res.status(404).json({ error: "Not found." });
+}
+
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, service: "stack-api" });
 });
 
 app.get("/api/db/health", async (req, res) => {
+  if (isProduction()) {
+    try {
+      const health = await checkDatabaseConnection();
+      res.status(health.ok ? 200 : 503).json(publicDatabaseHealthPayload(health));
+    } catch (error) {
+      console.error("Database health check failed:", error);
+      res.status(503).json({ ok: false });
+    }
+    return;
+  }
+
   try {
     const health = await checkDatabaseConnection();
     res.status(health.ok ? 200 : 503).json(health);
@@ -190,6 +206,11 @@ app.get("/api/db/health", async (req, res) => {
 });
 
 app.get("/api/test", async (req, res) => {
+  if (isProduction()) {
+    notFoundInProduction(req, res);
+    return;
+  }
+
   try {
     const rows = await getTestRows();
     res.json({ rows });
@@ -805,7 +826,7 @@ app.get("/api/admin/users/:id/audit", requireFullAdmin, async (req, res) => {
   }
 });
 
-app.get("/api/airtable/status", (req, res) => {
+app.get("/api/airtable/status", requireFullAdmin, (req, res) => {
   res.json({
     ...getAirtableSyncStatus(),
     periodic: getPeriodicAirtableSyncStatus(),
@@ -830,7 +851,7 @@ app.post("/api/airtable/sync", async (req, res) => {
     res.status(500).json({
       ok: false,
       error: "Manual Airtable sync failed.",
-      message: error instanceof Error ? error.message : String(error),
+      message: clientErrorMessage(error, "Manual Airtable sync failed."),
     });
   }
 });

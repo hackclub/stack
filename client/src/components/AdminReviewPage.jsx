@@ -1,39 +1,27 @@
 import { useAuth } from "../auth/AuthContext.jsx";
 import { useEffect, useMemo, useState } from "react";
+import { JournalDescription } from "./JournalDescription.jsx";
+import { resolveStackAssetUrl } from "../utils/mediaUrls.js";
+import "./AdminReviewPage.css";
 
-function isVideoUrl(url) {
-  const ext = url.split("?")[0].split(".").pop()?.toLowerCase();
-  return ["mp4", "webm", "ogg", "mov"].includes(ext);
-}
+function ReviewImage({ src, className, alt = "" }) {
+  const resolved = resolveStackAssetUrl(src);
+  const [failed, setFailed] = useState(false);
 
-function JournalDescriptionRenderer({ text }) {
-  if (!text) return null;
-  const parts = [];
-  const imgRe = /!\[([^\]]*)\]\((https:\/\/cdn\.hackclub\.com\/[^\s)]+)\)/g;
-  let last = 0;
-  let match;
-  while ((match = imgRe.exec(text)) !== null) {
-    if (match.index > last) parts.push({ type: "text", value: text.slice(last, match.index) });
-    parts.push({ type: "media", alt: match[1], url: match[2] });
-    last = match.index + match[0].length;
+  if (!resolved || failed) {
+    return <span className="admin-review-image-fallback">{alt || "Image could not be loaded"}</span>;
   }
-  if (last < text.length) parts.push({ type: "text", value: text.slice(last) });
 
   return (
-    <div className="admin-review-journal-description">
-      {parts.map((part, i) =>
-        part.type === "text" ? (
-          <span key={i} style={{ whiteSpace: "pre-wrap" }}>{part.value}</span>
-        ) : isVideoUrl(part.url) ? (
-          <video key={i} className="admin-review-media-item" src={part.url} controls preload="metadata" />
-        ) : (
-          <img key={i} className="admin-review-media-item" src={part.url} alt={part.alt} />
-        )
-      )}
-    </div>
+    <img
+      className={className}
+      src={resolved}
+      alt={alt}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
   );
 }
-import "./AdminReviewPage.css";
 
 function formatHours(value) {
   return Number(value ?? 0).toFixed(2);
@@ -179,7 +167,11 @@ function AdminReviewIndex() {
           {filteredProjects.map((project) => (
             <a className="admin-review-card" href={`/admin/review/project/${project.id}`} key={project.id}>
               <div className="admin-review-thumb">
-                {project.imageUrl ? <img src={project.imageUrl} alt="" /> : <span>Image could not be loaded</span>}
+                {project.imageUrl ? (
+                  <ReviewImage src={project.imageUrl} className="" alt="" />
+                ) : (
+                  <span className="admin-review-image-fallback">Image could not be loaded</span>
+                )}
               </div>
               <div className="admin-review-card-content">
                 <div className="admin-review-card-header">
@@ -199,7 +191,7 @@ function AdminReviewIndex() {
                     {slackDisplay(project.user)}
                   </div>
                   <div className="admin-review-stats">
-                    <strong>{formatHours(project.totalHours)}h</strong>
+                    <strong>{formatHours(project.combinedHours ?? 0)}h</strong>
                     <small>{formatDate(project.shippedAt)}</small>
                   </div>
                 </footer>
@@ -380,7 +372,7 @@ function AdminReviewDetail({ projectId }) {
         </header>
 
         {project.imageUrl ? (
-          <img className="admin-review-banner" src={project.imageUrl} alt="" />
+          <ReviewImage src={project.imageUrl} className="admin-review-banner" alt="" />
         ) : (
           <div className="admin-review-banner admin-review-banner--empty">Screenshot unavailable</div>
         )}
@@ -438,7 +430,7 @@ function AdminReviewDetail({ projectId }) {
             </div>
             <div>
               <span>Raw Hours</span>
-              <strong>{formatHours((Number(project.totalHours || 0) + Number(project.hackatimeHours || 0)).toFixed(2))}</strong>
+              <strong>{formatHours(project.combinedHours ?? 0)}</strong>
             </div>
             <div>
               <span>Previously banked</span>
@@ -486,7 +478,11 @@ function AdminReviewDetail({ projectId }) {
             journalEntries.map((entry) => (
               <article className="admin-review-journal-entry" key={entry.id}>
                 <strong>{entry.timeDone ? new Date(entry.timeDone).toLocaleString() : "N/A"} · {entry.hoursWorked}h</strong>
-                <JournalDescriptionRenderer text={entry.description} />
+                <JournalDescription
+                  text={entry.description}
+                  className="admin-review-journal-description"
+                  mediaClassName="admin-review-media-item"
+                />
                 {entry.toolsUsed?.length ? <small>Tools: {entry.toolsUsed.join(", ")}</small> : null}
               </article>
             ))

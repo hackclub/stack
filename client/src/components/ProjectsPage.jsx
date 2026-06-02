@@ -1,7 +1,9 @@
 const platformBackground = "https://cdn.hackclub.com/019e3e5a-908f-707d-9790-91f9ec414045/bkg.png";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext.jsx";
+import { JournalDescription } from "./JournalDescription.jsx";
 import { PlatformStatusBar } from "./PlatformStatusBar.jsx";
+import { resolveStackAssetUrl } from "../utils/mediaUrls.js";
 const sideBrick = "https://cdn.hackclub.com/019e3e5a-9d8a-7fcb-ad80-d6166cfd97f8/side_brick.png";
 const statusBtn = "https://cdn.hackclub.com/019e3e5a-9f39-7875-aec6-cf24a58b87d4/status_btn.png";
 const hoursBtn = "https://cdn.hackclub.com/019e3e5a-9b72-709a-8224-a87f14fd5e78/hours_btn.png";
@@ -111,39 +113,6 @@ const ALLOWED_UPLOAD_TYPES = new Set([
 ]);
 const PROJECT_IMAGE_UPLOAD_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "image/avif"]);
 const PROJECT_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
-
-function isVideoUrl(url) {
-  const ext = url.split("?")[0].split(".").pop()?.toLowerCase();
-  return ["mp4", "webm", "ogg", "mov"].includes(ext);
-}
-
-function JournalDescriptionRenderer({ text }) {
-  if (!text) return null;
-  const parts = [];
-  const imgRe = /!\[([^\]]*)\]\((https:\/\/cdn\.hackclub\.com\/[^\s)]+)\)/g;
-  let last = 0;
-  let match;
-  while ((match = imgRe.exec(text)) !== null) {
-    if (match.index > last) parts.push({ type: "text", value: text.slice(last, match.index) });
-    parts.push({ type: "media", alt: match[1], url: match[2] });
-    last = match.index + match[0].length;
-  }
-  if (last < text.length) parts.push({ type: "text", value: text.slice(last) });
-
-  return (
-    <div className="journal-description">
-      {parts.map((part, i) =>
-        part.type === "text" ? (
-          <span key={i} style={{ whiteSpace: "pre-wrap" }}>{part.value}</span>
-        ) : isVideoUrl(part.url) ? (
-          <video key={i} className="journal-media-item" src={part.url} controls preload="metadata" />
-        ) : (
-          <img key={i} className="journal-media-item" src={part.url} alt={part.alt} />
-        )
-      )}
-    </div>
-  );
-}
 
 function displayStatus(project) {
   if (project.status === "approved") return "Approved";
@@ -593,7 +562,13 @@ function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDe
 
         <h2 className="projects-page__modal-title">{project.name}</h2>
         <p className="projects-page__modal-description">{project.description || "No description yet."}</p>
-        {project.imageUrl ? <img className="projects-page__project-image" src={project.imageUrl} alt="" /> : null}
+        {project.imageUrl ? (
+          <img
+            className="projects-page__project-image"
+            src={resolveStackAssetUrl(project.imageUrl) || project.imageUrl}
+            alt=""
+          />
+        ) : null}
 
         <div className="projects-page__modal-row">
           <span>Type</span>
@@ -793,7 +768,7 @@ function JournalModal({ project, entries, form, onChange, onClose, onSubmit }) {
                 <strong>
                   {entry.timeDone ? new Date(entry.timeDone).toLocaleDateString() : "N/A"} - {entry.hoursWorked || 0} hrs
                 </strong>
-                <JournalDescriptionRenderer text={entry.description} />
+                <JournalDescription text={entry.description} />
                 {entry.toolsUsed?.length ? <small>Tools: {entry.toolsUsed.join(", ")}</small> : null}
               </article>
             ))
@@ -943,7 +918,11 @@ function ProjectFormModal({
                 }}
               />
               {project.imageUrl ? (
-                <img className="projects-page__image-preview" src={project.imageUrl} alt="" />
+                <img
+                  className="projects-page__image-preview"
+                  src={resolveStackAssetUrl(project.imageUrl) || project.imageUrl}
+                  alt=""
+                />
               ) : (
                 <p>Drag &amp; drop an image here</p>
               )}

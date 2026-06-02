@@ -1,4 +1,7 @@
 import { pool } from "./db.js";
+import { STACK_LAUNCH_UTC } from "./hackatimeAuth.js";
+
+const STACK_LAUNCH_TIMESTAMPTZ = STACK_LAUNCH_UTC.toISOString();
 import { hasAirtableProjectsConfig, syncProjectToAirtable, persistProjectAirtableRecordId } from "./airtableProjects.js";
 import { hasAirtableUsersConfig, syncPostgresUserToAirtable } from "./airtableUsers.js";
 
@@ -87,6 +90,7 @@ export async function syncAllUsersAndProjectsToAirtable() {
         LEFT JOIN journal_entries
           ON journal_entries.project_id = projects.id
           AND journal_entries.user_id = projects.user_id
+          AND COALESCE(journal_entries.time_done, journal_entries.created_at) >= '${STACK_LAUNCH_TIMESTAMPTZ}'::timestamptz
         GROUP BY projects.id, users.id
         ORDER BY projects.id ASC
       `);

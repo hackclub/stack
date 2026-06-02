@@ -40,7 +40,7 @@ export function AdminShopOrdersPage() {
   useEffect(() => {
     async function loadOrders() {
       try {
-        const response = await fetch("/api/admin/shop/orders");
+        const response = await fetch("/api/admin/shop/orders", { credentials: "include" });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Failed to load orders.");
         setOrders(data.orders || []);
