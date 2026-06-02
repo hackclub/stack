@@ -131,6 +131,30 @@ function formatHours(value) {
   return Number(value ?? 0).toFixed(2);
 }
 
+function sumHackatimeHoursForNames(hackatimeProjects, linkedNames) {
+  const names = new Set(
+    (Array.isArray(linkedNames) ? linkedNames : [])
+      .map((name) => String(name).trim().toLowerCase())
+      .filter(Boolean)
+  );
+  if (names.size === 0) return 0;
+
+  let seconds = 0;
+  for (const project of hackatimeProjects || []) {
+    if (names.has(String(project.name).trim().toLowerCase())) {
+      seconds += Number(project.totalSeconds ?? 0);
+    }
+  }
+
+  return Number((seconds / 3600).toFixed(2));
+}
+
+function journalTimeDoneToIso(value) {
+  if (!value) return new Date().toISOString();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
 function getLoggedHours(project) {
   return Number(project.combinedHours ?? project.totalHours ?? project.journalHours ?? 0);
 }
@@ -165,16 +189,50 @@ export function ProjectsPage() {
   useEffect(() => {
     loadProjects();
     loadHackatimeStatus();
-    refreshHackatimeHours();
   }, []);
 
-  async function openEditProject(project) {
-    if (project.id && hackatimeConnected) {
+  useEffect(() => {
+    if (!editingProject) return;
+    refreshHackatimeHours();
+  }, [editingProject?.id ?? "new"]);
+
+  function mergeProjectIntoLists(freshProject) {
+    if (!freshProject?.id) return;
+    setProjects((current) => current.map((p) => (p.id === freshProject.id ? freshProject : p)));
+    setSelectedProject((current) => (current?.id === freshProject.id ? freshProject : current));
+    setJournalProject((current) => (current?.id === freshProject.id ? freshProject : current));
+  }
+
+  async function fetchProjectById(projectId) {
+    const response = await fetch(`/api/projects/${projectId}`, { credentials: "include" });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.project ?? null;
+  }
+
+  async function openProjectDetails(project) {
+    if (project.id) {
       try {
-        const response = await fetch(`/api/projects/${project.id}`, { credentials: "include" });
-        const data = response.ok ? await response.json() : null;
-        if (data?.project) {
-          setEditingProject({ ...data.project, hackatimeNames: data.project.hackatimeNames || [] });
+        const fresh = await fetchProjectById(project.id);
+        if (fresh) {
+          mergeProjectIntoLists(fresh);
+          setSelectedProject(fresh);
+          return;
+        }
+      } catch {
+        // use cached project row
+      }
+    }
+    setSelectedProject(project);
+  }
+
+  async function openEditProject(project) {
+    if (project.id) {
+      try {
+        const fresh = await fetchProjectById(project.id);
+        if (fresh) {
+          mergeProjectIntoLists(fresh);
+          setEditingProject({ ...fresh, hackatimeNames: fresh.hackatimeNames || [] });
           return;
         }
       } catch {
@@ -202,7 +260,18 @@ export function ProjectsPage() {
       const response = await fetch("/api/hackatime/refresh", { method: "POST", credentials: "include" });
       if (!response.ok) return;
       const data = await response.json();
-      if (data.projects) setProjects(data.projects);
+      if (data.projects) {
+        setProjects(data.projects);
+        setSelectedProject((current) => {
+          if (!current?.id) return current;
+          return data.projects.find((p) => p.id === current.id) ?? current;
+        });
+        setJournalProject((current) => {
+          if (!current?.id) return current;
+          return data.projects.find((p) => p.id === current.id) ?? current;
+        });
+      }
+      if (data.hackatimeProjects) setHackatimeProjects(data.hackatimeProjects);
     } catch {
       // silently ignore — hours will still show last cached values
     }
@@ -235,7 +304,16 @@ export function ProjectsPage() {
       const response = await fetch("/api/projects", { credentials: "include" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to load projects.");
-      setProjects(data.projects || []);
+      const nextProjects = data.projects || [];
+      setProjects(nextProjects);
+      setSelectedProject((current) => {
+        if (!current?.id) return current;
+        return nextProjects.find((p) => p.id === current.id) ?? current;
+      });
+      setJournalProject((current) => {
+        if (!current?.id) return current;
+        return nextProjects.find((p) => p.id === current.id) ?? current;
+      });
       setHackatimeAvailable(Boolean(data.hackatimeAvailable));
       setStatus("");
     } catch (err) {
@@ -298,7 +376,9 @@ export function ProjectsPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to save project.");
       setEditingProject(null);
+      mergeProjectIntoLists(data.project);
       setSelectedProject(data.project);
+      await refreshHackatimeHours();
       await loadProjects();
     } catch (err) {
       setError(err.message);
@@ -337,6 +417,7 @@ export function ProjectsPage() {
       if (refreshRes.ok) {
         const refreshData = await refreshRes.json();
         if (refreshData.projects) setProjects(refreshData.projects);
+        if (refreshData.hackatimeProjects) setHackatimeProjects(refreshData.hackatimeProjects);
       }
 
       const response = await fetch(`/api/projects/${project.id}/ship`, {
@@ -395,7 +476,7 @@ export function ProjectsPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          timeDone: journalForm.timeDone || new Date().toISOString(),
+          timeDone: journalTimeDoneToIso(journalForm.timeDone),
           hoursWorked,
           description: journalForm.description,
           toolsUsed,
@@ -450,7 +531,7 @@ export function ProjectsPage() {
             key={project.id}
             type="button"
             aria-label={`Open details for ${project.name}`}
-            onClick={() => setSelectedProject(project)}
+            onClick={() => openProjectDetails(project)}
           >
             <img className="projects-page__studs" src={sideBrick} alt="" aria-hidden="true" />
             <h2 className="projects-page__title" title={project.name}>
@@ -515,7 +596,15 @@ export function ProjectsPage() {
           hackatimeAvailable={hackatimeAvailable}
           hackatimeConnected={hackatimeConnected}
           hackatimeProjects={hackatimeProjects}
-          onChange={(field, value) => setEditingProject((current) => ({ ...current, [field]: value }))}
+          onChange={(field, value) => {
+            setEditingProject((current) => {
+              const next = { ...current, [field]: value };
+              if (field === "hackatimeNames") {
+                next.hackatimeHours = sumHackatimeHoursForNames(hackatimeProjects, value);
+              }
+              return next;
+            });
+          }}
           onClose={() => setEditingProject(null)}
           onSubmit={saveProject}
         />
@@ -774,6 +863,10 @@ function ProjectFormModal({
       .flatMap((p) => p.hackatimeNames || [])
   );
 
+  const previewJournalHours = Number(project.journalHours ?? project.totalHours ?? 0);
+  const previewHackatimeHours = sumHackatimeHoursForNames(hackatimeProjects, project.hackatimeNames);
+  const previewCombinedHours = Number((previewJournalHours + previewHackatimeHours).toFixed(2));
+
   function applyProjectImageLink(rawUrl) {
     const normalized = normalizeHackClubCdnUrl(rawUrl);
     if (!normalized) {
@@ -819,6 +912,23 @@ function ProjectFormModal({
             Code URL (required before shipping)
             <input type="url" value={project.codeUrl || ""} onChange={(event) => onChange("codeUrl", event.target.value)} />
           </label>
+          <div className="projects-page__hours-preview" aria-live="polite">
+            <p>
+              <strong>{formatHours(previewCombinedHours)} h</strong> on this project
+              {previewCombinedHours > 0 ? (
+                <span className="projects-page__hours-preview-detail">
+                  {" "}
+                  (journal {formatHours(previewJournalHours)} + Hackatime {formatHours(previewHackatimeHours)})
+                </span>
+              ) : null}
+            </p>
+            {previewCombinedHours <= 0 ? (
+              <p className="projects-page__hours-preview-hint">
+                Hours come from journal entries (after you save this project) and from Hackatime projects you link below.
+                Connect Hackatime, check the matching project(s), then save.
+              </p>
+            ) : null}
+          </div>
           <div className="projects-page__image-field">
             <span>Project image (required before shipping)</span>
             <p className="cdn-upload-hint">{CDN_UPLOAD_HELP}</p>
@@ -886,8 +996,14 @@ function ProjectFormModal({
                 })}
               </div>
             )}
-            {Number(project.hackatimeHours) > 0 ? (
-              <p className="projects-page__hackatime-summary">Linked Hackatime: {project.hackatimeHours} h</p>
+            {previewHackatimeHours > 0 ? (
+              <p className="projects-page__hackatime-summary">
+                Selected Hackatime: {formatHours(previewHackatimeHours)} h (since Stack launch)
+              </p>
+            ) : hackatimeConnected && hackatimeProjects.length > 0 ? (
+              <p className="projects-page__hackatime-summary projects-page__hackatime-summary--muted">
+                Select at least one Hackatime project above to count your coding time.
+              </p>
             ) : null}
           </fieldset>
           <button type="submit">Save Project</button>
