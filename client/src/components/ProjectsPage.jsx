@@ -133,10 +133,64 @@ function journalEntryToForm(entry) {
 function displayStatus(project) {
   if (project.status === "approved") return "Approved";
   if (project.status === "rejected") return "Rejected";
+  if (project.status === "reship-rejected") return "Rejected";
+  if (project.status === "blocked") return "Blocked";
   if (project.status === "in-review") return "In Review";
+  if (project.status === "pending-reship") return "In Review";
   if (project.shipped) return "Shipped";
   if (project.status === "draft") return "Draft";
   return project.status || "Draft";
+}
+
+function getProjectReviewFeedback(project) {
+  if (Array.isArray(project.reviewFeedback) && project.reviewFeedback.length > 0) {
+    return project.reviewFeedback;
+  }
+
+  const legacyFeedback = String(project.adminFeedback || "").trim();
+  if (!legacyFeedback) return [];
+
+  return [
+    {
+      id: `legacy-${project.id}`,
+      outcome: project.status || "rejected",
+      feedback: legacyFeedback,
+      hours:
+        project.status === "approved"
+          ? Number(project.approvedHours ?? 0)
+          : null,
+      createdAt: project.reviewedAt || project.updatedAt,
+    },
+  ];
+}
+
+function shouldShowReviewerFeedback(project) {
+  return getProjectReviewFeedback(project).length > 0;
+}
+
+function reviewOutcomeLabel(outcome) {
+  if (outcome === "approved") return "Approved";
+  if (outcome === "reship-rejected") return "Rejected (resubmit)";
+  if (outcome === "blocked") return "Blocked";
+  if (outcome === "rejected") return "Rejected";
+  return "Review";
+}
+
+function formatReviewRecordMeta(record) {
+  const timestamp = record.createdAt
+    ? new Date(record.createdAt).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "Unknown date";
+  const hours = Number(record.hours ?? 0);
+  if (!Number.isFinite(hours) || hours <= 0) return timestamp;
+
+  if (record.outcome === "approved") {
+    return `${timestamp} · ${formatHours(hours)} h approved`;
+  }
+
+  return `${timestamp} · ${formatHours(hours)} h ship`;
 }
 
 function getShipLockReason(project) {
@@ -587,6 +641,32 @@ export function ProjectsPage() {
   );
 }
 
+function ProjectReviewerFeedback({ project }) {
+  const records = getProjectReviewFeedback(project);
+  if (records.length === 0) return null;
+
+  return (
+    <section className="projects-page__reviewer-feedback" aria-label="Reviewer feedback history">
+      <h3 className="projects-page__reviewer-feedback-title">Reviewer feedback</h3>
+      <div className="projects-page__reviewer-feedback-scroll">
+        {records.map((record) => (
+          <article className="projects-page__reviewer-feedback-item" key={record.id}>
+            <header className="projects-page__reviewer-feedback-item-header">
+              <strong className={`projects-page__reviewer-feedback-outcome is-${record.outcome}`}>
+                {reviewOutcomeLabel(record.outcome)}
+              </strong>
+              <small className="projects-page__reviewer-feedback-meta">{formatReviewRecordMeta(record)}</small>
+            </header>
+            {record.feedback ? (
+              <p className="projects-page__reviewer-feedback-body">{record.feedback}</p>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDelete }) {
   const shipLockReason = getShipLockReason(project);
   const unshippedHours = getUnshippedHours(project);
@@ -656,6 +736,8 @@ function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDe
             Code URL
           </a>
         ) : null}
+
+        {shouldShowReviewerFeedback(project) ? <ProjectReviewerFeedback project={project} /> : null}
 
         <div className="projects-page__modal-actions">
           <button type="button" onClick={onEdit}>

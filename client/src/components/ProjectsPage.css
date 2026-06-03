@@ -301,6 +301,76 @@
   font-weight: 700;
 }
 
+.projects-page__reviewer-feedback {
+  margin: 0.85rem 0 0;
+  padding: 0.75rem 0.85rem;
+  border: 2px solid #c7d6ff;
+  border-radius: 12px;
+  background: rgba(255, 248, 216, 0.92);
+}
+
+.projects-page__reviewer-feedback-title {
+  margin: 0 0 0.5rem;
+  color: #7a3b00;
+  font-size: 0.95rem;
+}
+
+.projects-page__reviewer-feedback-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.projects-page__reviewer-feedback-item {
+  padding: 0.55rem 0.6rem;
+  border: 2px solid #e8d9a8;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.projects-page__reviewer-feedback-item-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 0.35rem;
+}
+
+.projects-page__reviewer-feedback-outcome {
+  color: #12235c;
+  font-size: 0.92rem;
+}
+
+.projects-page__reviewer-feedback-outcome.is-approved {
+  color: #1b6b2f;
+}
+
+.projects-page__reviewer-feedback-outcome.is-rejected,
+.projects-page__reviewer-feedback-outcome.is-reship-rejected {
+  color: #9a3412;
+}
+
+.projects-page__reviewer-feedback-outcome.is-blocked {
+  color: #7f1d1d;
+}
+
+.projects-page__reviewer-feedback-meta {
+  color: #304389;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.projects-page__reviewer-feedback-body {
+  margin: 0;
+  color: #162456;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .projects-page__modal-actions {
   display: flex;
   gap: 0.6rem;

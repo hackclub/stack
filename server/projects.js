@@ -200,7 +200,131 @@ export async function ensureProjectsTable() {
   }
 
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_journal_entries_user_project ON journal_entries(user_id, project_id)`);
+  await ensureProjectReviewFeedbackTable();
   await ensureYswsProjectSubmissionsTable();
+}
+
+async function ensureProjectReviewFeedbackTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS project_review_feedback (
+      id BIGSERIAL PRIMARY KEY,
+      project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reviewer_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      outcome TEXT NOT NULL,
+      feedback TEXT,
+      hours NUMERIC(10, 2),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_project_review_feedback_project ON project_review_feedback(project_id, created_at DESC)`
+  );
+  await backfillProjectReviewFeedbackFromProjects();
+}
+
+async function backfillProjectReviewFeedbackFromProjects() {
+  await pool.query(`
+    INSERT INTO project_review_feedback (
+      project_id,
+      user_id,
+      reviewer_user_id,
+      outcome,
+      feedback,
+      hours,
+      created_at
+    )
+    SELECT
+      p.id,
+      p.user_id,
+      p.reviewed_by_user_id,
+      CASE
+        WHEN p.status = 'approved' THEN 'approved'
+        WHEN p.status = 'reship-rejected' THEN 'reship-rejected'
+        WHEN p.status = 'blocked' THEN 'blocked'
+        ELSE 'rejected'
+      END,
+      NULLIF(TRIM(p.admin_feedback), ''),
+      CASE
+        WHEN p.status = 'approved' THEN COALESCE(p.approved_hours, 0)
+        ELSE NULL
+      END,
+      COALESCE(p.reviewed_at, p.updated_at, NOW())
+    FROM projects p
+    WHERE NULLIF(TRIM(p.admin_feedback), '') IS NOT NULL
+      AND p.reviewed_at IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM project_review_feedback f WHERE f.project_id = p.id
+      )
+  `);
+}
+
+async function recordProjectReviewFeedback(client, input = {}) {
+  const feedback = textOrNull(input.feedback);
+  const hoursValue = input.hours;
+  const hours =
+    hoursValue != null && Number.isFinite(Number(hoursValue)) ? roundedHours(Number(hoursValue)) : null;
+  if (!feedback && (hours == null || hours <= 0)) return;
+
+  const queryClient = client || pool;
+  await queryClient.query(
+    `
+      INSERT INTO project_review_feedback (
+        project_id,
+        user_id,
+        reviewer_user_id,
+        outcome,
+        feedback,
+        hours
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+    `,
+    [
+      input.projectId,
+      input.userId,
+      input.reviewerUserId ?? null,
+      input.outcome,
+      feedback,
+      hours,
+    ]
+  );
+}
+
+async function loadReviewFeedbackMapForProjectIds(projectIds) {
+  const map = new Map();
+  if (!pool || !projectIds.length) return map;
+
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM project_review_feedback
+      WHERE project_id = ANY($1::bigint[])
+      ORDER BY created_at DESC, id DESC
+    `,
+    [projectIds]
+  );
+
+  for (const row of result.rows) {
+    const projectId = Number(row.project_id);
+    if (!map.has(projectId)) map.set(projectId, []);
+    map.get(projectId).push(toPublicReviewFeedback(row));
+  }
+
+  return map;
+}
+
+async function attachReviewFeedbackToProjects(projects) {
+  if (!projects.length) return projects;
+  const feedbackMap = await loadReviewFeedbackMapForProjectIds(projects.map((project) => project.id));
+  return projects.map((project) => ({
+    ...project,
+    reviewFeedback: feedbackMap.get(Number(project.id)) || [],
+  }));
+}
+
+async function toPublicProjectForUser(row) {
+  if (!row) return null;
+  const [project] = await attachReviewFeedbackToProjects([toPublicProject(row)]);
+  return project;
 }
 
 export async function listProjectsForUser(userId) {
@@ -221,7 +345,8 @@ export async function listProjectsForUser(userId) {
     [userId]
   );
 
-  return result.rows.map(toPublicProject);
+  const projects = result.rows.map(toPublicProject);
+  return attachReviewFeedbackToProjects(projects);
 }
 
 export async function createProjectForUser(userId, input) {
@@ -262,7 +387,7 @@ export async function createProjectForUser(userId, input) {
   const row = result.rows[0];
   await applyHackatimeHoursToProject(userId, row.id);
   await trySyncProjectToAirtable(row.id);
-  return toPublicProject((await getProjectRowForAirtableSync(row.id)) || row);
+  return toPublicProjectForUser((await getProjectRowForAirtableSync(row.id)) || row);
 }
 
 export async function updateProjectForUser(userId, projectId, input) {
@@ -304,7 +429,7 @@ export async function updateProjectForUser(userId, projectId, input) {
   if (!result.rows[0]) return null;
   await applyHackatimeHoursToProject(userId, result.rows[0].id);
   await trySyncProjectToAirtable(result.rows[0].id);
-  return toPublicProject((await getProjectRowForAirtableSync(result.rows[0].id)) || result.rows[0]);
+  return toPublicProjectForUser((await getProjectRowForAirtableSync(result.rows[0].id)) || result.rows[0]);
 }
 
 export async function shipProjectForUser(userId, projectId) {
@@ -368,7 +493,7 @@ export async function shipProjectForUser(userId, projectId) {
   const row = result.rows[0];
   await trySyncProjectToAirtable(row.id);
   await trySubmitProjectToYsws(row.id);
-  return toPublicProject(row);
+  return toPublicProjectForUser(row);
 }
 
 export function buildDefaultJustificationTemplate({
@@ -570,6 +695,14 @@ export async function approveAdminReviewProject(adminId, projectId, input = {}) 
     const approvedRow = updatedProjectResult.rows[0];
 
     await client.query("UPDATE users SET bricks = bricks + $1, updated_at = NOW() WHERE id = $2", [bricksDelta, project.user_id]);
+    await recordProjectReviewFeedback(client, {
+      projectId,
+      userId: project.user_id,
+      reviewerUserId: adminId,
+      outcome: "approved",
+      feedback,
+      hours: approvedHours,
+    });
     await client.query("COMMIT");
 
     await trySyncProjectToAirtable(approvedRow.id);
@@ -604,6 +737,7 @@ export async function rejectAdminReviewProject(adminId, projectId, input = {}) {
     const lookup = await client.query("SELECT * FROM projects WHERE id = $1 FOR UPDATE", [projectId]);
     const project = lookup.rows[0];
     const isReship = project?.ship_kind === "reship";
+    const submissionHours = project ? pendingReviewHours(project) : 0;
 
     const result = await client.query(
       `
@@ -636,6 +770,15 @@ export async function rejectAdminReviewProject(adminId, projectId, input = {}) {
       throw new Error("Project is not in the review queue.");
     }
 
+    await recordProjectReviewFeedback(client, {
+      projectId,
+      userId: project.user_id,
+      reviewerUserId: adminId,
+      outcome: isReship ? "reship-rejected" : "rejected",
+      feedback,
+      hours: submissionHours,
+    });
+
     await client.query("COMMIT");
 
     const row = result.rows[0];
@@ -657,6 +800,11 @@ export async function blockAdminReviewProject(adminId, projectId, input = {}) {
   if (!feedback) {
     throw new Error("Blocking requires a written reason.");
   }
+
+  const lookup = await pool.query("SELECT * FROM projects WHERE id = $1", [projectId]);
+  const project = lookup.rows[0];
+  if (!project) throw new Error("Project not found.");
+  const submissionHours = loggedHours(project);
 
   const result = await pool.query(
     `
@@ -689,6 +837,15 @@ export async function blockAdminReviewProject(adminId, projectId, input = {}) {
     );
     await trySyncProjectToAirtable(row.parent_project_id);
   }
+
+  await recordProjectReviewFeedback(pool, {
+    projectId,
+    userId: project.user_id,
+    reviewerUserId: adminId,
+    outcome: "blocked",
+    feedback,
+    hours: submissionHours,
+  });
 
   await trySyncProjectToAirtable(row.id);
   await trySubmitProjectToYsws(row.id);
@@ -1038,7 +1195,7 @@ export async function getProjectForUser(userId, projectId) {
   if (!row || Number(row.user_id) !== Number(userId)) return null;
   await applyHackatimeHoursToProject(userId, projectId);
   const refreshed = await getProjectRowForAirtableSync(projectId);
-  return toPublicProject(refreshed || row);
+  return toPublicProjectForUser(refreshed || row);
 }
 
 function validateProjectBasics(project) {
@@ -1124,7 +1281,7 @@ async function refreshProjectJournalHours(userId, projectId) {
 
   const row = result.rows[0];
   if (row) await trySyncProjectToAirtable(row.id);
-  return row ? toPublicProject(row) : null;
+  return row ? toPublicProjectForUser(row) : null;
 }
 
 async function refreshProjectJournalHoursWithClient(client, projectId) {
@@ -1251,6 +1408,16 @@ async function trySyncProjectToAirtable(projectId) {
       message: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+function toPublicReviewFeedback(row) {
+  return {
+    id: row.id,
+    outcome: row.outcome,
+    feedback: row.feedback,
+    hours: row.hours != null ? Number(row.hours) : null,
+    createdAt: row.created_at,
+  };
 }
 
 function toPublicProject(row) {
