@@ -537,6 +537,35 @@
   background: rgba(255, 255, 255, 0.72);
 }
 
+.projects-page__journal-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.projects-page__journal-edit-btn,
+.projects-page__journal-cancel-edit {
+  border: 2px solid #5a7fd4;
+  border-radius: 10px;
+  background: #eef3ff;
+  color: #1d2a57;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+  cursor: pointer;
+}
+
+.projects-page__journal-edit-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.projects-page__journal-edit-hint {
+  margin: 0 0 0.75rem;
+  color: #304389;
+  font-weight: 700;
+}
+
 .projects-page__journal-entry p {
   margin: 0.35rem 0;
 }

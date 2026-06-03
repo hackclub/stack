@@ -107,6 +107,29 @@ const emptyJournalEntry = {
   toolsUsed: "",
 };
 
+function toDatetimeLocalValue(iso) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function fromDatetimeLocalValue(value) {
+  if (!value) return new Date().toISOString();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+}
+
+function journalEntryToForm(entry) {
+  return {
+    timeDone: toDatetimeLocalValue(entry.timeDone || entry.createdAt),
+    hoursWorked: entry.hoursWorked != null ? String(entry.hoursWorked) : "",
+    description: entry.description || "",
+    toolsUsed: (entry.toolsUsed || []).join(", "),
+  };
+}
+
 function displayStatus(project) {
   if (project.status === "approved") return "Approved";
   if (project.status === "rejected") return "Rejected";
@@ -155,6 +178,7 @@ export function ProjectsPage() {
   const [journalProject, setJournalProject] = useState(null);
   const [journalEntries, setJournalEntries] = useState([]);
   const [journalForm, setJournalForm] = useState(emptyJournalEntry);
+  const [editingJournalEntryId, setEditingJournalEntryId] = useState(null);
   const [projectBlockPage, setProjectBlockPage] = useState(0);
   const [status, setStatus] = useState("Loading projects...");
   const [error, setError] = useState("");
@@ -353,9 +377,14 @@ export function ProjectsPage() {
     }
   }
 
+  function resetJournalForm() {
+    setEditingJournalEntryId(null);
+    setJournalForm(emptyJournalEntry);
+  }
+
   async function openJournal(project) {
     setJournalProject(project);
-    setJournalForm(emptyJournalEntry);
+    resetJournalForm();
     setError("");
     try {
       const response = await fetch(`/api/projects/${project.id}/journal_entries`, { credentials: "include" });
@@ -389,23 +418,33 @@ export function ProjectsPage() {
       .map((tool) => tool.trim())
       .filter(Boolean);
 
+    const payload = {
+      timeDone: fromDatetimeLocalValue(journalForm.timeDone),
+      hoursWorked,
+      description: journalForm.description,
+      toolsUsed,
+    };
+
     try {
-      const response = await fetch(`/api/projects/${journalProject.id}/journal_entries`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          timeDone: journalForm.timeDone || new Date().toISOString(),
-          hoursWorked,
-          description: journalForm.description,
-          toolsUsed,
-        }),
-      });
+      const isEditing = Boolean(editingJournalEntryId);
+      const response = await fetch(
+        isEditing
+          ? `/api/projects/${journalProject.id}/journal_entries/${editingJournalEntryId}`
+          : `/api/projects/${journalProject.id}/journal_entries`,
+        {
+          method: isEditing ? "PATCH" : "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to save journal entry.");
 
-      setJournalForm(emptyJournalEntry);
-      setJournalEntries((current) => [data.entry, ...current]);
+      resetJournalForm();
+      setJournalEntries((current) =>
+        isEditing ? current.map((entry) => (entry.id === data.entry.id ? data.entry : entry)) : [data.entry, ...current]
+      );
       if (data.project) {
         setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
         setSelectedProject((current) => (current?.id === data.project.id ? data.project : current));
@@ -526,6 +565,7 @@ export function ProjectsPage() {
           project={journalProject}
           entries={journalEntries}
           form={journalForm}
+          editingEntryId={editingJournalEntryId}
           onChange={(field, value) => {
             if (field === "hoursWorked" && value) {
               const numValue = Number(value);
@@ -533,6 +573,12 @@ export function ProjectsPage() {
             }
             setJournalForm((current) => ({ ...current, [field]: value }));
           }}
+          onEditEntry={(entry) => {
+            setEditingJournalEntryId(entry.id);
+            setJournalForm(journalEntryToForm(entry));
+            setError("");
+          }}
+          onCancelEdit={resetJournalForm}
           onClose={() => setJournalProject(null)}
           onSubmit={saveJournalEntry}
         />
@@ -631,7 +677,7 @@ function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDe
   );
 }
 
-function JournalModal({ project, entries, form, onChange, onClose, onSubmit }) {
+function JournalModal({ project, entries, form, editingEntryId, onChange, onEditEntry, onCancelEdit, onClose, onSubmit }) {
   const [linkError, setLinkError] = useState("");
   const [cdnLinkInput, setCdnLinkInput] = useState("");
   const textareaRef = useRef(null);
@@ -664,6 +710,7 @@ function JournalModal({ project, entries, form, onChange, onClose, onSubmit }) {
           x
         </button>
         <h2 className="projects-page__modal-title">{project.name} - Journal</h2>
+        {editingEntryId ? <p className="projects-page__journal-edit-hint">Editing an unshipped journal entry.</p> : null}
 
         <form className="projects-page__form" onSubmit={onSubmit}>
           <label>
@@ -713,7 +760,12 @@ function JournalModal({ project, entries, form, onChange, onClose, onSubmit }) {
             Tools Used
             <input value={form.toolsUsed} onChange={(event) => onChange("toolsUsed", event.target.value)} placeholder="React, Figma, CAD" />
           </label>
-          <button type="submit">Save Entry</button>
+          <button type="submit">{editingEntryId ? "Update Entry" : "Save Entry"}</button>
+          {editingEntryId ? (
+            <button type="button" className="projects-page__journal-cancel-edit" onClick={onCancelEdit}>
+              Cancel edit
+            </button>
+          ) : null}
         </form>
 
         <section className="projects-page__journal-list" aria-label="Journal entries">
@@ -723,9 +775,21 @@ function JournalModal({ project, entries, form, onChange, onClose, onSubmit }) {
           ) : (
             entries.map((entry) => (
               <article className="projects-page__journal-entry" key={entry.id}>
-                <strong>
-                  {entry.timeDone ? new Date(entry.timeDone).toLocaleDateString() : "N/A"} - {entry.hoursWorked || 0} hrs
-                </strong>
+                <div className="projects-page__journal-entry-header">
+                  <strong>
+                    {entry.timeDone ? new Date(entry.timeDone).toLocaleDateString() : "N/A"} - {entry.hoursWorked || 0} hrs
+                  </strong>
+                  {entry.editable ? (
+                    <button
+                      type="button"
+                      className="projects-page__journal-edit-btn"
+                      onClick={() => onEditEntry(entry)}
+                      disabled={editingEntryId === entry.id}
+                    >
+                      {editingEntryId === entry.id ? "Editing…" : "Edit"}
+                    </button>
+                  ) : null}
+                </div>
                 <JournalDescription text={entry.description} />
                 {entry.toolsUsed?.length ? <small>Tools: {entry.toolsUsed.join(", ")}</small> : null}
               </article>

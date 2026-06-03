@@ -751,13 +751,15 @@ export async function deleteProjectForUser(userId, projectId) {
 export async function listJournalEntriesForUserProject(userId, projectId) {
   if (!pool) throw new Error("DATABASE_URL is not set.");
 
+  const project = await getProjectRowForUser(userId, projectId);
+  if (!project) {
+    throw new Error("Project not found.");
+  }
+
   const result = await pool.query(
     `
       SELECT journal_entries.*
       FROM journal_entries
-      JOIN projects
-        ON projects.id = journal_entries.project_id
-        AND projects.user_id = journal_entries.user_id
       WHERE journal_entries.user_id = $1
         AND journal_entries.project_id = $2
       ORDER BY journal_entries.created_at DESC, journal_entries.id DESC
@@ -765,7 +767,85 @@ export async function listJournalEntriesForUserProject(userId, projectId) {
     [userId, projectId]
   );
 
-  return result.rows.map(toPublicJournalEntry);
+  return result.rows.map((row) => toPublicJournalEntry(row, project));
+}
+
+export async function updateJournalEntryForUser(userId, projectId, entryId, input = {}) {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const project = await getProjectRowForUser(userId, projectId);
+  if (!project) {
+    throw new Error("Project not found.");
+  }
+
+  const existingResult = await pool.query(
+    `
+      SELECT journal_entries.*
+      FROM journal_entries
+      WHERE journal_entries.id = $1
+        AND journal_entries.user_id = $2
+        AND journal_entries.project_id = $3
+    `,
+    [entryId, userId, projectId]
+  );
+  const existing = existingResult.rows[0];
+  if (!existing) {
+    throw new Error("Journal entry not found.");
+  }
+  if (!isJournalEntryEditable(project, existing)) {
+    throw new Error("This journal entry cannot be edited because it is part of a shipped submission.");
+  }
+
+  const journal = normalizeJournalEntryInput(input);
+  assertJournalDescriptionMediaIsCdnOnly(journal.description);
+
+  const mergedEntry = {
+    time_done: journal.timeDone,
+    created_at: existing.created_at,
+  };
+  if (!isJournalEntryEditable(project, mergedEntry)) {
+    throw new Error("Time done must stay after your last ship date for editable entries.");
+  }
+
+  const result = await pool.query(
+    `
+      UPDATE journal_entries
+      SET
+        time_done = $4,
+        hours_worked = $5,
+        description = $6,
+        tools_used = $7,
+        project_name = $8,
+        project_index = $9,
+        updated_at = NOW()
+      WHERE id = $1
+        AND user_id = $2
+        AND project_id = $3
+      RETURNING *
+    `,
+    [
+      entryId,
+      userId,
+      project.id,
+      journal.timeDone,
+      journal.hoursWorked,
+      journal.description,
+      JSON.stringify(journal.toolsUsed),
+      project.name,
+      project.project_index ?? 0,
+    ]
+  );
+
+  const updatedProject = await refreshProjectJournalHours(userId, project.id);
+
+  syncJournalEntryToAirtable(result.rows[0]).catch((err) => {
+    console.error("[airtable] Failed to sync journal entry:", err.message);
+  });
+
+  return {
+    entry: toPublicJournalEntry(result.rows[0], project),
+    project: updatedProject,
+  };
 }
 
 export async function createJournalEntryForUser(userId, input = {}) {
@@ -812,7 +892,7 @@ export async function createJournalEntryForUser(userId, input = {}) {
   });
 
   return {
-    entry: toPublicJournalEntry(result.rows[0]),
+    entry: toPublicJournalEntry(result.rows[0], project),
     project: updatedProject,
   };
 }
@@ -1237,6 +1317,37 @@ function isPendingReviewProject(project) {
   return project.shipped && project.shipKind === "reship";
 }
 
+function journalEntryTimestamp(row) {
+  const value = row.time_done ?? row.created_at;
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isJournalEntryEditable(projectRow, entryRow) {
+  if (!projectRow || !entryRow) return false;
+  if (projectRow.blocked) return false;
+  if (
+    isPendingReviewProject({
+      reviewed: projectRow.reviewed,
+      status: projectRow.status,
+      shipped: projectRow.shipped,
+      shipKind: projectRow.ship_kind,
+    })
+  ) {
+    return false;
+  }
+
+  if (!projectRow.shipped || !projectRow.shipped_at) return true;
+
+  const entryAt = journalEntryTimestamp(entryRow);
+  const shippedAt =
+    projectRow.shipped_at instanceof Date ? projectRow.shipped_at : new Date(projectRow.shipped_at);
+  if (!entryAt || Number.isNaN(shippedAt.getTime())) return true;
+
+  return entryAt > shippedAt;
+}
+
 function getShipMissingRequirements(project) {
   const missing = [];
   // Block shipping only if already shipped but not in a valid state for re-shipping
@@ -1256,7 +1367,7 @@ function getShipMissingRequirements(project) {
   return missing;
 }
 
-function toPublicJournalEntry(row) {
+function toPublicJournalEntry(row, projectRow = null) {
   return {
     id: row.id,
     userId: row.user_id,
@@ -1269,6 +1380,7 @@ function toPublicJournalEntry(row) {
     toolsUsed: row.tools_used || [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    editable: projectRow ? isJournalEntryEditable(projectRow, row) : false,
   };
 }
 

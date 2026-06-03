@@ -33,6 +33,7 @@ import {
   createProjectForUser,
   getProjectForUser,
   createJournalEntryForUser,
+  updateJournalEntryForUser,
   deleteProjectForUser,
   deleteProjectBySuperadmin,
   ensureProjectsTable,
@@ -579,6 +580,24 @@ app.post("/api/projects/:id/journal_entries", requireUser, async (req, res) => {
   } catch (error) {
     console.error("Failed to create journal entry:", error);
     res.status(500).json({ error: error.message || "Failed to create journal entry." });
+  }
+});
+
+app.patch("/api/projects/:id/journal_entries/:entryId", requireUser, async (req, res) => {
+  try {
+    const result = await updateJournalEntryForUser(
+      req.session.userId,
+      req.params.id,
+      req.params.entryId,
+      req.body
+    );
+    res.json(result);
+  } catch (error) {
+    const message = error.message || "Failed to update journal entry.";
+    const status =
+      message === "Project not found." || message === "Journal entry not found." ? 404 : 400;
+    console.error("Failed to update journal entry:", error);
+    res.status(status).json({ error: message });
   }
 });
 
