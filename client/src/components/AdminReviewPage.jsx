@@ -64,6 +64,11 @@ function combinedLoggedHours(project) {
   return Number(project.combinedHours ?? journal + hackatime);
 }
 
+function formatHackatimeProjectNames(names) {
+  const list = (Array.isArray(names) ? names : []).map((name) => String(name).trim()).filter(Boolean);
+  return list.length ? list.join(", ") : "—";
+}
+
 /** True when "new hours to approve" is above the logged/pending caps shown on the review page. */
 function approvalNeedsExceedAck(project, requestedNewHours) {
   if (!project || !Number.isFinite(requestedNewHours)) return false;
@@ -536,6 +541,10 @@ function AdminReviewDetail({ projectId }) {
             <div>
               <span>Hackatime hours</span>
               <strong>{formatHours(project.hackatimeHours)} h</strong>
+            </div>
+            <div className="admin-review-hours-grid-hackatime-names">
+              <span>Hackatime projects</span>
+              <strong>{formatHackatimeProjectNames(project.hackatimeNames)}</strong>
             </div>
             <div>
               <span>Combined total</span>

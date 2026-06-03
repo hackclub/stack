@@ -369,6 +369,15 @@
   font-size: 0.85rem;
 }
 
+.admin-review-hours-grid-hackatime-names {
+  grid-column: 1 / -1;
+}
+
+.admin-review-hours-grid-hackatime-names strong {
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .admin-review-hours-input {
   padding: 0.5rem;
 }
