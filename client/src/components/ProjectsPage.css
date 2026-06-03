@@ -429,6 +429,38 @@
   font-weight: 700;
 }
 
+.projects-page__hours-preview {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 2px solid #c7d6ff;
+  border-radius: 10px;
+  background: rgba(238, 242, 255, 0.85);
+  color: #27376f;
+  font-size: 0.92rem;
+}
+
+.projects-page__hours-preview p {
+  margin: 0;
+}
+
+.projects-page__hours-preview-detail {
+  font-weight: 600;
+  color: #4a5f9a;
+}
+
+.projects-page__hours-preview-hint {
+  margin-top: 0.45rem !important;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #4a5f9a;
+}
+
+.projects-page__hackatime-summary--muted {
+  color: #6b7ea8;
+  font-weight: 600;
+}
+
 .projects-page__image-field {
   display: grid;
   gap: 0.25rem;

@@ -8,7 +8,7 @@ import {
   isHackatimeOAuthConfigured,
   sumHackatimeHoursForNames,
 } from "./hackatimeAuth.js";
-import { refreshProjectHackatimeHoursForUser } from "./projects.js";
+import { syncAllProjectHoursForUser } from "./projects.js";
 
 export function isHackatimeConnected(row) {
   return Boolean(row?.hackatime_access_token);
@@ -74,7 +74,7 @@ export async function refreshUserHackatimeCache(userId, accessToken) {
     [hours.totalHours, userId]
   );
 
-  await refreshProjectHackatimeHoursForUser(userId, stackProjects);
+  await syncAllProjectHoursForUser(userId, stackProjects);
 
   const userRow = (
     await pool.query(`SELECT * FROM users WHERE id = $1`, [userId])

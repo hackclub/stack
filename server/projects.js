@@ -1141,6 +1141,46 @@ function normalizeProjectInput(input = {}) {
   };
 }
 
+function parseHackatimeNames(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+/** Recompute journal totals on every existing project (post-launch entries only). */
+export async function refreshJournalHoursForAllUserProjects(userId) {
+  if (!pool) return;
+
+  const updated = await pool.query(
+    `
+      UPDATE projects
+      SET
+        total_hours = COALESCE((
+          SELECT SUM(journal_entries.hours_worked)
+          FROM journal_entries
+          WHERE journal_entries.user_id = projects.user_id
+            AND journal_entries.project_id = projects.id
+            AND ${journalEntryAfterLaunchOn()}
+        ), 0),
+        updated_at = NOW()
+      WHERE projects.user_id = $1
+      RETURNING id
+    `,
+    [userId]
+  );
+
+  for (const row of updated.rows) {
+    await trySyncProjectToAirtable(row.id);
+  }
+}
+
 export async function refreshProjectHackatimeHoursForUser(userId, hackatimeProjects = null) {
   if (!pool) return;
 
@@ -1158,7 +1198,7 @@ export async function refreshProjectHackatimeHoursForUser(userId, hackatimeProje
   );
 
   for (const project of projectsResult.rows) {
-    const names = Array.isArray(project.hackatime_names) ? project.hackatime_names : [];
+    const names = parseHackatimeNames(project.hackatime_names);
     const hours = sumHackatimeHoursForNames(list, names);
     await pool.query(
       `UPDATE projects SET hackatime_hours = $1, updated_at = NOW() WHERE id = $2`,
@@ -1166,6 +1206,12 @@ export async function refreshProjectHackatimeHoursForUser(userId, hackatimeProje
     );
     await trySyncProjectToAirtable(project.id);
   }
+}
+
+/** Sync journal + Hackatime hours for all of a user's existing Stack projects. */
+export async function syncAllProjectHoursForUser(userId, hackatimeProjects = null) {
+  await refreshJournalHoursForAllUserProjects(userId);
+  await refreshProjectHackatimeHoursForUser(userId, hackatimeProjects);
 }
 
 async function applyHackatimeHoursToProject(userId, projectId) {
@@ -1180,7 +1226,7 @@ async function applyHackatimeHoursToProject(userId, projectId) {
     `SELECT hackatime_names FROM projects WHERE id = $1 AND user_id = $2`,
     [projectId, userId]
   );
-  const names = projectResult.rows[0]?.hackatime_names || [];
+  const names = parseHackatimeNames(projectResult.rows[0]?.hackatime_names);
   const list = await fetchHackatimeProjectsForStack(token);
   const hours = sumHackatimeHoursForNames(list, names);
 
@@ -1193,6 +1239,7 @@ async function applyHackatimeHoursToProject(userId, projectId) {
 export async function getProjectForUser(userId, projectId) {
   const row = await getProjectRowForAirtableSync(projectId);
   if (!row || Number(row.user_id) !== Number(userId)) return null;
+  await refreshProjectJournalHours(userId, projectId);
   await applyHackatimeHoursToProject(userId, projectId);
   const refreshed = await getProjectRowForAirtableSync(projectId);
   return toPublicProjectForUser(refreshed || row);

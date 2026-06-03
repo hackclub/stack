@@ -45,6 +45,7 @@ import {
   listProjectsForUser,
   rejectAdminReviewProject,
   shipProjectForUser,
+  syncAllProjectHoursForUser,
   updateProjectForUser,
 } from "./projects.js";
 import {
@@ -246,7 +247,17 @@ app.post("/api/shop/items/:id/buy", requireUser, async (req, res) => {
 
 app.get("/api/projects", requireUser, async (req, res) => {
   try {
-    const projects = await listProjectsForUser(req.session.userId);
+    const userId = req.session.userId;
+    try {
+      if (isHackatimeOAuthConfigured()) {
+        await refreshUserHackatimeCache(userId);
+      } else {
+        await syncAllProjectHoursForUser(userId);
+      }
+    } catch (error) {
+      console.error("[projects] hours sync on list failed:", error?.message || error);
+    }
+    const projects = await listProjectsForUser(userId);
     res.json({ projects, hackatimeAvailable: isHackatimeOAuthConfigured() });
   } catch (error) {
     console.error("Failed to load projects:", error);
@@ -290,9 +301,13 @@ app.get("/api/hackatime/status", requireUser, async (req, res) => {
 
 app.post("/api/hackatime/refresh", requireUser, async (req, res) => {
   try {
-    await refreshUserHackatimeCache(req.session.userId);
+    const refreshed = await refreshUserHackatimeCache(req.session.userId);
     const projects = await listProjectsForUser(req.session.userId);
-    res.json({ projects });
+    res.json({
+      projects,
+      hackatimeProjects: refreshed.projects,
+      hackatimeTotalHours: refreshed.totalHours,
+    });
   } catch (error) {
     console.error("Failed to refresh Hackatime hours:", error);
     res.status(500).json({ error: error.message || "Failed to refresh Hackatime hours." });
