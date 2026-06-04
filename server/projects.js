@@ -24,6 +24,7 @@ function journalEntryAfterLaunchWhere() {
 }
 
 export const BRICKS_PER_APPROVED_HOUR = 20;
+export const MIN_SHIP_LOGGED_HOURS = 1;
 
 export async function ensureProjectsTable() {
   if (!pool) {
@@ -453,15 +454,7 @@ export async function shipProjectForUser(userId, projectId) {
     throw new Error(`Cannot ship yet: ${missing.join(", ")}.`);
   }
 
-  const isReship =
-    (project.status === "approved" && project.reviewed) ||
-    project.status === "reship-rejected";
-  if (isReship) {
-    const newHours = pendingReviewHours(project);
-    if (newHours <= 0) {
-      throw new Error("No new hours to ship. Add more hours before re-shipping.");
-    }
-  }
+  const isReship = isReshipEligibleProject(project);
 
   const result = await pool.query(
     `
@@ -1389,6 +1382,18 @@ function pendingReviewHours(row) {
   return Math.max(0, roundedHours(loggedHours(row) - previouslyShippedHours(row)));
 }
 
+function isReshipEligibleProject(project) {
+  const status = String(project.status || "");
+  return (status === "approved" && project.reviewed) || status === "reship-rejected";
+}
+
+function hoursRequiredToShip(project) {
+  if (isReshipEligibleProject(project)) {
+    return pendingReviewHours(project);
+  }
+  return loggedHours(project);
+}
+
 async function getProjectRowForAirtableSync(projectId) {
   if (!pool) return null;
 
@@ -1576,8 +1581,14 @@ function getShipMissingRequirements(project) {
   if (!textOrNull(project.playable_url)) missing.push("playable URL missing");
   if (!textOrNull(project.code_url)) missing.push("code URL missing");
   if (!textOrNull(project.image_url)) missing.push("project image missing");
-  const combinedHours = loggedHours(project);
-  if (combinedHours <= 0) missing.push("hours logged missing");
+  const shipHours = hoursRequiredToShip(project);
+  if (shipHours < MIN_SHIP_LOGGED_HOURS) {
+    missing.push(
+      isReshipEligibleProject(project)
+        ? "at least 1 new hour must be logged before re-shipping"
+        : "at least 1 hour of work must be logged before shipping"
+    );
+  }
   return missing;
 }
 

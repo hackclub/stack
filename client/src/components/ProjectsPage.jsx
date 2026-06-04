@@ -193,14 +193,35 @@ function formatReviewRecordMeta(record) {
   return `${timestamp} · ${formatHours(hours)} h ship`;
 }
 
+const MIN_SHIP_LOGGED_HOURS = 1;
+
+function isReshipEligibleProject(project) {
+  return (
+    (project.status === "approved" && project.reviewed) ||
+    project.status === "reship-rejected"
+  );
+}
+
+function hoursRequiredToShip(project) {
+  if (isReshipEligibleProject(project)) {
+    return getUnshippedHours(project);
+  }
+  return getLoggedHours(project);
+}
+
 function getShipLockReason(project) {
   if (project.status === "in-review") return "Project is currently in review.";
   const missing = [];
   if (!project.playableUrl) missing.push("playable URL missing");
   if (!project.codeUrl) missing.push("code URL missing");
   if (!project.imageUrl) missing.push("project image missing");
-  const hours = Number(project.combinedHours ?? project.totalHours ?? project.journalHours ?? 0);
-  if (hours <= 0) missing.push("hours logged missing");
+  if (hoursRequiredToShip(project) < MIN_SHIP_LOGGED_HOURS) {
+    missing.push(
+      isReshipEligibleProject(project)
+        ? "at least 1 new hour must be logged before re-shipping"
+        : "at least 1 hour of work must be logged before shipping"
+    );
+  }
   return missing.length ? `Locked: ${missing.join(", ")}.` : "";
 }
 
