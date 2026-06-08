@@ -69,6 +69,52 @@ function formatHackatimeProjectNames(names) {
   return list.length ? list.join(", ") : "—";
 }
 
+function getProjectReviewHistory(project) {
+  if (Array.isArray(project.reviewFeedback) && project.reviewFeedback.length > 0) {
+    return [...project.reviewFeedback].sort(
+      (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+    );
+  }
+
+  const legacyFeedback = String(project.adminFeedback || "").trim();
+  if (!legacyFeedback) return [];
+
+  return [
+    {
+      id: `legacy-${project.id}`,
+      outcome: project.status || "rejected",
+      feedback: legacyFeedback,
+      hours: project.status === "approved" ? Number(project.approvedHours ?? 0) : null,
+      createdAt: project.reviewedAt || project.updatedAt,
+    },
+  ];
+}
+
+function reviewOutcomeLabel(outcome) {
+  if (outcome === "approved") return "Approved";
+  if (outcome === "reship-rejected") return "Rejected (resubmit)";
+  if (outcome === "blocked") return "Blocked";
+  if (outcome === "rejected") return "Rejected";
+  return "Review";
+}
+
+function formatReviewHistoryMeta(record) {
+  const timestamp = record.createdAt
+    ? new Date(record.createdAt).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "Unknown date";
+  const hours = Number(record.hours ?? 0);
+  if (!Number.isFinite(hours) || hours <= 0) return timestamp;
+
+  if (record.outcome === "approved") {
+    return `${timestamp} · ${formatHours(hours)} h approved`;
+  }
+
+  return `${timestamp} · ${formatHours(hours)} h at review`;
+}
+
 /** True when "new hours to approve" is above the logged/pending caps shown on the review page. */
 function approvalNeedsExceedAck(project, requestedNewHours) {
   if (!project || !Number.isFinite(requestedNewHours)) return false;
@@ -335,18 +381,12 @@ function AdminReviewDetail({ projectId }) {
       if (!response.ok) throw new Error(data.error || "Failed to submit review.");
       setExceedModalOpen(false);
       setExceedAcknowledged(false);
-      setProject((current) => ({
-        ...current,
-        ...data.project,
-        user: current?.user,
-        pendingReviewHours: data.project?.pendingReviewHours ?? 0,
-        fraudFlag: data.project?.fraudFlag ?? current?.fraudFlag,
-      }));
-      setMessage(
+      const successMessage =
         selectedAction === "reject"
           ? "Project rejected and returned to the participant deck."
-          : `Project approved. Awarded ${data.bricksEarned} bricks.`
-      );
+          : `Project approved. Awarded ${data.bricksEarned} bricks.`;
+      await loadProject();
+      setMessage(successMessage);
     } catch (err) {
       setMessage(err.message);
     }
@@ -418,6 +458,7 @@ function AdminReviewDetail({ projectId }) {
     Number.isFinite(approvedHoursNumber) &&
     approvalNeedsExceedAck(project, approvedHoursNumber);
   const loggedHoursPreview = combinedLoggedHours(project);
+  const reviewHistory = getProjectReviewHistory(project);
 
   return (
     <main className="admin-review-page">
@@ -439,13 +480,6 @@ function AdminReviewDetail({ projectId }) {
         ) : (
           <div className="admin-review-banner admin-review-banner--empty">Screenshot unavailable</div>
         )}
-
-        {project.status === "rejected" && project.adminFeedback ? (
-          <section className="admin-review-panel admin-review-rejection-feedback">
-            <h2>Rejection Reason</h2>
-            <p>{project.adminFeedback}</p>
-          </section>
-        ) : null}
 
         <section className="admin-review-quick-links" aria-label="Project links">
           {project.codeUrl ? (
@@ -484,9 +518,10 @@ function AdminReviewDetail({ projectId }) {
           {fraudSaving ? <small className="admin-review-fraud-saving">Saving…</small> : null}
         </label>
 
-        <section className="admin-review-panel">
-          <h2>Time Tracking</h2>
-          <div className="admin-review-hours-grid">
+        <div className={`admin-review-time-row${reviewHistory.length > 0 ? " has-history" : ""}`}>
+          <section className="admin-review-panel admin-review-time-panel">
+            <h2>Time Tracking</h2>
+            <div className="admin-review-hours-grid">
             <div>
               <span>Project</span>
               <strong>{project.name}</strong>
@@ -551,7 +586,27 @@ function AdminReviewDetail({ projectId }) {
               <strong>{formatHours((Number(project.journalHours || 0) + Number(project.hackatimeHours || 0)).toFixed(2))} h</strong>
             </div>
           </div>
-        </section>
+          </section>
+
+          {reviewHistory.length > 0 ? (
+            <section className="admin-review-panel admin-review-history" aria-label="Review history">
+              <h2>History ({reviewHistory.length})</h2>
+              <div className="admin-review-history-list">
+                {reviewHistory.map((record) => (
+                  <article className={`admin-review-history-item is-${record.outcome}`} key={record.id}>
+                    <header className="admin-review-history-item-header">
+                      <strong className={`admin-review-history-outcome is-${record.outcome}`}>
+                        {reviewOutcomeLabel(record.outcome)}
+                      </strong>
+                      <small className="admin-review-history-meta">{formatReviewHistoryMeta(record)}</small>
+                    </header>
+                    {record.feedback ? <p className="admin-review-history-body">{record.feedback}</p> : null}
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </div>
 
         <section className="admin-review-panel">
           <h2>Journal Entries ({journalEntries.length})</h2>

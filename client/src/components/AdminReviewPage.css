@@ -13,7 +13,7 @@
 }
 
 .admin-review-detail {
-  max-width: 980px;
+  max-width: 1320px;
 }
 
 .admin-review-back {
@@ -305,19 +305,119 @@
   color: #f7cf57;
 }
 
-.admin-review-rejection-feedback {
-  border-color: rgba(255, 143, 171, 0.6);
-  background: rgba(60, 10, 25, 0.3);
+.admin-review-time-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin: 1rem 0;
 }
 
-.admin-review-rejection-feedback h2 {
-  color: #ffccd4;
-}
-
-.admin-review-rejection-feedback p {
+.admin-review-time-row .admin-review-time-panel {
+  flex: 1;
+  min-width: 0;
   margin: 0;
+}
+
+.admin-review-history {
+  width: min(22rem, 30%);
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.85rem 0.95rem;
+  border-color: rgba(247, 207, 87, 0.55);
+  background: rgba(20, 40, 90, 0.55);
+  align-self: stretch;
+  max-height: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-review-history h2 {
+  margin: 0 0 0.55rem;
+  font-size: 1rem;
+}
+
+.admin-review-history-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.admin-review-history-item {
+  padding: 0.65rem 0.75rem;
+  border: 2px solid rgba(75, 179, 255, 0.35);
+  border-radius: 10px;
+  background: rgba(12, 28, 72, 0.55);
+}
+
+.admin-review-history-item.is-approved {
+  border-color: rgba(156, 255, 207, 0.45);
+}
+
+.admin-review-history-item.is-rejected,
+.admin-review-history-item.is-reship-rejected {
+  border-color: rgba(255, 143, 171, 0.5);
+  background: rgba(60, 10, 25, 0.28);
+}
+
+.admin-review-history-item.is-blocked {
+  border-color: rgba(255, 120, 72, 0.5);
+}
+
+.admin-review-history-item-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 0.3rem;
+}
+
+.admin-review-history-outcome {
+  color: #e8f4ff;
+  font-size: 0.9rem;
+}
+
+.admin-review-history-outcome.is-approved {
+  color: #9cffcf;
+}
+
+.admin-review-history-outcome.is-rejected,
+.admin-review-history-outcome.is-reship-rejected {
   color: #ffccd4;
-  line-height: 1.5;
+}
+
+.admin-review-history-outcome.is-blocked {
+  color: #ffd4bf;
+}
+
+.admin-review-history-meta {
+  color: rgba(232, 244, 255, 0.7);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.admin-review-history-body {
+  margin: 0;
+  color: rgba(232, 244, 255, 0.92);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .admin-review-time-row.has-history {
+    flex-direction: column;
+  }
+
+  .admin-review-history {
+    width: 100%;
+    max-height: 14rem;
+  }
 }
 
 .admin-review-links {
@@ -351,8 +451,22 @@
 
 .admin-review-hours-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 0.8rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.9rem;
+}
+
+@media (min-width: 1100px) {
+  .admin-review-detail .admin-review-panel {
+    padding: 1.35rem 1.45rem;
+  }
+
+  .admin-review-detail .admin-review-hours-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .admin-review-detail .admin-review-banner {
+    max-height: 32rem;
+  }
 }
 
 .admin-review-hours-grid div {

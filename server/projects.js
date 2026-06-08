@@ -591,8 +591,9 @@ export async function getAdminReviewProject(projectId) {
   const project = result.rows[0] ? toAdminReviewProject(result.rows[0]) : null;
   if (!project) return null;
 
-  const journalEntries = await listJournalEntriesForUserProject(project.userId, project.id);
-  return { project, journalEntries };
+  const [projectWithFeedback] = await attachReviewFeedbackToProjects([project]);
+  const journalEntries = await listJournalEntriesForUserProject(projectWithFeedback.userId, projectWithFeedback.id);
+  return { project: projectWithFeedback, journalEntries };
 }
 
 export async function approveAdminReviewProject(adminId, projectId, input = {}) {
