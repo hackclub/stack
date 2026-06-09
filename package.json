@@ -11,7 +11,7 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "build": "npm run build --workspace=client",
-    "start": "npm run start --workspace=server"
+    "start": "NODE_ENV=production node server/index.js"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

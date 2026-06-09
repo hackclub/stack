@@ -1,6 +1,7 @@
 import { useAuth } from "../auth/AuthContext.jsx";
 import { useEffect, useMemo, useState } from "react";
 import { JournalDescription } from "./JournalDescription.jsx";
+import { readJsonResponse } from "../utils/fetchJson.js";
 import { resolveStackAssetUrl } from "../utils/mediaUrls.js";
 import "./AdminReviewPage.css";
 
@@ -156,7 +157,7 @@ function AdminReviewIndex() {
       const response = await fetch(`/api/admin/review/projects?shipSort=${encodeURIComponent(shipSort)}`, {
         credentials: "include",
       });
-      const data = await response.json();
+      const data = await readJsonResponse(response);
       if (!response.ok) throw new Error(data.error || "Failed to load review projects.");
       setProjects(data.projects || []);
       setPendingProjects(data.pendingProjects || []);
@@ -298,7 +299,7 @@ function AdminReviewDetail({ projectId }) {
     setMessage("");
     try {
       const response = await fetch(`/api/admin/review/projects/${projectId}`, { credentials: "include" });
-      const data = await response.json();
+      const data = await readJsonResponse(response);
       if (!response.ok) throw new Error(data.error || "Failed to load project.");
       setProject(data.project);
       setJournalEntries(data.journalEntries || []);
@@ -321,7 +322,7 @@ function AdminReviewDetail({ projectId }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fraudFlag: nextChecked }),
       });
-      const data = await response.json();
+      const data = await readJsonResponse(response);
       if (!response.ok) throw new Error(data.error || "Could not save fraud flag.");
       setProject((current) => ({
         ...current,
@@ -377,7 +378,7 @@ function AdminReviewDetail({ projectId }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await response.json();
+      const data = await readJsonResponse(response);
       if (!response.ok) throw new Error(data.error || "Failed to submit review.");
       setExceedModalOpen(false);
       setExceedAcknowledged(false);
@@ -425,7 +426,7 @@ function AdminReviewDetail({ projectId }) {
         method: "DELETE",
         credentials: "include",
       });
-      const data = await response.json().catch(() => ({}));
+      const data = await readJsonResponse(response);
       if (!response.ok) throw new Error(data.error || "Failed to delete project.");
       window.location.href = "/admin/review";
     } catch (err) {

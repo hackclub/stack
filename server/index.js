@@ -904,6 +904,10 @@ if (isProd) {
   const dist = path.join(__dirname, "../client/dist");
   app.use(express.static(dist));
   app.get("*", (req, res) => {
+    if (req.path.startsWith("/api/")) {
+      notFoundInProduction(req, res);
+      return;
+    }
     res.sendFile(path.join(dist, "index.html"));
   });
 }
@@ -922,10 +926,20 @@ async function startServer() {
     }
   }
 
-  app.listen(PORT, HOST, () => {
+  const server = app.listen(PORT, HOST, () => {
     console.log(
       `Server http://${HOST}:${PORT} (${isProd ? "serving React build" : "API only - use Vite on :5173 for UI"})`
     );
+  });
+
+  server.on("error", (error) => {
+    if (error?.code === "EADDRINUSE") {
+      console.error(
+        `[server] Port ${PORT} is already in use. Stop the other project using it, or set PORT in .env (and VITE_DEV_PORT + APP_ORIGIN for the Vite client).`
+      );
+      process.exit(1);
+    }
+    throw error;
   });
 
   startPeriodicAirtableSync();

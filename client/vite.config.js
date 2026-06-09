@@ -1,31 +1,42 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { fileURLToPath } from "url";
 
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@assets": path.resolve(__dirname, "../web_assets"),
-      "@fonts": path.resolve(__dirname, "../fonts"),
-    },
-  },
-  server: {
-    host: "127.0.0.1",
-    port: 5173,
-    proxy: {
-      "/api": {
-        target: "http://127.0.0.1:3000",
-        changeOrigin: true,
-      },
-      "/auth": {
-        target: "http://127.0.0.1:3000",
-        changeOrigin: true,
-      },
-      "/uploads": {
-        target: "http://127.0.0.1:3000",
-        changeOrigin: true,
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, path.resolve(__dirname, ".."), "");
+  const apiPort = env.PORT || "3000";
+  const devPort = Number(env.VITE_DEV_PORT || 5173);
+  const apiTarget = `http://127.0.0.1:${apiPort}`;
+
+  return {
+    plugins: [react()],
+    resolve: {
+      alias: {
+        "@assets": path.resolve(__dirname, "../web_assets"),
+        "@fonts": path.resolve(__dirname, "../fonts"),
       },
     },
-  },
+    server: {
+      host: "127.0.0.1",
+      port: devPort,
+      strictPort: true,
+      proxy: {
+        "/api": {
+          target: apiTarget,
+          changeOrigin: true,
+        },
+        "/auth": {
+          target: apiTarget,
+          changeOrigin: true,
+        },
+        "/uploads": {
+          target: apiTarget,
+          changeOrigin: true,
+        },
+      },
+    },
+  };
 });

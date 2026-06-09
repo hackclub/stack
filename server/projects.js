@@ -536,17 +536,16 @@ export async function listAdminReviewProjects({ shipSort = "oldest" } = {}) {
     ORDER BY projects.shipped_at ${direction} NULLS LAST, projects.updated_at ${direction}, projects.id ${direction}
   `;
 
-  const initial = await pool.query(reviewProjectsSql);
-  const userIds = [...new Set(initial.rows.map((row) => Number(row.user_id)).filter(Number.isFinite))];
-  await Promise.all(
+  const result = await pool.query(reviewProjectsSql);
+  const userIds = [...new Set(result.rows.map((row) => Number(row.user_id)).filter(Number.isFinite))];
+  // Refresh Hackatime in the background so the review queue is not blocked (or timed out) in production.
+  void Promise.all(
     userIds.map((userId) =>
       refreshProjectHackatimeHoursForUser(userId).catch((error) => {
         console.error("[review] hackatime refresh failed:", error?.message || error);
       })
     )
   );
-
-  const result = await pool.query(reviewProjectsSql);
 
   const projects = result.rows.map(toAdminReviewProject);
   const pendingProjects = projects.filter(isPendingReviewProject);

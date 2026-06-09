@@ -1,0 +1,11 @@
+node_modules
+client/dist
+server/uploads
+.git
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+docker-compose.yml
+backups
