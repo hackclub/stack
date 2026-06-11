@@ -85,30 +85,39 @@ export function RulesPage() {
             <table className="rules-page__table">
               <thead>
                 <tr>
-                  <th>Yes, that is art</th>
-                  <th>No, not art here</th>
+                  <th>ART examples</th>
+                  <th>Hardware examples</th>
+                  <th>Not-shippable</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>Blender and 3D modeling</td>
+                  <td>Blender or 3D modeling only</td>
+                  <td>PCB design</td>
                   <td>Google research for your project</td>
                 </tr>
                 <tr>
-                  <td>CAD</td>
+                  <td>Assets, music, drawings, Figma, Video editing</td>
+                  <td>CAD/3D modeling associated with a hardware component*</td>
                   <td>Random external work unrelated to the project</td>
                 </tr>
                 <tr>
-                  <td>Video editing</td>
+                  <td>Anything that includes design only</td>
+                  <td>Schematics</td>
                   <td>General planning or browsing</td>
-                </tr>
-                <tr>
-                  <td>Assets, music, audio FX, drawings, Figma</td>
-                  <td>Anything that does not add real project value</td>
                 </tr>
               </tbody>
             </table>
           </div>
+          <aside className="rules-page__footnote" aria-label="CAD and 3D modeling note">
+            <p>
+              <em>
+                * CAD/3D modeling is not considered as art only if you associate that to a hardware project. Eg. if
+                you&apos;re 3D modeling a Raspberry case, that will be considered as non-art only if you ship some
+                hardware with it (like a PCB schematic). Otherwise, the case only, is just art.
+              </em>
+            </p>
+          </aside>
           <p className="rules-page__callout">
             Not sure if your add-on art will count? Ask first in{" "}
             <a href="https://slack.com/archives/C0B6AFEA2J3" target="_blank" rel="noreferrer">#stack-help</a>.
