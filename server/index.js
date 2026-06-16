@@ -340,7 +340,9 @@ app.patch("/api/projects/:id", requireUser, async (req, res) => {
 
 app.post("/api/projects/:id/ship", requireUser, async (req, res) => {
   try {
-    const project = await shipProjectForUser(req.session.userId, req.params.id);
+    const project = await shipProjectForUser(req.session.userId, req.params.id, {
+      reshipUpdate: req.body?.reshipUpdate,
+    });
     res.json({ project });
   } catch (error) {
     console.error("Failed to ship project:", error);

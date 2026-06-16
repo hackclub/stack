@@ -63,6 +63,7 @@ export async function ensureProjectsTable() {
       ysws_record_id TEXT,
       parent_project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL,
       ship_kind TEXT NOT NULL DEFAULT 'initial',
+      reship_update TEXT,
       blocked BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -98,6 +99,7 @@ export async function ensureProjectsTable() {
     ysws_record_id: "TEXT",
     parent_project_id: "BIGINT REFERENCES projects(id) ON DELETE SET NULL",
     ship_kind: "TEXT NOT NULL DEFAULT 'initial'",
+    reship_update: "TEXT",
     blocked: "BOOLEAN NOT NULL DEFAULT FALSE",
     created_at: "TIMESTAMPTZ NOT NULL DEFAULT NOW()",
     updated_at: "TIMESTAMPTZ NOT NULL DEFAULT NOW()",
@@ -433,7 +435,9 @@ export async function updateProjectForUser(userId, projectId, input) {
   return toPublicProjectForUser((await getProjectRowForAirtableSync(result.rows[0].id)) || result.rows[0]);
 }
 
-export async function shipProjectForUser(userId, projectId) {
+const MAX_RESHIP_UPDATE_LENGTH = 10000;
+
+export async function shipProjectForUser(userId, projectId, { reshipUpdate } = {}) {
   if (!pool) throw new Error("DATABASE_URL is not set.");
 
   await Promise.all([
@@ -455,6 +459,17 @@ export async function shipProjectForUser(userId, projectId) {
   }
 
   const isReship = isReshipEligibleProject(project);
+  let normalizedReshipUpdate = null;
+
+  if (isReship) {
+    normalizedReshipUpdate = String(reshipUpdate || "").trim();
+    if (!normalizedReshipUpdate) {
+      throw new Error("Please give a detailed update of your work compared to the previous ship.");
+    }
+    if (normalizedReshipUpdate.length > MAX_RESHIP_UPDATE_LENGTH) {
+      throw new Error(`Update must be ${MAX_RESHIP_UPDATE_LENGTH} characters or fewer.`);
+    }
+  }
 
   const result = await pool.query(
     `
@@ -469,6 +484,7 @@ export async function shipProjectForUser(userId, projectId) {
         admin_feedback = NULL,
         shipped_at = NOW(),
         hour_justification = $5,
+        reship_update = $6,
         updated_at = NOW()
       WHERE user_id = $1
         AND id = $2
@@ -480,6 +496,7 @@ export async function shipProjectForUser(userId, projectId) {
       isReship ? "pending-reship" : "in-review",
       isReship ? "reship" : "initial",
       null,
+      normalizedReshipUpdate,
     ]
   );
 

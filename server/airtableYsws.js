@@ -19,6 +19,7 @@ export const F = {
   overrideHours: "fldJgHp4dZbet58u6",
   overrideHoursJustification: "fldVfLaSZWGc3rZq3",
   status: process.env.AIRTABLE_YSWS_STATUS_FIELD_ID || "Status",
+  update: process.env.AIRTABLE_YSWS_UPDATE_FIELD_ID || "Update",
 };
 
 const airtableToken =
@@ -185,6 +186,7 @@ function buildSubmissionFromContext({ project, user, status }) {
     birthday: airtableDate(birthday) || null,
     override_hours: hours,
     override_hours_justification: project.hour_justification || null,
+    reship_update: project.reship_update || null,
     status,
     source_project_status: project.status || null,
     ship_kind: project.ship_kind || "initial",
@@ -212,6 +214,10 @@ function buildFieldsFromSubmission(submission) {
     [F.overrideHoursJustification]: submission.override_hours_justification || null,
     [F.status]: submission.status,
   };
+
+  if (submission.reship_update) {
+    fields[F.update] = submission.reship_update;
+  }
 
   if (submission.screenshot_url) {
     fields[F.screenshot] = [{ url: submission.screenshot_url }];
@@ -253,6 +259,7 @@ export async function ensureYswsProjectSubmissionsTable() {
       birthday DATE,
       override_hours NUMERIC(10, 2) NOT NULL DEFAULT 0,
       override_hours_justification TEXT,
+      reship_update TEXT,
       status TEXT NOT NULL,
       source_project_status TEXT,
       ship_kind TEXT,
@@ -283,6 +290,7 @@ export async function ensureYswsProjectSubmissionsTable() {
     birthday: "DATE",
     override_hours: "NUMERIC(10, 2) NOT NULL DEFAULT 0",
     override_hours_justification: "TEXT",
+    reship_update: "TEXT",
     status: "TEXT NOT NULL",
     source_project_status: "TEXT",
     ship_kind: "TEXT",
@@ -421,6 +429,7 @@ async function upsertLocalSubmission(submission) {
         birthday,
         override_hours,
         override_hours_justification,
+        reship_update,
         status,
         source_project_status,
         ship_kind,
@@ -429,7 +438,7 @@ async function upsertLocalSubmission(submission) {
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
         $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-        $21, $22, $23, $24, NOW()
+        $21, $22, $23, $24, $25, NOW()
       )
       ON CONFLICT (project_id, status)
       DO UPDATE SET
@@ -452,6 +461,7 @@ async function upsertLocalSubmission(submission) {
         birthday = EXCLUDED.birthday,
         override_hours = EXCLUDED.override_hours,
         override_hours_justification = EXCLUDED.override_hours_justification,
+        reship_update = EXCLUDED.reship_update,
         source_project_status = EXCLUDED.source_project_status,
         ship_kind = EXCLUDED.ship_kind,
         airtable_record_id = COALESCE(ysws_project_submissions.airtable_record_id, EXCLUDED.airtable_record_id),
@@ -488,10 +498,11 @@ async function updateLocalSubmission(id, submission) {
         birthday = $18,
         override_hours = $19,
         override_hours_justification = $20,
-        status = $21,
-        source_project_status = $22,
-        ship_kind = $23,
-        airtable_record_id = COALESCE(airtable_record_id, $24),
+        reship_update = $21,
+        status = $22,
+        source_project_status = $23,
+        ship_kind = $24,
+        airtable_record_id = COALESCE(airtable_record_id, $25),
         updated_at = NOW()
       WHERE id = $1
       RETURNING *
@@ -524,6 +535,7 @@ function submissionValues(submission) {
     submission.birthday,
     submission.override_hours,
     submission.override_hours_justification,
+    submission.reship_update,
     submission.status,
     submission.source_project_status,
     submission.ship_kind,

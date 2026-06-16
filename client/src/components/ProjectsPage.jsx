@@ -497,10 +497,15 @@ export function ProjectsPage() {
     }
   }
 
-  async function shipProject(project) {
+  async function shipProject(project, reshipUpdate) {
     const lockReason = getShipLockReason(project);
     if (lockReason) {
       setError(lockReason);
+      return;
+    }
+
+    if (isReshipEligibleProject(project) && !String(reshipUpdate || "").trim()) {
+      setError("Please give a detailed update of your work compared to the previous ship.");
       return;
     }
 
@@ -516,6 +521,10 @@ export function ProjectsPage() {
       const response = await fetch(`/api/projects/${project.id}/ship`, {
         method: "POST",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          isReshipEligibleProject(project) ? { reshipUpdate: String(reshipUpdate || "").trim() } : {}
+        ),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to ship project.");
@@ -693,7 +702,7 @@ export function ProjectsPage() {
           onClose={() => setSelectedProject(null)}
           onEdit={() => openEditProject(selectedProject)}
           onJournal={() => openJournal(selectedProject)}
-          onShip={() => shipProject(selectedProject)}
+          onShip={(reshipUpdate) => shipProject(selectedProject, reshipUpdate)}
           onDelete={() => deleteProject(selectedProject)}
         />
       )}
@@ -774,6 +783,18 @@ function ProjectReviewerFeedback({ project }) {
 function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDelete }) {
   const shipLockReason = getShipLockReason(project);
   const unshippedHours = getUnshippedHours(project);
+  const isReship = isReshipEligibleProject(project);
+  const [reshipUpdate, setReshipUpdate] = useState("");
+  const [reshipUpdateError, setReshipUpdateError] = useState("");
+
+  function handleShip() {
+    if (isReship && !reshipUpdate.trim()) {
+      setReshipUpdateError("Please give a detailed update of your work compared to the previous ship.");
+      return;
+    }
+    setReshipUpdateError("");
+    onShip(isReship ? reshipUpdate.trim() : undefined);
+  }
 
   return (
     <div className="projects-page__modal-overlay" role="presentation" onClick={onClose}>
@@ -843,6 +864,24 @@ function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDe
 
         {shouldShowReviewerFeedback(project) ? <ProjectReviewerFeedback project={project} /> : null}
 
+        {isReship ? (
+          <div className="projects-page__reship-update">
+            <label htmlFor="reship-update">
+              Please give a detailed update of your work compared to the previous ship
+            </label>
+            <textarea
+              id="reship-update"
+              value={reshipUpdate}
+              onChange={(event) => {
+                setReshipUpdate(event.target.value);
+                if (reshipUpdateError) setReshipUpdateError("");
+              }}
+              required
+            />
+            {reshipUpdateError ? <p className="projects-page__ship-lock">{reshipUpdateError}</p> : null}
+          </div>
+        ) : null}
+
         <div className="projects-page__modal-actions">
           <button type="button" onClick={onEdit}>
             Edit
@@ -850,7 +889,7 @@ function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDe
           <button type="button" onClick={onJournal}>
             Journal
           </button>
-          <button type="button" disabled={Boolean(shipLockReason)} title={shipLockReason || "Ready to ship"} onClick={onShip}>
+          <button type="button" disabled={Boolean(shipLockReason)} title={shipLockReason || "Ready to ship"} onClick={handleShip}>
             Ship It
           </button>
           <button type="button" className="projects-page__danger-btn" disabled={project.shipped} title={project.shipped ? "Cannot delete shipped projects" : "Delete project"} onClick={onDelete}>
