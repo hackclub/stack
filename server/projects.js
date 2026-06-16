@@ -435,6 +435,7 @@ export async function updateProjectForUser(userId, projectId, input) {
   return toPublicProjectForUser((await getProjectRowForAirtableSync(result.rows[0].id)) || result.rows[0]);
 }
 
+const MIN_RESHIP_UPDATE_LENGTH = 80;
 const MAX_RESHIP_UPDATE_LENGTH = 10000;
 
 export async function shipProjectForUser(userId, projectId, { reshipUpdate } = {}) {
@@ -465,6 +466,11 @@ export async function shipProjectForUser(userId, projectId, { reshipUpdate } = {
     normalizedReshipUpdate = String(reshipUpdate || "").trim();
     if (!normalizedReshipUpdate) {
       throw new Error("Please give a detailed update of your work compared to the previous ship.");
+    }
+    if (normalizedReshipUpdate.length < MIN_RESHIP_UPDATE_LENGTH) {
+      throw new Error(
+        `Please give a detailed update of at least ${MIN_RESHIP_UPDATE_LENGTH} characters comparing your work to the previous ship.`
+      );
     }
     if (normalizedReshipUpdate.length > MAX_RESHIP_UPDATE_LENGTH) {
       throw new Error(`Update must be ${MAX_RESHIP_UPDATE_LENGTH} characters or fewer.`);

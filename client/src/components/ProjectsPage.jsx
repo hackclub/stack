@@ -194,6 +194,18 @@ function formatReviewRecordMeta(record) {
 }
 
 const MIN_SHIP_LOGGED_HOURS = 1;
+const MIN_RESHIP_UPDATE_LENGTH = 80;
+
+function getReshipUpdateValidationError(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) {
+    return "Please give a detailed update of your work compared to the previous ship.";
+  }
+  if (trimmed.length < MIN_RESHIP_UPDATE_LENGTH) {
+    return `Please give a detailed update of at least ${MIN_RESHIP_UPDATE_LENGTH} characters comparing your work to the previous ship.`;
+  }
+  return null;
+}
 
 function isReshipEligibleProject(project) {
   return (
@@ -504,8 +516,11 @@ export function ProjectsPage() {
       return;
     }
 
-    if (isReshipEligibleProject(project) && !String(reshipUpdate || "").trim()) {
-      setError("Please give a detailed update of your work compared to the previous ship.");
+    const reshipUpdateError = isReshipEligibleProject(project)
+      ? getReshipUpdateValidationError(reshipUpdate)
+      : null;
+    if (reshipUpdateError) {
+      setError(reshipUpdateError);
       return;
     }
 
@@ -788,9 +803,12 @@ function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDe
   const [reshipUpdateError, setReshipUpdateError] = useState("");
 
   function handleShip() {
-    if (isReship && !reshipUpdate.trim()) {
-      setReshipUpdateError("Please give a detailed update of your work compared to the previous ship.");
-      return;
+    if (isReship) {
+      const validationError = getReshipUpdateValidationError(reshipUpdate);
+      if (validationError) {
+        setReshipUpdateError(validationError);
+        return;
+      }
     }
     setReshipUpdateError("");
     onShip(isReship ? reshipUpdate.trim() : undefined);
@@ -867,11 +885,13 @@ function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDe
         {isReship ? (
           <div className="projects-page__reship-update">
             <label htmlFor="reship-update">
-              Please give a detailed update of your work compared to the previous ship
+              Please give a detailed update of your work compared to the previous ship (minimum {MIN_RESHIP_UPDATE_LENGTH}{" "}
+              characters)
             </label>
             <textarea
               id="reship-update"
               value={reshipUpdate}
+              minLength={MIN_RESHIP_UPDATE_LENGTH}
               onChange={(event) => {
                 setReshipUpdate(event.target.value);
                 if (reshipUpdateError) setReshipUpdateError("");
