@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import confetti from "canvas-confetti";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { PlatformStatusBar } from "./PlatformStatusBar.jsx";
+import { DeadlineCountdown, useDeadlineState } from "./DeadlineCountdown.jsx";
+import { SHOP_CLOSE_MS, SHOP_CLOSED_MESSAGE } from "../utils/eventDeadlines.js";
 const shelfBox = "https://cdn.hackclub.com/019e3e5a-a3a2-7a84-90e5-43d56ce44873/shelfBox.png";
 const shopCoin = "https://cdn.hackclub.com/019e3e5a-a63b-7b9d-84e1-1d78a8320ab7/shop_coin.png";
 const buyBtn = "https://cdn.hackclub.com/019e3e5a-a103-7306-8df6-e6cd08b537ef/buy_btn.png";
@@ -33,6 +35,7 @@ export function ShopPage() {
   const [purchaseQuantity, setPurchaseQuantity] = useState(1);
   const [showPurchaseConfirm, setShowPurchaseConfirm] = useState(false);
   const [isFromUsa, setIsFromUsa] = useState(false);
+  const { isOpen: shopOpen } = useDeadlineState(SHOP_CLOSE_MS);
 
   useEffect(() => {
     let isMounted = true;
@@ -75,7 +78,7 @@ export function ShopPage() {
   const hasEnoughBricks = userBricks >= totalBricks;
 
   async function buySelectedItem() {
-    if (!selectedItem || !hasEnoughBricks) return;
+    if (!selectedItem || !hasEnoughBricks || !shopOpen) return;
 
     setPurchaseMessage("");
     try {
@@ -129,6 +132,8 @@ export function ShopPage() {
 
       <PlatformStatusBar user={user} />
 
+      <DeadlineCountdown label="Shop" deadlineMs={SHOP_CLOSE_MS} className="shop-page__deadline" />
+
       <section className="shop-page__left-panel" aria-label="Inspiration panel">
         <p className="shop-page__inspired">1 hour = 20 Coins!</p>
         <img src={legoCharacter} alt="" aria-hidden="true" />
@@ -161,6 +166,8 @@ export function ShopPage() {
                 className="shop-page__buy"
                 type="button"
                 aria-label={`Buy ${item.name}`}
+                disabled={!shopOpen}
+                title={shopOpen ? `Buy ${item.name}` : SHOP_CLOSED_MESSAGE}
                 onClick={() => openItem(item)}
               >
                 <img src={buyBtn} alt="" aria-hidden="true" />
@@ -252,8 +259,14 @@ export function ShopPage() {
               </p>
             ) : null}
             {purchaseMessage ? <p className="shop-page__modal-warning">{purchaseMessage}</p> : null}
+            {!shopOpen ? <p className="shop-page__modal-warning">{SHOP_CLOSED_MESSAGE}</p> : null}
 
-            <button className="shop-page__modal-buy" type="button" disabled={!hasEnoughBricks} onClick={() => setShowPurchaseConfirm(true)}>
+            <button
+              className="shop-page__modal-buy"
+              type="button"
+              disabled={!hasEnoughBricks || !shopOpen}
+              onClick={() => setShowPurchaseConfirm(true)}
+            >
               Buy
             </button>
 
@@ -309,7 +322,7 @@ export function ShopPage() {
                   <div className="shop-page__confirm-total">
                     {formatBricks(totalBricks)} bricks
                   </div>
-                  <button className="shop-page__modal-buy" type="button" onClick={buySelectedItem}>
+                  <button className="shop-page__modal-buy" type="button" disabled={!shopOpen} onClick={buySelectedItem}>
                     Confirm purchase
                   </button>
                 </section>

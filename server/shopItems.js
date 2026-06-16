@@ -1,4 +1,5 @@
 import { pool } from "./db.js";
+import { assertShopOpen } from "./eventDeadlines.js";
 
 const SHOP_ITEM_COLUMNS = [
   "name",
@@ -193,6 +194,8 @@ export async function setAllShopItemsActive(active) {
 
 export async function purchaseShopItemForUser(userId, itemId, input = {}) {
   if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  assertShopOpen();
 
   const quantity = Math.max(1, integerOrNull(input.quantity) || 1);
   const client = await pool.connect();

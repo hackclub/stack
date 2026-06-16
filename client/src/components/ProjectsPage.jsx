@@ -11,6 +11,8 @@ import {
   normalizeHackClubCdnUrl,
 } from "../utils/cdnLinks.js";
 import { resolveStackAssetUrl } from "../utils/mediaUrls.js";
+import { SHIP_CLOSE_MS, SHIP_CLOSED_MESSAGE } from "../utils/eventDeadlines.js";
+import { DeadlineCountdown, useDeadlineState } from "./DeadlineCountdown.jsx";
 const sideBrick = "https://cdn.hackclub.com/019e3e5a-9d8a-7fcb-ad80-d6166cfd97f8/side_brick.png";
 const statusBtn = "https://cdn.hackclub.com/019e3e5a-9f39-7875-aec6-cf24a58b87d4/status_btn.png";
 const hoursBtn = "https://cdn.hackclub.com/019e3e5a-9b72-709a-8224-a87f14fd5e78/hours_btn.png";
@@ -290,6 +292,7 @@ export function ProjectsPage() {
   const [hackatimeAvailable, setHackatimeAvailable] = useState(false);
   const [hackatimeConnected, setHackatimeConnected] = useState(false);
   const [hackatimeProjects, setHackatimeProjects] = useState([]);
+  const { isOpen: shippingOpen } = useDeadlineState(SHIP_CLOSE_MS);
 
   useEffect(() => {
     loadProjects();
@@ -511,6 +514,10 @@ export function ProjectsPage() {
 
   async function shipProject(project, reshipUpdate) {
     const lockReason = getShipLockReason(project);
+    if (!shippingOpen) {
+      setError(SHIP_CLOSED_MESSAGE);
+      return;
+    }
     if (lockReason) {
       setError(lockReason);
       return;
@@ -643,6 +650,12 @@ export function ProjectsPage() {
 
       <PlatformStatusBar user={user} />
 
+      <DeadlineCountdown
+        label="Shipping"
+        deadlineMs={SHIP_CLOSE_MS}
+        className="projects-page__deadline"
+      />
+
       <section className="projects-page__grid" aria-label="Project list">
         <button
           className="projects-page__card projects-page__card--add"
@@ -714,6 +727,7 @@ export function ProjectsPage() {
       {selectedProject && (
         <ProjectDetailsModal
           project={selectedProject}
+          shippingOpen={shippingOpen}
           onClose={() => setSelectedProject(null)}
           onEdit={() => openEditProject(selectedProject)}
           onJournal={() => openJournal(selectedProject)}
@@ -795,8 +809,9 @@ function ProjectReviewerFeedback({ project }) {
   );
 }
 
-function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDelete }) {
+function ProjectDetailsModal({ project, shippingOpen, onClose, onEdit, onJournal, onShip, onDelete }) {
   const shipLockReason = getShipLockReason(project);
+  const shipDisabledReason = !shippingOpen ? SHIP_CLOSED_MESSAGE : shipLockReason;
   const unshippedHours = getUnshippedHours(project);
   const isReship = isReshipEligibleProject(project);
   const [reshipUpdate, setReshipUpdate] = useState("");
@@ -909,14 +924,19 @@ function ProjectDetailsModal({ project, onClose, onEdit, onJournal, onShip, onDe
           <button type="button" onClick={onJournal}>
             Journal
           </button>
-          <button type="button" disabled={Boolean(shipLockReason)} title={shipLockReason || "Ready to ship"} onClick={handleShip}>
+          <button
+            type="button"
+            disabled={Boolean(shipDisabledReason)}
+            title={shipDisabledReason || "Ready to ship"}
+            onClick={handleShip}
+          >
             Ship It
           </button>
           <button type="button" className="projects-page__danger-btn" disabled={project.shipped} title={project.shipped ? "Cannot delete shipped projects" : "Delete project"} onClick={onDelete}>
             Delete
           </button>
         </div>
-        {shipLockReason ? <p className="projects-page__ship-lock">{shipLockReason}</p> : null}
+        {shipDisabledReason ? <p className="projects-page__ship-lock">{shipDisabledReason}</p> : null}
       </section>
     </div>
   );

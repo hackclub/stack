@@ -11,6 +11,7 @@ import {
   STACK_LAUNCH_UTC,
   sumHackatimeHoursForNames,
 } from "./hackatimeAuth.js";
+import { assertShipOpen } from "./eventDeadlines.js";
 
 const STACK_LAUNCH_TIMESTAMPTZ = STACK_LAUNCH_UTC.toISOString();
 
@@ -440,6 +441,8 @@ const MAX_RESHIP_UPDATE_LENGTH = 10000;
 
 export async function shipProjectForUser(userId, projectId, { reshipUpdate } = {}) {
   if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  assertShipOpen();
 
   await Promise.all([
     refreshProjectJournalHours(userId, projectId),
