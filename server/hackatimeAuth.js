@@ -116,16 +116,35 @@ export async function fetchHackatimeMe(accessToken) {
 
 export const STACK_LAUNCH_UTC = new Date("2026-05-28T04:00:00Z");
 
-/** Hackatime stats range: ISO 8601 (API rejects bare YYYY-MM-DD dates). */
+/** ISO 8601 without fractional seconds (Hackatime accepts this reliably). */
+function toHackatimeDateTime(date) {
+  return date.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+/** Stack program window for project stats (ISO 8601). */
 export function stackHackatimeStatsRange() {
   return {
-    start: STACK_LAUNCH_UTC.toISOString(),
-    end: new Date().toISOString(),
+    start: toHackatimeDateTime(STACK_LAUNCH_UTC),
+    end: toHackatimeDateTime(new Date()),
   };
 }
 
-export async function fetchHackatimeProjects(accessToken, { includeArchived = false, start = null, end = null } = {}) {
+/** Stack program window for /hours (YYYY-MM-DD). */
+export function stackHackatimeHoursQuery() {
+  const end = new Date();
+  return {
+    start_date: STACK_LAUNCH_UTC.toISOString().slice(0, 10),
+    end_date: end.toISOString().slice(0, 10),
+  };
+}
+
+export async function fetchHackatimeProjects(
+  accessToken,
+  { includeArchived = false, start = null, end = null, since = null, until = null } = {}
+) {
   const query = { include_archived: includeArchived ? "true" : "false" };
+  if (since) query.since = since;
+  if (until) query.until = until;
   if (start) query.start = start;
   if (end) query.end = end;
   const data = await hackatimeApiGet(accessToken, "/api/v1/authenticated/projects", query);
@@ -143,29 +162,62 @@ export async function fetchHackatimeProjects(accessToken, { includeArchived = fa
 
 export async function fetchHackatimeProjectsForStack(accessToken) {
   const statsRange = stackHackatimeStatsRange();
+  // Always pass start/end so Hackatime queries live heartbeats instead of stale rollups.
+  const allTimeDiscovery = {
+    since: "1970-01-01T00:00:00Z",
+    until: statsRange.end,
+    start: "1970-01-01T00:00:00Z",
+    end: statsRange.end,
+  };
+  const stackWindow = {
+    since: statsRange.start,
+    until: statsRange.end,
+    start: statsRange.start,
+    end: statsRange.end,
+  };
+
   const [allProjects, postLaunchProjects] = await Promise.all([
-    fetchHackatimeProjects(accessToken),
-    fetchHackatimeProjects(accessToken, statsRange),
+    fetchHackatimeProjects(accessToken, allTimeDiscovery),
+    fetchHackatimeProjects(accessToken, stackWindow),
   ]);
 
   const postLaunchByName = new Map(
     postLaunchProjects.map((p) => [p.name.trim().toLowerCase(), p])
   );
 
-  return allProjects.map((p) => {
-    const key = p.name.trim().toLowerCase();
+  const mergedByName = new Map();
+
+  for (const project of allProjects) {
+    const key = project.name.trim().toLowerCase();
     const post = postLaunchByName.get(key);
-    const newSeconds = post?.totalSeconds ?? 0;
-    return {
-      ...p,
-      totalSeconds: newSeconds,
-      totalHours: Number((newSeconds / 3600).toFixed(2)),
-    };
-  });
+    const seconds = post?.totalSeconds ?? 0;
+    mergedByName.set(key, {
+      ...project,
+      totalSeconds: seconds,
+      totalHours: Number((seconds / 3600).toFixed(2)),
+    });
+  }
+
+  // Projects with Stack-era activity may not appear in the all-time discovery response yet.
+  for (const project of postLaunchProjects) {
+    const key = project.name.trim().toLowerCase();
+    if (mergedByName.has(key)) continue;
+    mergedByName.set(key, {
+      ...project,
+      totalSeconds: project.totalSeconds,
+      totalHours: project.totalHours,
+    });
+  }
+
+  return Array.from(mergedByName.values());
 }
 
 export async function fetchHackatimeTotalHours(accessToken) {
-  const data = await hackatimeApiGet(accessToken, "/api/v1/authenticated/hours", {});
+  const data = await hackatimeApiGet(
+    accessToken,
+    "/api/v1/authenticated/hours",
+    stackHackatimeHoursQuery()
+  );
   const seconds = Number(data.total_seconds ?? 0);
   return {
     totalSeconds: seconds,
