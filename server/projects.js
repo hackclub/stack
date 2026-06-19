@@ -7,7 +7,7 @@ import {
   safeHackClubCdnUrl,
 } from "./cdnLinks.js";
 import {
-  fetchHackatimeProjectsForStack,
+  fetchHackatimeProjectsForLinkedNames,
   STACK_LAUNCH_UTC,
   sumHackatimeHoursForNames,
 } from "./hackatimeAuth.js";
@@ -1200,6 +1200,19 @@ export async function refreshJournalHoursForAllUserProjects(userId) {
   }
 }
 
+export async function getAllLinkedHackatimeNamesForUser(userId) {
+  if (!pool) return [];
+
+  const result = await pool.query(`SELECT hackatime_names FROM projects WHERE user_id = $1`, [userId]);
+  const names = new Set();
+  for (const row of result.rows) {
+    for (const name of parseHackatimeNames(row.hackatime_names)) {
+      names.add(name);
+    }
+  }
+  return [...names];
+}
+
 export async function refreshProjectHackatimeHoursForUser(userId, hackatimeProjects = null) {
   if (!pool) return;
 
@@ -1210,11 +1223,21 @@ export async function refreshProjectHackatimeHoursForUser(userId, hackatimeProje
   const token = tokenResult.rows[0]?.hackatime_access_token;
   if (!token && !hackatimeProjects) return;
 
-  const list = hackatimeProjects || (await fetchHackatimeProjectsForStack(token));
   const projectsResult = await pool.query(
     `SELECT id, hackatime_names FROM projects WHERE user_id = $1`,
     [userId]
   );
+
+  let list = hackatimeProjects;
+  if (!list) {
+    const linkedNames = projectsResult.rows.flatMap((project) =>
+      parseHackatimeNames(project.hackatime_names)
+    );
+    list =
+      linkedNames.length > 0
+        ? await fetchHackatimeProjectsForLinkedNames(token, linkedNames)
+        : [];
+  }
 
   for (const project of projectsResult.rows) {
     const names = parseHackatimeNames(project.hackatime_names);
@@ -1246,7 +1269,14 @@ async function applyHackatimeHoursToProject(userId, projectId) {
     [projectId, userId]
   );
   const names = parseHackatimeNames(projectResult.rows[0]?.hackatime_names);
-  const list = await fetchHackatimeProjectsForStack(token);
+  if (names.length === 0) {
+    await pool.query(`UPDATE projects SET hackatime_hours = 0, updated_at = NOW() WHERE id = $1`, [
+      projectId,
+    ]);
+    return;
+  }
+
+  const list = await fetchHackatimeProjectsForLinkedNames(token, names);
   const hours = sumHackatimeHoursForNames(list, names);
 
   await pool.query(

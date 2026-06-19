@@ -2,13 +2,13 @@ import { pool } from "./db.js";
 import { syncPostgresUserToAirtable } from "./airtableUsers.js";
 import {
   fetchHackatimeMe,
-  fetchHackatimeProjects,
-  fetchHackatimeProjectsForStack,
+  fetchHackatimeProjectCatalog,
+  fetchHackatimeProjectsForLinkedNames,
   fetchHackatimeTotalHours,
   isHackatimeOAuthConfigured,
-  sumHackatimeHoursForNames,
+  refreshHackatimeAccessToken,
 } from "./hackatimeAuth.js";
-import { syncAllProjectHoursForUser } from "./projects.js";
+import { getAllLinkedHackatimeNamesForUser, syncAllProjectHoursForUser } from "./projects.js";
 
 export function isHackatimeConnected(row) {
   return Boolean(row?.hackatime_access_token);
@@ -46,40 +46,111 @@ export async function saveHackatimeTokensForUser(userId, token) {
 export async function getHackatimeAccessTokenForUser(userId) {
   if (!pool) return null;
   const result = await pool.query(
-    `SELECT hackatime_access_token FROM users WHERE id = $1`,
+    `
+      SELECT
+        hackatime_access_token,
+        hackatime_refresh_token,
+        hackatime_token_expires_at
+      FROM users
+      WHERE id = $1
+    `,
     [userId]
   );
-  return result.rows[0]?.hackatime_access_token ?? null;
+  return result.rows[0] ?? null;
+}
+
+async function withHackatimeAccessToken(userId, run) {
+  const row = await getHackatimeAccessTokenForUser(userId);
+  const accessToken = row?.hackatime_access_token;
+  if (!accessToken) return null;
+
+  const expiresAt = row.hackatime_token_expires_at
+    ? new Date(row.hackatime_token_expires_at).getTime()
+    : null;
+  const shouldRefresh =
+    row.hackatime_refresh_token &&
+    expiresAt != null &&
+    Number.isFinite(expiresAt) &&
+    expiresAt <= Date.now() + 60_000;
+
+  let token = accessToken;
+  if (shouldRefresh) {
+    try {
+      const refreshed = await refreshHackatimeAccessToken(row.hackatime_refresh_token);
+      await saveHackatimeTokensForUser(userId, refreshed);
+      token = refreshed.access_token ?? accessToken;
+    } catch (error) {
+      console.error("[hackatime] token refresh failed:", {
+        userId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  try {
+    return await run(token);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const unauthorized = /\b401\b|unauthorized/i.test(message);
+    if (!unauthorized || !row.hackatime_refresh_token) throw error;
+
+    const refreshed = await refreshHackatimeAccessToken(row.hackatime_refresh_token);
+    await saveHackatimeTokensForUser(userId, refreshed);
+    const nextToken = refreshed.access_token;
+    if (!nextToken) throw error;
+    return run(nextToken);
+  }
 }
 
 export async function refreshUserHackatimeCache(userId, accessToken) {
   if (!pool) throw new Error("DATABASE_URL is not set.");
 
-  const token = accessToken || (await getHackatimeAccessTokenForUser(userId));
-  if (!token) {
+  const runRefresh = async (token) => {
+    const linkedNames = await getAllLinkedHackatimeNamesForUser(userId);
+    const [catalog, hours, linkedProjects] = await Promise.all([
+      fetchHackatimeProjectCatalog(token),
+      fetchHackatimeTotalHours(token),
+      linkedNames.length > 0
+        ? fetchHackatimeProjectsForLinkedNames(token, linkedNames)
+        : Promise.resolve([]),
+    ]);
+
+    await pool.query(
+      `
+        UPDATE users
+        SET hackatime_total_hours = $1, updated_at = NOW()
+        WHERE id = $2
+      `,
+      [hours.totalHours, userId]
+    );
+
+    await syncAllProjectHoursForUser(userId, linkedProjects);
+
+    return { projects: catalog, totalHours: hours.totalHours };
+  };
+
+  if (accessToken) {
+    const refreshed = await runRefresh(accessToken);
+    const userRow = (await pool.query(`SELECT * FROM users WHERE id = $1`, [userId])).rows[0];
+    if (userRow) {
+      try {
+        await syncPostgresUserToAirtable(userRow);
+      } catch (error) {
+        console.error("[hackatime] Airtable user sync after refresh failed:", {
+          userId,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return refreshed;
+  }
+
+  const refreshed = await withHackatimeAccessToken(userId, runRefresh);
+  if (!refreshed) {
     return { projects: [], totalHours: 0 };
   }
 
-  const [stackProjects, hours] = await Promise.all([
-    fetchHackatimeProjectsForStack(token),
-    fetchHackatimeTotalHours(token),
-  ]);
-
-  await pool.query(
-    `
-      UPDATE users
-      SET hackatime_total_hours = $1, updated_at = NOW()
-      WHERE id = $2
-    `,
-    [hours.totalHours, userId]
-  );
-
-  await syncAllProjectHoursForUser(userId, stackProjects);
-
-  const userRow = (
-    await pool.query(`SELECT * FROM users WHERE id = $1`, [userId])
-  ).rows[0];
-
+  const userRow = (await pool.query(`SELECT * FROM users WHERE id = $1`, [userId])).rows[0];
   if (userRow) {
     try {
       await syncPostgresUserToAirtable(userRow);
@@ -91,7 +162,7 @@ export async function refreshUserHackatimeCache(userId, accessToken) {
     }
   }
 
-  return { projects: stackProjects, totalHours: hours.totalHours };
+  return refreshed;
 }
 
 export async function connectHackatimeForUser(userId, tokenResponse) {
@@ -121,21 +192,32 @@ export async function getHackatimeStatusForUser(userId) {
     return { configured: false, connected: false, projects: [], totalHours: 0 };
   }
 
-  const token = await getHackatimeAccessTokenForUser(userId);
-  if (!token) {
+  const tokenRow = await getHackatimeAccessTokenForUser(userId);
+  if (!tokenRow?.hackatime_access_token) {
     return { configured: true, connected: false, projects: [], totalHours: 0 };
   }
 
   try {
-    const userRow = (
-      await pool.query(`SELECT hackatime_total_hours FROM users WHERE id = $1`, [userId])
-    ).rows[0];
-    const projects = await fetchHackatimeProjectsForStack(token);
+    const result = await withHackatimeAccessToken(userId, async (token) => {
+      const [projects, userRow] = await Promise.all([
+        fetchHackatimeProjectCatalog(token),
+        pool.query(`SELECT hackatime_total_hours FROM users WHERE id = $1`, [userId]),
+      ]);
+      return {
+        projects,
+        totalHours: Number(userRow.rows[0]?.hackatime_total_hours ?? 0),
+      };
+    });
+
+    if (!result) {
+      return { configured: true, connected: false, projects: [], totalHours: 0 };
+    }
+
     return {
       configured: true,
       connected: true,
-      projects,
-      totalHours: Number(userRow?.hackatime_total_hours ?? 0),
+      projects: result.projects,
+      totalHours: result.totalHours,
     };
   } catch (error) {
     console.error("[hackatime] status fetch failed:", {
@@ -153,8 +235,7 @@ export async function getHackatimeStatusForUser(userId) {
 }
 
 export async function listHackatimeProjectsForUser(userId) {
-  const token = await getHackatimeAccessTokenForUser(userId);
-  if (!token) return [];
-  return fetchHackatimeProjectsForStack(token);
+  const projects = await withHackatimeAccessToken(userId, fetchHackatimeProjectCatalog);
+  return projects ?? [];
 }
 

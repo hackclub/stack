@@ -300,6 +300,16 @@ export function ProjectsPage() {
   }, []);
 
   useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "visible") return;
+      refreshHackatimeHours();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
+  useEffect(() => {
     if (!editingProject) return;
     refreshHackatimeHours();
   }, [editingProject?.id ?? "new"]);
