@@ -508,6 +508,13 @@ function AdminReviewDetail({ projectId }) {
           )}
         </section>
 
+        {(project.shipKind === "reship" || project.status === "pending-reship") && project.reshipUpdate ? (
+          <section className="admin-review-panel admin-review-reship-update" aria-label="Re-ship update">
+            <h2>Re-ship update</h2>
+            <p className="admin-review-reship-update-body">{project.reshipUpdate}</p>
+          </section>
+        ) : null}
+
         <label className="admin-review-fraud">
           <input
             type="checkbox"

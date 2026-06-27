@@ -1563,6 +1563,7 @@ function toPublicProject(row) {
     fraudFlag: Boolean(row.fraud_flag),
     blocked: Boolean(row.blocked),
     shipKind: row.ship_kind || "initial",
+    reshipUpdate: textOrNull(row.reship_update),
     parentProjectId: row.parent_project_id != null ? Number(row.parent_project_id) : null,
   };
 }

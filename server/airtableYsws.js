@@ -190,8 +190,16 @@ function buildSubmissionFromContext({ project, user, status }) {
     status,
     source_project_status: project.status || null,
     ship_kind: project.ship_kind || "initial",
-    airtable_record_id: status === YSWS_STATUS.approved ? project.ysws_record_id || null : null,
+    airtable_record_id: resolveAirtableRecordIdForSubmission(project, status),
   };
+}
+
+function resolveAirtableRecordIdForSubmission(project, status) {
+  const linkedRecordId = project.ysws_record_id || null;
+  if (status === YSWS_STATUS.approved || status === YSWS_STATUS.pendingReship) {
+    return linkedRecordId;
+  }
+  return null;
 }
 
 function buildFieldsFromSubmission(submission) {
@@ -215,7 +223,9 @@ function buildFieldsFromSubmission(submission) {
     [F.status]: submission.status,
   };
 
-  if (submission.reship_update) {
+  const isReshipSubmission =
+    submission.ship_kind === "reship" || submission.status === YSWS_STATUS.pendingReship;
+  if (isReshipSubmission && submission.reship_update) {
     fields[F.update] = submission.reship_update;
   }
 
@@ -385,7 +395,33 @@ export async function deleteProjectSubmissionsFromYsws(projectId) {
   return { ok: true, deleted: result.rows.length };
 }
 
+async function resolveSubmissionAirtableRecordId(submission) {
+  if (submission.airtable_record_id) return submission.airtable_record_id;
+
+  const result = await pool.query(
+    `
+      SELECT airtable_record_id
+      FROM ysws_project_submissions
+      WHERE project_id = $1
+        AND airtable_record_id IS NOT NULL
+        AND status = ANY($2::text[])
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `,
+    [submission.project_id, [YSWS_STATUS.approved, YSWS_STATUS.pending, YSWS_STATUS.pendingReship]]
+  );
+
+  return result.rows[0]?.airtable_record_id || null;
+}
+
 async function upsertLocalSubmission(submission) {
+  if (
+    (submission.status === YSWS_STATUS.pendingReship || submission.status === YSWS_STATUS.approved) &&
+    !submission.airtable_record_id
+  ) {
+    submission.airtable_record_id = await resolveSubmissionAirtableRecordId(submission);
+  }
+
   if (submission.status === YSWS_STATUS.approved) {
     const approvedResult = await pool.query(
       "SELECT * FROM ysws_project_submissions WHERE project_id = $1 AND status = $2",

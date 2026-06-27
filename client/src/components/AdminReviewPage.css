@@ -409,6 +409,24 @@
   overflow-wrap: anywhere;
 }
 
+.admin-review-reship-update {
+  border-color: rgba(255, 214, 120, 0.55);
+  background: rgba(48, 36, 8, 0.35);
+}
+
+.admin-review-reship-update h2 {
+  color: #ffe4a3;
+}
+
+.admin-review-reship-update-body {
+  margin: 0;
+  color: rgba(232, 244, 255, 0.95);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 760px) {
   .admin-review-time-row.has-history {
     flex-direction: column;
