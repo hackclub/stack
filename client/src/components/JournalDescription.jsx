@@ -5,8 +5,8 @@ import {
   parseJournalDescription,
 } from "../utils/mediaUrls.js";
 
-function JournalMedia({ url, rawUrl, alt, className }) {
-  const apiSrc = journalDisplaySrc({ resolved: url, rawUrl, alt });
+function JournalMedia({ url, rawUrl, alt, className, mediaEndpoint }) {
+  const apiSrc = journalDisplaySrc({ resolved: url, rawUrl, alt, mediaEndpoint });
   const [objectUrl, setObjectUrl] = useState(null);
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(Boolean(apiSrc));
@@ -83,7 +83,12 @@ function JournalMedia({ url, rawUrl, alt, className }) {
   );
 }
 
-export function JournalDescription({ text, className = "journal-description", mediaClassName = "journal-media-item" }) {
+export function JournalDescription({
+  text,
+  className = "journal-description",
+  mediaClassName = "journal-media-item",
+  mediaEndpoint,
+}) {
   const parts = parseJournalDescription(text);
   if (parts.length === 0) return null;
 
@@ -101,6 +106,7 @@ export function JournalDescription({ text, className = "journal-description", me
             rawUrl={part.rawUrl}
             alt={part.alt}
             className={mediaClassName}
+            mediaEndpoint={mediaEndpoint}
           />
         )
       )}

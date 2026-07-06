@@ -1073,6 +1073,54 @@ export async function createJournalEntryForUser(userId, input = {}) {
   };
 }
 
+function toJournalingRecordEntry(row) {
+  return {
+    id: row.id,
+    timeDone: row.time_done,
+    hoursWorked: Number(row.hours_worked ?? 0),
+    description: row.description,
+    toolsUsed: row.tools_used || [],
+    createdAt: row.created_at,
+  };
+}
+
+export async function listAllJournalRecords() {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const result = await pool.query(`
+    SELECT
+      journal_entries.*,
+      projects.name AS current_project_name,
+      users.email AS user_email,
+      users.slug AS user_slug
+    FROM journal_entries
+    LEFT JOIN projects ON projects.id = journal_entries.project_id
+    LEFT JOIN users ON users.id = journal_entries.user_id
+    ORDER BY
+      COALESCE(projects.name, journal_entries.project_name) ASC NULLS LAST,
+      journal_entries.created_at DESC,
+      journal_entries.id DESC
+  `);
+
+  const groups = new Map();
+  for (const row of result.rows) {
+    const key = `${row.user_id ?? "unknown"}:${row.project_id ?? "none"}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        projectName: row.current_project_name || row.project_name || "Untitled Project",
+        user: {
+          email: row.user_email || null,
+          slug: row.user_slug || null,
+        },
+        entries: [],
+      });
+    }
+    groups.get(key).entries.push(toJournalingRecordEntry(row));
+  }
+
+  return [...groups.values()];
+}
+
 export async function getJournalEntriesCsv() {
   if (!pool) throw new Error("DATABASE_URL is not set.");
 

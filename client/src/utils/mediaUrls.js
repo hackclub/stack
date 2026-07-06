@@ -140,7 +140,7 @@ function pushMediaPart(parts, alt, rawUrl) {
  * Staff review / journal images: always load via server proxy so prod works
  * (CDN encoding, hotlinking, dev URLs → local /uploads path, filename lookup).
  */
-export function journalDisplaySrc({ resolved, rawUrl, alt }) {
+export function journalDisplaySrc({ resolved, rawUrl, alt, mediaEndpoint = "/api/admin/review/media" }) {
   if (typeof window === "undefined") return resolved || null;
 
   const origin = window.location.origin;
@@ -155,7 +155,7 @@ export function journalDisplaySrc({ resolved, rawUrl, alt }) {
   }
 
   if ([...params.keys()].length === 0) return null;
-  return `${origin}/api/admin/review/media?${params.toString()}`;
+  return `${origin}${mediaEndpoint}?${params.toString()}`;
 }
 
 function collectMarkdownRanges(text) {

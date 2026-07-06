@@ -11,6 +11,7 @@ import { TestPage } from "./components/TestPage.jsx";
 import { AdminAirtableSyncPage } from "./components/AdminAirtableSyncPage.jsx";
 import { AdminPage } from "./components/AdminPage.jsx";
 import { AdminReviewPage } from "./components/AdminReviewPage.jsx";
+import { JournalingRecordsPage } from "./components/JournalingRecordsPage.jsx";
 import { AdminShopPage } from "./components/AdminShopPage.jsx";
 import { AdminShopOrdersPage } from "./components/AdminShopOrdersPage.jsx";
 import { AdminStatsPage } from "./components/AdminStatsPage.jsx";
@@ -114,6 +115,9 @@ export default function App() {
       break;
     case "/rules":
       page = <RulesPage />;
+      break;
+    case "/journalingrecords":
+      page = <JournalingRecordsPage />;
       break;
     case "/user":
       page = <UserAreaPage />;

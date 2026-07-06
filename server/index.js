@@ -13,6 +13,14 @@ import { isHackatimeOAuthConfigured } from "./hackatimeAuth.js";
 import { getHackatimeStatusForUser, listHackatimeProjectsForUser, refreshUserHackatimeCache } from "./hackatimeService.js";
 import { checkDatabaseConnection, getTestRows } from "./db.js";
 import { streamJournalMediaForReview } from "./journalMedia.js";
+import {
+  clearJournalingAuthAttempts,
+  clearJournalingSession,
+  consumeJournalingAuthAttempt,
+  isJournalingSessionValid,
+  markJournalingSession,
+  timingSafeSecretMatch,
+} from "./journalingAccess.js";
 import { clientErrorMessage, isProduction, publicDatabaseHealthPayload } from "./security.js";
 import { adjustUserBricks, ensureAuditLogTable, getAdminStats, getAuditLogForTarget } from "./adminStats.js";
 import {
@@ -39,6 +47,7 @@ import {
   ensureProjectsTable,
   getAdminReviewProject,
   getJournalEntriesCsv,
+  listAllJournalRecords,
   listJournalEntriesForUserProject,
   listAdminReviewProjects,
   patchAdminReviewProjectFlags,
@@ -70,6 +79,7 @@ if (isProd) {
   app.set("trust proxy", 1);
 }
 const AIRTABLE_SYNC_SECRET = process.env.AIRTABLE_SYNC_SECRET;
+const JOURNALING_PW = process.env.journalingPW || process.env.JOURNALING_PW;
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const LOCAL_UPLOADS_DIR = path.join(__dirname, "uploads");
 
@@ -170,6 +180,19 @@ function requireUser(req, res, next) {
   const userId = req.session?.userId;
   if (!userId) {
     res.status(401).json({ error: "Authentication required." });
+    return;
+  }
+  next();
+}
+
+function requireJournalingAccess(req, res, next) {
+  if (!JOURNALING_PW) {
+    res.status(503).json({ error: "Journaling records access is not configured." });
+    return;
+  }
+  if (!isJournalingSessionValid(req.session)) {
+    clearJournalingSession(req.session);
+    res.status(401).json({ error: "Password required." });
     return;
   }
   next();
@@ -615,6 +638,68 @@ app.patch("/api/projects/:id/journal_entries/:entryId", requireUser, async (req,
       message === "Project not found." || message === "Journal entry not found." ? 404 : 400;
     console.error("Failed to update journal entry:", error);
     res.status(status).json({ error: message });
+  }
+});
+
+app.get("/api/journalingrecords/session", (req, res) => {
+  if (!JOURNALING_PW) {
+    res.status(503).json({ error: "Journaling records access is not configured." });
+    return;
+  }
+
+  if (!isJournalingSessionValid(req.session)) {
+    clearJournalingSession(req.session);
+  }
+
+  res.json({
+    authenticated: isJournalingSessionValid(req.session),
+  });
+});
+
+app.post("/api/journalingrecords/auth", (req, res) => {
+  if (!JOURNALING_PW) {
+    res.status(503).json({ error: "Journaling records access is not configured." });
+    return;
+  }
+
+  const attempt = consumeJournalingAuthAttempt(req);
+  if (!attempt.allowed) {
+    res.status(429).json({ error: "Too many attempts. Try again later." });
+    return;
+  }
+
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+  if (!password || !timingSafeSecretMatch(password, JOURNALING_PW)) {
+    res.status(401).json({ error: "Incorrect password." });
+    return;
+  }
+
+  clearJournalingAuthAttempts(req);
+  markJournalingSession(req.session);
+  res.json({ ok: true });
+});
+
+app.post("/api/journalingrecords/logout", (req, res) => {
+  clearJournalingSession(req.session);
+  res.json({ ok: true });
+});
+
+app.get("/api/journalingrecords", requireJournalingAccess, async (req, res) => {
+  try {
+    const groups = await listAllJournalRecords();
+    res.json({ groups });
+  } catch (error) {
+    console.error("Failed to load journaling records:", error);
+    res.status(500).json({ error: "Failed to load journaling records." });
+  }
+});
+
+app.get("/api/journalingrecords/media", requireJournalingAccess, async (req, res) => {
+  try {
+    await streamJournalMediaForReview(req, res);
+  } catch (error) {
+    console.error("Failed to proxy journaling records media:", error);
+    res.status(500).json({ error: "Failed to load media." });
   }
 });
 
