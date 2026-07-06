@@ -148,6 +148,8 @@ export default function App() {
         page = <AdminUsersPage userId={pathname.split("/").pop()} />;
       } else if (pathname.startsWith("/admin/review/project/")) {
         page = <AdminReviewPage projectId={pathname.split("/").pop()} />;
+      } else if (pathname.startsWith("/journalingrecords/project/")) {
+        page = <JournalingRecordsPage projectId={pathname.split("/").pop()} />;
       } else {
         page = <Hero />;
       }

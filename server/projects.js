@@ -1084,41 +1084,94 @@ function toJournalingRecordEntry(row) {
   };
 }
 
-export async function listAllJournalRecords() {
+export async function listJournalingRecordProjects() {
   if (!pool) throw new Error("DATABASE_URL is not set.");
 
   const result = await pool.query(`
     SELECT
-      journal_entries.*,
-      projects.name AS current_project_name,
+      projects.id,
+      projects.name,
+      projects.description,
+      projects.status,
+      projects.shipped,
+      projects.shipped_at,
+      projects.image_url,
+      projects.code_url,
       users.email AS user_email,
-      users.slug AS user_slug
-    FROM journal_entries
-    LEFT JOIN projects ON projects.id = journal_entries.project_id
-    LEFT JOIN users ON users.id = journal_entries.user_id
-    ORDER BY
-      COALESCE(projects.name, journal_entries.project_name) ASC NULLS LAST,
-      journal_entries.created_at DESC,
-      journal_entries.id DESC
+      users.slug AS user_slug,
+      COUNT(journal_entries.id) AS journal_entry_count,
+      COALESCE(SUM(journal_entries.hours_worked), 0) AS journal_hours
+    FROM projects
+    INNER JOIN journal_entries ON journal_entries.project_id = projects.id
+    LEFT JOIN users ON users.id = projects.user_id
+    GROUP BY projects.id, users.email, users.slug
+    ORDER BY COALESCE(projects.shipped_at, projects.created_at) ASC, projects.name ASC
   `);
 
-  const groups = new Map();
-  for (const row of result.rows) {
-    const key = `${row.user_id ?? "unknown"}:${row.project_id ?? "none"}`;
-    if (!groups.has(key)) {
-      groups.set(key, {
-        projectName: row.current_project_name || row.project_name || "Untitled Project",
-        user: {
-          email: row.user_email || null,
-          slug: row.user_slug || null,
-        },
-        entries: [],
-      });
-    }
-    groups.get(key).entries.push(toJournalingRecordEntry(row));
-  }
+  return result.rows.map((row) => ({
+    id: row.id,
+    name: row.name || "Untitled Project",
+    description: row.description || "",
+    status: row.status,
+    shipped: row.shipped,
+    shippedAt: row.shipped_at,
+    imageUrl: row.image_url,
+    codeUrl: row.code_url,
+    journalEntryCount: Number(row.journal_entry_count ?? 0),
+    journalHours: Number(row.journal_hours ?? 0),
+    user: {
+      email: row.user_email || null,
+      slug: row.user_slug || null,
+    },
+  }));
+}
 
-  return [...groups.values()];
+export async function getJournalingRecordProject(projectId) {
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const projectResult = await pool.query(
+    `
+      SELECT
+        projects.*,
+        users.email AS user_email,
+        users.slug AS user_slug
+      FROM projects
+      LEFT JOIN users ON users.id = projects.user_id
+      WHERE projects.id = $1
+    `,
+    [projectId]
+  );
+  const row = projectResult.rows[0];
+  if (!row) return null;
+
+  const entriesResult = await pool.query(
+    `
+      SELECT journal_entries.*
+      FROM journal_entries
+      WHERE journal_entries.project_id = $1
+      ORDER BY journal_entries.created_at DESC, journal_entries.id DESC
+    `,
+    [projectId]
+  );
+
+  return {
+    project: {
+      id: row.id,
+      name: row.name || "Untitled Project",
+      description: row.description || "",
+      status: row.status,
+      shipped: row.shipped,
+      shippedAt: row.shipped_at,
+      imageUrl: row.image_url,
+      codeUrl: row.code_url,
+      playableUrl: row.playable_url,
+      user: {
+        email: row.user_email || null,
+        slug: row.user_slug || null,
+      },
+    },
+    journalEntries: entriesResult.rows.map(toJournalingRecordEntry),
+  };
 }
 
 export async function getJournalEntriesCsv() {

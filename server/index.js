@@ -47,7 +47,8 @@ import {
   ensureProjectsTable,
   getAdminReviewProject,
   getJournalEntriesCsv,
-  listAllJournalRecords,
+  getJournalingRecordProject,
+  listJournalingRecordProjects,
   listJournalEntriesForUserProject,
   listAdminReviewProjects,
   patchAdminReviewProjectFlags,
@@ -684,13 +685,27 @@ app.post("/api/journalingrecords/logout", (req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/journalingrecords", requireJournalingAccess, async (req, res) => {
+app.get("/api/journalingrecords/projects", requireJournalingAccess, async (req, res) => {
   try {
-    const groups = await listAllJournalRecords();
-    res.json({ groups });
+    const projects = await listJournalingRecordProjects();
+    res.json({ projects });
   } catch (error) {
-    console.error("Failed to load journaling records:", error);
-    res.status(500).json({ error: "Failed to load journaling records." });
+    console.error("Failed to load journaling record projects:", error);
+    res.status(500).json({ error: "Failed to load journaling record projects." });
+  }
+});
+
+app.get("/api/journalingrecords/projects/:id", requireJournalingAccess, async (req, res) => {
+  try {
+    const record = await getJournalingRecordProject(req.params.id);
+    if (!record) {
+      res.status(404).json({ error: "Project not found." });
+      return;
+    }
+    res.json(record);
+  } catch (error) {
+    console.error("Failed to load journaling record project:", error);
+    res.status(500).json({ error: "Failed to load journaling record project." });
   }
 });
 
