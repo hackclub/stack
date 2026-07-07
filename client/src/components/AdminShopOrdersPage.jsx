@@ -29,6 +29,10 @@ function groupLabel(groupBy, key) {
   return "Flat list";
 }
 
+function isActiveOrder(order) {
+  return !order.rejected;
+}
+
 export function AdminShopOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +95,36 @@ export function AdminShopOrdersPage() {
     }
   }
 
+  const orderTotals = useMemo(() => {
+    const activeOrders = orders.filter(isActiveOrder);
+    const fulfilledOrders = orders.filter((order) => order.fulfilled && !order.rejected);
+    const sumBricks = (list) => list.reduce((sum, order) => sum + Number(order.totalBricks ?? 0), 0);
+    const sumUsd = (list) => list.reduce((sum, order) => sum + (orderUsdTotal(order) ?? 0), 0);
+
+    return {
+      totalBricks: sumBricks(activeOrders),
+      totalUsd: sumUsd(activeOrders),
+      fulfilledBricks: sumBricks(fulfilledOrders),
+      fulfilledUsd: sumUsd(fulfilledOrders),
+      activeOrderCount: activeOrders.length,
+      fulfilledOrderCount: fulfilledOrders.length,
+      uniqueUsers: new Set(activeOrders.map((order) => order.userId)).size,
+    };
+  }, [orders]);
+
+  const customerTotals = useMemo(() => {
+    const totals = new Map();
+
+    for (const order of orders.filter(isActiveOrder)) {
+      const current = totals.get(order.userId) ?? { bricks: 0, usd: 0 };
+      current.bricks += Number(order.totalBricks ?? 0);
+      current.usd += orderUsdTotal(order) ?? 0;
+      totals.set(order.userId, current);
+    }
+
+    return totals;
+  }, [orders]);
+
   const visibleOrders = useMemo(() => {
     const filtered = orders.filter((order) => statusFilter === "all" || orderStatus(order) === statusFilter);
     return [...filtered].sort((a, b) => {
@@ -124,6 +158,34 @@ export function AdminShopOrdersPage() {
 
         {error && <p className="admin-shop-error">{error}</p>}
         {loading && <p>Loading orders...</p>}
+
+        {!loading && !error && (
+          <section className="admin-shop-order-summary">
+            <h2>Spending overview</h2>
+            <p className="admin-shop-order-summary-note">
+              Fulfilled: {orderTotals.fulfilledOrderCount} orders · Pending + fulfilled: {orderTotals.activeOrderCount}{" "}
+              orders · {orderTotals.uniqueUsers} {orderTotals.uniqueUsers === 1 ? "customer" : "customers"}
+            </p>
+            <div className="admin-shop-order-summary-grid">
+              <div className="admin-shop-order-summary-card">
+                <span className="admin-shop-order-summary-value">{orderTotals.fulfilledBricks.toLocaleString()}</span>
+                <span className="admin-shop-order-summary-label">Fulfilled bricks</span>
+              </div>
+              <div className="admin-shop-order-summary-card">
+                <span className="admin-shop-order-summary-value">{formatUsd(orderTotals.fulfilledUsd)}</span>
+                <span className="admin-shop-order-summary-label">Fulfilled USD</span>
+              </div>
+              <div className="admin-shop-order-summary-card">
+                <span className="admin-shop-order-summary-value">{orderTotals.totalBricks.toLocaleString()}</span>
+                <span className="admin-shop-order-summary-label">Total bricks spent</span>
+              </div>
+              <div className="admin-shop-order-summary-card">
+                <span className="admin-shop-order-summary-value">{formatUsd(orderTotals.totalUsd)}</span>
+                <span className="admin-shop-order-summary-label">Total USD spent</span>
+              </div>
+            </div>
+          </section>
+        )}
 
         {!loading && !error && orders.length === 0 && <p>No orders yet.</p>}
 
@@ -171,6 +233,7 @@ export function AdminShopOrdersPage() {
                     {groupOrders.map((order) => {
                       const status = orderStatus(order);
                       const isActionable = status === "pending";
+                      const userTotals = customerTotals.get(order.userId);
                       return (
                         <article key={order.id} className={`admin-shop-order-card is-${status}`}>
                           <div className="admin-shop-order-card-main">
@@ -188,6 +251,12 @@ export function AdminShopOrdersPage() {
                               <strong>Customer</strong>
                               <span>Email: {order.email || "Unknown"}</span>
                               <span>User ID: #{order.userId}</span>
+                              {userTotals ? (
+                                <>
+                                  <span>Total bricks spent: {userTotals.bricks.toLocaleString()}</span>
+                                  <span>Total USD spent: {formatUsd(userTotals.usd)}</span>
+                                </>
+                              ) : null}
                             </div>
 
                             <footer>
