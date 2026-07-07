@@ -17,20 +17,80 @@
 
 .shop-page__deadline {
   position: absolute;
-  top: 2.5rem;
-  right: clamp(1rem, 3vw, 2.5rem);
-  z-index: 4;
-  width: fit-content;
-  max-width: min(22rem, 92vw);
-  padding: 0.45rem 0.75rem;
-  border: 2px solid #162456;
-  border-radius: 999px;
-  background: rgba(255, 248, 216, 0.92);
-  color: #27376f;
-  font-size: 0.88rem;
-  font-weight: 700;
+  top: 1rem;
+  left: 50%;
+  z-index: 5;
+  width: min(40rem, calc(100% - 2rem));
+  transform: translateX(-50%);
+  padding: 0.95rem 1.35rem 1.05rem;
+  border: 3px solid #162456;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fff8d8 0%, #ffe9a8 100%);
+  color: #162456;
   text-align: center;
-  box-shadow: 0 3px 0 rgba(22, 36, 86, 0.18);
+  box-shadow:
+    0 6px 0 rgba(22, 36, 86, 0.28),
+    0 0 0 4px rgba(255, 255, 255, 0.35);
+}
+
+.shop-page__deadline.is-open {
+  animation: shop-deadline-pulse 2.4s ease-in-out infinite;
+}
+
+.shop-page__deadline.is-closed {
+  background: linear-gradient(180deg, #ffd6df 0%, #ffb8c6 100%);
+  border-color: #8f1d35;
+  box-shadow:
+    0 6px 0 rgba(143, 29, 53, 0.24),
+    0 0 0 4px rgba(255, 255, 255, 0.28);
+}
+
+.shop-page__deadline-kicker {
+  margin: 0 0 0.35rem;
+  color: #dd3b45;
+  font-size: clamp(0.82rem, 1.4vw, 0.98rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.shop-page__deadline-heading {
+  margin: 0;
+  display: grid;
+  gap: 0.2rem;
+  justify-items: center;
+}
+
+.shop-page__deadline-label {
+  color: #27376f;
+  font-size: clamp(0.95rem, 1.8vw, 1.15rem);
+  font-weight: 800;
+}
+
+.shop-page__deadline-time {
+  display: block;
+  color: #12235c;
+  font-size: clamp(1.8rem, 4.2vw, 2.75rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes shop-deadline-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 6px 0 rgba(22, 36, 86, 0.28),
+      0 0 0 4px rgba(255, 255, 255, 0.35);
+  }
+
+  50% {
+    box-shadow:
+      0 8px 0 rgba(22, 36, 86, 0.24),
+      0 0 0 6px rgba(247, 207, 87, 0.55);
+  }
 }
 
 .shop-page__left-panel {
@@ -64,7 +124,7 @@
   position: relative;
   z-index: 3;
   width: min(58rem, 67vw);
-  margin: 8.3rem clamp(5rem, 7.8vw, 8rem) 0 auto;
+  margin: 10.5rem clamp(5rem, 7.8vw, 8rem) 0 auto;
   display: grid;
   grid-template-columns: repeat(3, minmax(13rem, 1fr));
   gap: 1.5rem;
@@ -503,7 +563,7 @@
   .shop-page__grid {
     width: min(44rem, 71vw);
     gap: 1.15rem;
-    margin: 10rem clamp(3.6rem, 6.4vw, 5.8rem) 0 auto;
+    margin: 11.5rem clamp(3.6rem, 6.4vw, 5.8rem) 0 auto;
   }
 
   .shop-page__actions {
@@ -531,9 +591,15 @@
     transform: translate(0.55rem, 0.35rem) rotate(-6deg);
   }
 
+  .shop-page__deadline {
+    top: 0.65rem;
+    width: calc(100% - 1.2rem);
+    padding: 0.75rem 0.9rem 0.85rem;
+  }
+
   .shop-page__grid {
     width: min(25rem, 72vw);
-    margin: 9.4rem clamp(1.8rem, 7vw, 3.2rem) 0 auto;
+    margin: 10.8rem clamp(1.8rem, 7vw, 3.2rem) 0 auto;
     grid-template-columns: repeat(2, minmax(10.5rem, 1fr));
   }
 

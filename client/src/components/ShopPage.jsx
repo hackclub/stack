@@ -132,7 +132,12 @@ export function ShopPage() {
 
       <PlatformStatusBar user={user} />
 
-      <DeadlineCountdown label="Shop" deadlineMs={SHOP_CLOSE_MS} className="shop-page__deadline" />
+      <DeadlineCountdown
+        label="Shop"
+        deadlineMs={SHOP_CLOSE_MS}
+        layout="banner"
+        className="shop-page__deadline"
+      />
 
       <section className="shop-page__left-panel" aria-label="Inspiration panel">
         <p className="shop-page__inspired">1 hour = 20 Coins!</p>

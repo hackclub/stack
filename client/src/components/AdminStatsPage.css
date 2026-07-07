@@ -36,6 +36,27 @@
   border-bottom: 2px solid rgba(247, 207, 87, 0.3);
 }
 
+.astat-section-featured {
+  padding: 1.4rem;
+  border: 3px solid rgba(247, 207, 87, 0.55);
+  border-radius: 16px;
+  background: rgba(27, 58, 122, 0.82);
+}
+
+.astat-section-featured .astat-section-title {
+  margin-bottom: 0.5rem;
+  border-bottom: none;
+  padding-bottom: 0;
+  font-size: 0.95rem;
+}
+
+.astat-section-note {
+  margin: 0 0 1.2rem;
+  color: rgba(232, 244, 255, 0.72);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
 /* Stat cards */
 .astat-grid {
   display: grid;

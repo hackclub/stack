@@ -1,4 +1,8 @@
 import { pool } from "./db.js";
+import { BRICKS_PER_APPROVED_HOUR } from "./projects.js";
+
+const USD_PER_APPROVED_HOUR_MIN = 5;
+const USD_PER_APPROVED_HOUR_MAX = 7.5;
 
 export async function ensureAuditLogTable() {
   if (!pool) return;
@@ -116,16 +120,15 @@ export async function getAdminStats() {
             ),
             0
           )
-        ) FILTER (WHERE status IN ('in-review', 'pending-reship')), 0) AS pending_review_hours
+        ) FILTER (WHERE status IN ('in-review', 'pending-reship')), 0) AS pending_review_hours,
+        COUNT(DISTINCT user_id) FILTER (WHERE COALESCE(approved_hours, 0) > 0)::int AS users_with_approved_hours
       FROM projects
     `),
     pool.query(`
       SELECT COALESCE(SUM(hours_worked), 0) AS total_journal_hours FROM journal_entries
     `),
     pool.query(`SELECT COALESCE(SUM(bricks), 0) AS wallet_bricks FROM users`),
-    pool.query(`
-      SELECT COALESCE(SUM(bricks_earned), 0) AS total_earned FROM projects WHERE COALESCE(approved_hours, 0) > 0
-    `),
+    pool.query(`SELECT COALESCE(SUM(bricks_earned), 0) AS total_earned FROM projects`),
     pool.query(`
       SELECT
         COUNT(*)::int AS total_users,
@@ -146,8 +149,19 @@ export async function getAdminStats() {
 
   const totalEarned = Number(er.total_earned);
   const walletBricks = Number(wr.wallet_bricks);
+  const approvedHours = Number(pr.approved_hours);
+  const usersWithApprovedHours = Number(pr.users_with_approved_hours);
 
   return {
+    spendableFromApproved: {
+      approvedHours,
+      totalBricks: totalEarned,
+      totalCoins: totalEarned,
+      bricksPerHour: BRICKS_PER_APPROVED_HOUR,
+      usdMin: approvedHours * USD_PER_APPROVED_HOUR_MIN,
+      usdMax: approvedHours * USD_PER_APPROVED_HOUR_MAX,
+      users: usersWithApprovedHours,
+    },
     projects: {
       total: pr.total,
       draft: pr.draft,

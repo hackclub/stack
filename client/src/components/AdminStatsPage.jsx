@@ -7,6 +7,20 @@ function fmt(n, decimals = 1) {
   return Number.isFinite(num) ? num.toFixed(decimals).replace(/\.0+$/, "") : "—";
 }
 
+function fmtInt(n) {
+  if (n === undefined || n === null) return "—";
+  const num = Number(n);
+  return Number.isFinite(num) ? num.toLocaleString() : "—";
+}
+
+function fmtUsdRange(min, max) {
+  const lo = Number(min);
+  const hi = Number(max);
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return "—";
+  const format = (value) => `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  return lo === hi ? format(lo) : `${format(lo)} – ${format(hi)}`;
+}
+
 function StatCard({ label, value, sub, accent }) {
   return (
     <div className="astat-card" style={accent ? { "--astat-accent": accent } : undefined}>
@@ -238,6 +252,39 @@ export function AdminStatsPage() {
 
         {stats ? (
           <>
+            <section className="astat-section astat-section-featured">
+              <h2 className="astat-section-title">Spendable from approved projects</h2>
+              <p className="astat-section-note">
+                Total across all users with approved hours, regardless of whether they also have pending or draft projects.
+              </p>
+              <div className="astat-grid">
+                <StatCard
+                  label="Total coins / bricks"
+                  value={fmtInt(stats.spendableFromApproved.totalCoins)}
+                  sub={`${fmt(stats.spendableFromApproved.approvedHours)} approved hrs × ${stats.spendableFromApproved.bricksPerHour}`}
+                  accent="#ffd740"
+                />
+                <StatCard
+                  label="Total USD value"
+                  value={fmtUsdRange(stats.spendableFromApproved.usdMin, stats.spendableFromApproved.usdMax)}
+                  sub="$5/h – $7.5/h program rate"
+                  accent="#9cffcf"
+                />
+                <StatCard
+                  label="Approved hours"
+                  value={fmt(stats.spendableFromApproved.approvedHours)}
+                  sub="all projects, all statuses"
+                  accent="#8af4ff"
+                />
+                <StatCard
+                  label="Users with approved hrs"
+                  value={stats.spendableFromApproved.users}
+                  sub="could spend shop currency"
+                  accent="#c8d4ff"
+                />
+              </div>
+            </section>
+
             {/* Projects */}
             <section className="astat-section">
               <h2 className="astat-section-title">Projects</h2>
